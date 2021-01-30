@@ -18,22 +18,28 @@
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import os
+import numpy as np
 
-colours = ['red', 'blue', 'green', 'yellow']
+colours     = ['red',  'green', 'blue', 'yellow']
 colour_maps = [plt.cm.Reds,plt.cm.Blues,plt.cm.Greens,plt.cm.Oranges]
-meanings = ['Microtubules', 'Nucleus', 'Protein/antibody', 'Endoplasmic reticulum']
-fig, axs = plt.subplots(2, 2)
-path    = r'C:\data\hpa-scc\train512512'
-image   = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0'
+meanings    = ['Microtubules', 'Nucleus', 'Protein/antibody', 'Endoplasmic reticulum']
+fig, axs    = plt.subplots(2, 2)
+path        = r'C:\data\hpa-scc\train512512'
+image_id    = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0'
+image       = None
+
 for i in range(2):
     for j in range(2):
-        file    = f'{image}_{colours[2*i+j]}.png'
-        name    = os.path.join(path,file)
-        img     = mpimg.imread(name)
-        imgplot = axs[i,j].imshow(img,cmap=colour_maps[2*i+j])
-        axs[i,j].set_title(meanings[2*i+j])
-        axs[i,j].set_xticklabels([])
-        axs[i,j].set_yticklabels([])
+        index      = 2*i+j
+        file_name  = f'{image_id}_{colours[index]}.png'
+        path_name  = os.path.join(path,file_name)
+        image_mono = mpimg.imread(path_name)
+        if index==0:
+            nx,ny   = image_mono.shape
+            image   = np.zeros((nx,ny,4))
+        image[:,:,index] = image_mono
+ 
+axs[0,0].imshow(image[:,:,[0,2,3]])
         
-fig.suptitle(image)
+fig.suptitle(image_id)
 plt.show()
