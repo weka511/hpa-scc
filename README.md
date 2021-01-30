@@ -7,3 +7,4 @@
 |hpa-scc.wpr|Python project|
 |hpa-scc.bib|Bibliography|
 |unzip.py|Unzip downloaded files|
+|visualize.py|Visualize image files|
