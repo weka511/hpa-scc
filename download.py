@@ -19,6 +19,10 @@ import kaggle
 import os 
 import argparse
 
+# download
+#
+# Used to download a set of images from kaggle to local computer
+
 def download(
     source      = 'train',
     file        = '000a6c98-bb9b-11e8-b2b9-ac1f6b6435d0_blue.png',
@@ -29,6 +33,10 @@ def download(
         f = f'{source}/{file}_{colour}.png'
         print(f)
         system(f'kaggle competitions download -f {f}  -c {competition} -p {path}')
+
+# present
+#
+# Used to etsablish whether file is already present on local computer
 
 def present(file,folder, exts=['png','png.zip']):
     for ext in exts:
@@ -42,23 +50,25 @@ if __name__=='__main__':
     parser.add_argument('--list',        default = 'train.csv')
     parser.add_argument('--competition', default = 'hpa-single-cell-image-classification')
     parser.add_argument('--source',      default='train')
-    args   = parser.parse_args()
-    colours     = ['green','blue','red','yellow']
+    args    = parser.parse_args()
+    colours = ['green','blue','red','yellow']
+    
+    # Build list of files that are in train.csv - all these files need to be downloaded
+    # Omit files that have already been downloaded
     targets = []
     with open(os.path.join(args.path,args.list)) as files:
         for line in files:
             targets.append(line.split(',')[0])
     full_targets = [f'{target}_{colour}' for target in targets[1:] for colour in colours if not present(f'{target}_{colour}',
                                                                                                         args.path)]
+    #connect to kaggle
+    
     kaggle.api.authenticate()
+    
+    # download files
     
     for target in full_targets:
         print (f'{args.source}/{target}.png')
         print (f'kaggle competitions download -f {args.source}/{target}  -c {args.competition} -p {args.path}')
         os.system(f'kaggle competitions download -f {args.source}/{target}  -c {args.competition} -p {args.path}')
-    #i = 0
-    #with open(r'C:\data\hpa-scc\train.csv') as files:
-        #for line in files:
-            #if i==0: continue
-            #download(file=line.split(',')[0])
-            #i += 1
+ 
