@@ -1,147 +1,85 @@
 \documentclass[]{article}
 \usepackage[acronym,toc]{glossaries}
 \usepackage{url}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{tocloft}
+\loadglsentries{glossary-entries}
+
 \makeglossaries
 
 %opening
-\title{}
-\author{}
+\title{Human Protein Atlas - Single Cell Classification\\Notes}
+\author{Simon Crase}
 
 \begin{document}
 
 \maketitle
 
+
+
 \begin{abstract}
 
 \end{abstract}
 \tableofcontents
-\section{}
+\listoftables
+\section{The Task}
 
+\begin{quotation}
+	The labels are the organelles/structures in which the proteins are located. So you are correct in assuming that the labels only apply to the cells where green is present (as the green is the protein).
+	
+	If there are 4 cells and 3 have green staining and the image-level labels are Mitochondria, and Nucleoplasm.
+	
+	Cell 1:
+	- Green looks to be in the Mitochondria. Therefore, the cell level is Mitochondria.
+	
+	Cell 2:
+	- Green looks to be in the Nucleoplasm. Therefore, the cell level is Nucleoplasm.
+	
+	Cell 3:
+	- Green looks to be in the Nucleoplasm and Mitochondria. Therefore, the cell level label is Nucleoplasm and Mitochondria
+	
+	Cell 4:
+	- No green or green is not present in any organelle. Therefore, the cell level label is Negative. \cite{Schettler2021}
+\end{quotation}
 
-
-\newglossaryentry{aggresome} {
-	name=Aggresome,
-	description={In eukaryotic cells, an aggresome refers to an aggregation of misfolded proteins in the cell, formed when the protein degradation system of the cell is overwhelmed. Aggresome formation is a highly regulated process that possibly serves to organize misfolded proteins into a single location.}
-}
-
-
-\newglossaryentry{centrosome} {
-	name= Centrosome,
-	description={In cell biology, the centrosome is an organelle that serves as the main microtubule organizing center (MTOC) of the animal cell, as well as a regulator of cell-cycle progression. The centrosome is thought to have evolved only in the metazoan lineage of eukaryotic cells. Fungi and plants lack centrosomes and therefore use other structures to organize their microtubules. Although the centrosome has a key role in efficient mitosis in animal cells, it is not essential in certain fly and flatworm species. }
-}
-
-\newglossaryentry{microtubules} {
-	name= Microtubules ,
-	description={Microtubules are polymers of tubulin that form part of the cytoskeleton and provide structure and shape to eukaryotic cells. Microtubules can grow as long as 50 micrometres and are highly dynamic. The outer diameter of a microtubule is between 23 and 27 nm while the inner diameter is between 11 and 15 nm. They are formed by the polymerization of a dimer of two globular proteins, alpha and beta tubulin into protofilaments that can then associate laterally to form a hollow tube, the microtubule. The most common form of a microtubule consists of 13 protofilaments in the tubular arrangement.}
-}
-
-\newglossaryentry{nucleoplasm} {
-	name=nucleoplasm,
-	description={Similar to the cytoplasm of a cell, the nucleus contains nucleoplasm, also known as karyoplasm, or karyolymph or nucleus sap. The nucleoplasm is a type of protoplasm, and is enveloped by the nuclear envelope (also known as the nuclear membrane). The nucleoplasm includes the chromosomes and nucleolus. Many substances such as nucleotides (necessary for purposes such as DNA replication) and enzymes (which direct activities that take place in the nucleus) are dissolved in the nucleoplasm. The soluble, liquid portion of the nucleoplasm is called the nucleosol or nuclear hyaloplasm.}
-}
-
-\newglossaryentry{Nuclear_membrane}
-{
-	name=Nuclear membrane,
-	description={TBP}
-}
-
-\newglossaryentry{nucleoli }
-{
-	name= Nucleoli ,
-	description={TBP}
-}
-
-\newglossaryentry{nucleoli_fibrillar_center}
-{
-	name=Nucleoli fibrillar center ,
-	description={TBP}
-}
-
-\newglossaryentry{Nuclear_speckles }
-{
-	name=Nuclear speckles,
-	description={TBP}
-}
-
-\newglossaryentry{nuclear_bodies}
-{
-	name= Nuclear bodies,
-	description={TBP}
-}
-
-\newglossaryentry{ Endoplasmic reticulum }
-{
-	name= Endoplasmic reticulum ,
-	description={TBP}
-}
-
-\newglossaryentry{golgi_apparatus }
-{
-	name=nucleoplasm,
-	description={TBP}
-}
-
-\newglossaryentry{intermediate_filaments}
-{
-	name= Intermediate filaments,
-	description={TBP}
-}
-
-\newglossaryentry{actin_filaments}
-{
-	name=Actin filaments,
-	description={TBP}
-}
-
-
-
-\newglossaryentry{mitotic_spindle}
-{
-	name=Mitotic spindle,
-	description={TBP}
-}
-
-
-
-\newglossaryentry{plasma_membrane}
-{
-	name=Plasma membrane,
-	description={TBP}
-}
-
-\newglossaryentry{mitochondria }
-{
-	name= Mitochondria ,
-	description={TBP}
-}
-
-
-\newglossaryentry{cytosol }
-{
-	name= Cytosol ,
-	description={TBP}
-}
-
-\newglossaryentry{vesicles}
-{
-	name= Vesicles,
-	description={TBP}
-}
-
-\newglossaryentry{punctate_cytosolic_patterns }
-{
-	name= punctate cytosolic patterns ,
-	description={TBP}
-}
+\begin{table}[H]
+\begin{center}
+	\caption{Labels}
+	\begin{tabular}{|r|l|} \hline
+			 0&\gls{nucleoplasm}\\ \hline
+			 1&\gls{nuclear_membrane}\\ \hline
+			 2&\glspl{nucleolus}\\ \hline
+			 3&\gls{nucleoli_fibrillar_center}\\ \hline
+			 4&\gls{nuclear_speckles}\\ \hline
+			 5&\gls{nuclear_bodies}\\ \hline
+			 6&\gls{endoplasmic_reticulum}\\ \hline
+			 7&\gls{golgi_apparatus}\\ \hline
+			 8&\gls{intermediate_filaments}\\\hline
+			 9&\gls{actin_filaments}\\\hline
+			 10&\gls{microtubules}\\\hline
+			 11&\gls{mitotic_spindle}\\\hline
+			 12&\gls{centrosome}\\\hline
+			 13&\gls{plasma_membrane}\\\hline
+			 14&\gls{mitochondria}\\\hline
+			 15&\gls{aggresome}\\\hline
+			 16&\gls{cytosol}\\\hline
+			 17&\gls{vesicles} and \gls{punctate} cytosolic patterns\\\hline
+			 18&Negative \\ \hline
+	\end{tabular}
+\end{center}
+\end{table}
 
 
 
 \clearpage
 
-\glsaddall
 \printglossary
-\nocite{*}
+
 \bibliographystyle{unsrt}
 \addcontentsline{toc}{section}{Bibliography}
 \bibliography{hpa-scc}
