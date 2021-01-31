@@ -7,4 +7,5 @@
 |hpa-scc.wpr|Python project|
 |hpa-scc.bib|Bibliography|
 |unzip.py|Unzip downloaded files|
+|segmentation.py|Segment cells|
 |visualize.py|Visualize image files|
