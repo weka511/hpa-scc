@@ -150,6 +150,9 @@ if __name__=='__main__':
     explore(Image,axs=axs)
     explore(Image,axs=axs,c='c')
     explore(Image,axs=axs,c='m')
+    explore(Image,axs=axs,c='y')
+    explore(Image,axs=axs,c='g')
+    explore(Image,axs=axs,c='k')  
 
     mylabels =  '+'.join([Descriptions[label] for label in Training[image_id]])      
     fig.suptitle(f'{args.image_id}: {mylabels}')
