@@ -100,33 +100,57 @@ def get_neighbours(x,y,nx=256,ny=256,delta=1):
     candidates = [(x+dx,y+dy) for dx in [-delta,0,delta] for dy in [-delta,0,delta] if dx !=0 or dy !=0]
     return [(x1,y1) for x1,y1 in candidates if 0<=x1 and x1<nx and 0<=y1 and y1<ny]
 
+def create_admissable(Candidates,m=10,Delta=10000):
+    def get_distance(P1,P2):
+        x1,y1,_ = P1
+        x2,y2,_ = P2
+        return (x1-x2)**2 + (y1-y2)**2
+    
+    admissable = False
+    while not admissable:
+        Possibities = [choice(Candidates) for _ in range(m)]
+        for i in range(m):
+            for j in range(i+1,m):
+                if get_distance(Possibities[i],Possibities[2])<Delta:
+                    admissable = False
+        admissable = True
+        
+    for configuration in Possibities:
+        yield configuration
+        
 def explore(Image,
-            threshold1 = 0.005, 
-            threshold2 = 0.2,
-            nx         = 256,
-            ny         = 256,
+            threshold1 = 0.01, 
+            threshold2 = 0.5,
+            nx         = 512,
+            ny         = 512,
             delta      = 16,
             axs        = None,
-            c          = 'red'):
+            fmt        = 'r-',
+            n          = 5000,
+            m          = 32):
     Candidates = [(i,j,Image[i,j,BLUE]) for i in range(nx) for j in range(ny) if Image[i,j,BLUE]<threshold1]
-    x,y,blue   = choice(Candidates)
-    for i in range(1000):
-        Neighbours = get_neighbours(x,y,nx,ny,delta=delta)
-        Blues      = sorted([(x,y,Image[x,y,BLUE]) for x,y in Neighbours],
-                            key = lambda x:x[2],
-                            reverse=True)
-        Increasing = [(x,y,b) for x,y,b in Blues if b>blue]
-        Same       = [(x,y,b) for x,y,b in Blues if b==blue]
-        Decreasing = [(x,y,b) for x,y,b in Blues if b<blue]
-        if len(Increasing)>0:
-            x,y,blue = choice(Increasing)
-        elif len(Same)>0:
-            x,y,blue = choice(Same)
-        else:
-            x,y,blue = choice(Decreasing)
-        while blue>threshold2 and delta>1:
-            delta = 1
-        axs.scatter(y, x, s=1, c=c, marker='+')
+    for x0,y0,blue in create_admissable(Candidates,m=m):
+        x1,y1        = x0,y0
+        axs.scatter(y0,x0,c='r',s=100,marker='x')
+        for i in range(n):
+            Neighbours = get_neighbours(x0,y0,nx,ny,delta=delta)
+            Blues      = sorted([(x,y,Image[x,y,BLUE]) for x,y in Neighbours],
+                                key = lambda x:x[2],
+                                reverse=True)
+            Increasing = [(x,y,b) for x,y,b in Blues if b>blue]
+            Same       = [(x,y,b) for x,y,b in Blues if b==blue]
+            Decreasing = [(x,y,b) for x,y,b in Blues if b<blue]
+            if len(Increasing)>0:
+                x1,y1,blue = choice(Increasing)
+            elif len(Same)>0:
+                x1,y1,blue = choice(Same)
+            else:
+                x1,y1,blue = choice(Decreasing)
+            while blue>threshold2 and delta>1:
+                delta = 1
+            axs.plot([y0,y1], [x0,x1], fmt)
+            x0,y0 = x1,y1
+        axs.scatter(y1,x1,c='r',s=100,marker='o')
 
 if __name__=='__main__':
     parser = ArgumentParser('Segment HPA data using Watershed algorithm')
@@ -147,12 +171,7 @@ if __name__=='__main__':
     axs.axes.yaxis.set_ticks([]) 
     fig.colorbar(im, ax=axs, orientation='vertical') 
     
-    explore(Image,axs=axs)
-    explore(Image,axs=axs,c='c')
-    explore(Image,axs=axs,c='m')
-    explore(Image,axs=axs,c='y')
-    explore(Image,axs=axs,c='g')
-    explore(Image,axs=axs,c='k')  
+    explore(Image,axs=axs,nx=nx,ny=ny)
 
     mylabels =  '+'.join([Descriptions[label] for label in Training[image_id]])      
     fig.suptitle(f'{args.image_id}: {mylabels}')
