@@ -168,9 +168,8 @@ if __name__=='__main__':
     Training = read_training_expectations(path=args.path)
     Image    = read_image(path=args.path,image_id=args.image_id,image_set=args.image_set)
     
-    fig = plt.figure(figsize=(20,20))
-    axs = fig.subplots(1, 1)
-    
+    fig      = plt.figure(figsize=(20,20))
+    axs      = fig.subplots(1, 1) 
     nx,ny,_  = Image.shape
     im       = axs.imshow(Image[:,:,BLUE],cmap=cm.get_cmap('Blues'))
     axs.axes.xaxis.set_ticks([])
@@ -186,4 +185,5 @@ if __name__=='__main__':
     seconds = elapsed - 60*minutes
     print (f'Elapsed Time {minutes} m {seconds:.2f} s')
     plt.savefig(f'{basename(__file__).split(".")[0]}.png')
-    plt.show()
+    if args.show:
+        plt.show()
