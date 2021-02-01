@@ -56,8 +56,6 @@ def read_training_expectations(path=r'C:\data\hpa-scc',file_name='train.csv'):
  
     return Types
 
-
-
 if __name__=='__main__':
     start  = time()
     parser = ArgumentParser('List datasets for each type')
