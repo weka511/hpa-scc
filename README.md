@@ -9,6 +9,7 @@
 |hpa-scc.wpr|Python project|
 |unzip.py|Unzip downloaded files|
 |segmentation.py|Segment cells|
+|otsu.py|Otsu's method|
 |visualize.py|Visualize image files|
 |watershed.py|Naive Watershed segmentation|
 
