@@ -98,20 +98,23 @@ def create_selection(Image,
     return Product
 
 
-def otsu(Image,nx,ny,tolerance=0.0001,N=50):
+def otsu(Image,nx,ny,tolerance=0.0001,N=50,ax1=None,ax2=None):
     def get_icv(threshold):
         P1  = [blue for blue in Blues if blue<threshold]
         P2 = [blue for blue in Blues if blue>threshold]        
         var1 = np.var(P1)
         var2 = np.var(P2)
-        return (len(P1)*var1 + len(P2)*var2)/(len(P1) + len(P2))    
+        return (len(P1)*var1 + len(P2)*var2)/(len(P1) + len(P2))  
+    
     Blues = [Image[i,j,BLUE] for i in range(nx) for j in range(ny)]
-    n,bins,_ = axs[0,1].hist(Blues)
+    n,bins,_ = ax1.hist(Blues)
+    ax1.set_title('Blue levels')
     threshold1 = bins[1]
     threshold2 = bins[-2]
     icv1       = get_icv(threshold1)
     icv2       = get_icv(threshold2)
     ICVs      = [icv1,icv2]
+    Thresholds = [threshold1,threshold2]
     for _ in range(N):
         if abs(icv1-icv2)<tolerance: break
         threshold_mid = 0.5*(threshold1 + threshold2)
@@ -123,7 +126,18 @@ def otsu(Image,nx,ny,tolerance=0.0001,N=50):
             threshold1 = threshold_mid
             icv1       = icv_mid
         ICVs.append(icv_mid)
-    axs[1,0].scatter(range(len(ICVs)),ICVs)
+        Thresholds.append(threshold_mid)
+        
+    ax2.plot(range(len(ICVs)),ICVs, c='r', label='ICV')
+    ax2.set_title('Intra-class variance')
+    ax2.set_xlabel('Iteration')
+    ax2.set_ylabel('ICV')
+    ax2t = ax2.twinx()
+    ax2t.plot(range(len(Thresholds)),Thresholds,c='b', label='Threshold')
+    ax2t.set_ylabel('Threshold')
+    ax2.legend(loc='lower center')
+    ax2t.legend(loc='center right')
+    
     return threshold_mid,icv_mid
 
 if __name__=='__main__':
@@ -138,27 +152,35 @@ if __name__=='__main__':
     
     Training = read_training_expectations(path=args.path)
     Image    = read_image(path=args.path,image_id=args.image_id,image_set=args.image_set)
+    nx,ny,_  = Image.shape
     
     fig      = plt.figure(figsize=(20,20))
     axs      = fig.subplots(2, 2) 
-    nx,ny,_  = Image.shape
+
     im       = axs[0,0].imshow(Image[:,:,BLUE],cmap=cm.get_cmap('Blues'))
     axs[0,0].axes.xaxis.set_ticks([])
     axs[0,0].axes.yaxis.set_ticks([]) 
+    axs[0,0].set_title(args.image_id)
     fig.colorbar(im, ax=axs[0,0], orientation='vertical')
-    threshold_mid,icv_mid=otsu(Image,nx,ny)
-    Partitioned = np.zeros((nx,ny,3))
+    
+    threshold,icv = otsu(Image,nx,ny,ax1=axs[0,1],ax2=axs[1,0])
+    Partitioned   = np.zeros((nx,ny,3))
     for i in range(nx):
         for j in range(ny):
-            k = BLUE if Image[i,j,BLUE]<threshold_mid else RED
-            Partitioned[i,j,k] = Image[i,j,BLUE]
-    axs[1,1].imshow(Partitioned)        
-    mylabels =  '+'.join([Descriptions[label] for label in Training[image_id]])      
-    fig.suptitle(f'{args.image_id}: {mylabels}')
+            if Image[i,j,BLUE]>threshold:
+                Partitioned[i,j,BLUE] = Image[i,j,BLUE]
+    axs[1,1].imshow(Partitioned) 
+    axs[1,1].axes.xaxis.set_ticks([])
+    axs[1,1].axes.yaxis.set_ticks([]) 
+    axs[1,1].set_title('Partitioned')
+    fig.suptitle(f'{"+".join([Descriptions[label] for label in Training[image_id]])  }')
+
+    plt.savefig(f'{basename(__file__).split(".")[0]}.png')
+    
     elapsed = time() - start
     minutes = int(elapsed/60)
     seconds = elapsed - 60*minutes
     print (f'Elapsed Time {minutes} m {seconds:.2f} s')
-    plt.savefig(f'{basename(__file__).split(".")[0]}.png')
+    
     if args.show:
         plt.show()
