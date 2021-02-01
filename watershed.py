@@ -18,10 +18,11 @@
 import matplotlib.pyplot as plt
 from   matplotlib.image import imread
 from   matplotlib       import cm
-from   os.path          import join
+from   os.path          import join,basename
 import numpy            as np
 from   argparse         import ArgumentParser
 from   random           import choice
+from   time             import time
 
 Descriptions = [
     'Nucleoplasm',
@@ -153,10 +154,15 @@ def explore(Image,
         axs.scatter(y1,x1,c='r',s=100,marker='o')
 
 if __name__=='__main__':
+    start  = time()
     parser = ArgumentParser('Segment HPA data using Watershed algorithm')
-    parser.add_argument('--path',      default=r'C:\data\hpa-scc')
-    parser.add_argument('--image_set', default = 'train512512')
-    parser.add_argument('--image_id',  default = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0')
+    parser.add_argument('--path',                default=r'C:\data\hpa-scc')
+    parser.add_argument('--image_set',           default = 'train512512')
+    parser.add_argument('--image_id',            default = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0')
+    parser.add_argument('--n',         type=int, default = 5000)
+    parser.add_argument('--m',         type=int, default = 32)
+    parser.add_argument('--show',                default=False, action='store_true')
+ 
     args     = parser.parse_args()
     
     Training = read_training_expectations(path=args.path)
@@ -171,8 +177,13 @@ if __name__=='__main__':
     axs.axes.yaxis.set_ticks([]) 
     fig.colorbar(im, ax=axs, orientation='vertical') 
     
-    explore(Image,axs=axs,nx=nx,ny=ny)
+    explore(Image,axs=axs,nx=nx,ny=ny, n=args.n, m=args.m)
 
     mylabels =  '+'.join([Descriptions[label] for label in Training[image_id]])      
     fig.suptitle(f'{args.image_id}: {mylabels}')
+    elapsed = time() - start
+    minutes = int(elapsed/60)
+    seconds = elapsed - 60*minutes
+    print (f'Elapsed Time {minutes} m {seconds:.2f} s')
+    plt.savefig(f'{basename(__file__).split(".")[0]}.png')
     plt.show()
