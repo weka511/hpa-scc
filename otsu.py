@@ -56,13 +56,6 @@ colours     = ['red',  'green', 'blue', 'yellow']
 meanings    = ['Microtubules', 'Nuclei channels', 'Protein/antibody', 'Endoplasmic reticulum channels']
 image_id    = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0'
 
-def find_area(array):  # snarfed from https://arachnoid.com/area_irregular_polygon/index.html
-    a = 0
-    ox,oy = array[0]
-    for x,y in array[1:]:
-        a += (x*oy-y*ox)
-        ox,oy = x,y
-    return a/2
 
 def read_training_expectations(path=r'C:\data\hpa-scc',file_name='train.csv'):
     header    = True
@@ -106,7 +99,7 @@ def create_selection(Image,
   
     return Product
 
-def remove_false_findings(Image,threshold=0.5,nx=512,ny=512):
+def get8components(Image,threshold=0.5,nx=512,ny=512,deltas=[-1,0,1]):
     def find_first_ripe():
         for i in range(nx):
             for j in range(ny):
@@ -114,10 +107,10 @@ def remove_false_findings(Image,threshold=0.5,nx=512,ny=512):
                     return i,j
     
                        
-    Closed  = zeros((nx,ny),dtype=bool)
-    Open    = zeros((nx,ny),dtype=bool)
-    Counts  = []
-    Contour = []
+    Closed   = zeros((nx,ny),dtype=bool)
+    Open     = zeros((nx,ny),dtype=bool)
+    Counts   = []
+    Component = []
     for i in range(nx):
         for j in range(ny):
             if Image[i,j,BLUE]>threshold:
@@ -127,9 +120,9 @@ def remove_false_findings(Image,threshold=0.5,nx=512,ny=512):
         while len(Ripe)>0:
             i,j         = Ripe.pop()
             Closed[i,j] = True
-            Contour.append((i,j))
-            for delta_i in [-1,0,1]:
-                for delta_j in [-1,0,1]:
+            Component.append((i,j))
+            for delta_i in deltas:
+                for delta_j in deltas:
                     if delta_i==0 and delta_j==0: continue
                     i1 = i+delta_i
                     if i1<0 or i1>=nx: continue
@@ -137,15 +130,12 @@ def remove_false_findings(Image,threshold=0.5,nx=512,ny=512):
                     if j1<0 or j1>=ny: continue
                     if Image[i1,j1,BLUE]>threshold and not Closed[i1,j1] and not (i1,j1) in Ripe:
                         Ripe.add((i1,j1))
-        yield Contour
+        yield Component
         
         next_set = find_first_ripe()
         if next_set == None: return
         Ripe    = set([next_set])               
-        Contour = []
-
-  
-                    
+        Component = []
 
 def otsu(Image,nx,ny,tolerance=0.0001,N=50,ax1=None,ax2=None):
     def get_icv(threshold):
@@ -191,7 +181,39 @@ def otsu(Image,nx,ny,tolerance=0.0001,N=50,ax1=None,ax2=None):
 
 def parse_tuple(s):
     return tuple([int(x) for x in s[1:-1].split(',')])
+
+def remove_false_findings(Image,threshold=-1,nx=256,ny=256):
+    component_file = join(gettempdir(),f'{uuid4()}.txt')
     
+    Areas = []
+    
+    with open(component_file,'w') as temp:
+        for Component in get8components(Image,threshold=threshold,nx=nx,ny=ny):
+            if len(Component)>1:
+                Areas.append(len(Component))
+                temp.write(' '.join([f'({x},{y})' for x,y in Component])  + '\n')
+            else:
+                print (' '.join([f'({x},{y})' for x,y in Component]), 'dropped')
+                
+    for a in sorted(Areas):
+        print (a)
+    P = mean(Areas)- std(Areas)
+    print (f'{mean(Areas):0f} {std(Areas):0f}')
+    n,bins,_ = axs[1,2].hist(Areas,bins=25)    
+    
+    Mask = zeros((nx,ny,3)) 
+    
+    with open(component_file,'r') as temp:
+        for line in temp:
+            Component = [parse_tuple(s) for s in line.strip().split()]
+            if len(Component)>P:
+                for i,j in Component:
+                    Mask[i,j,BLUE] = 1
+                
+    remove(component_file)
+    
+    return Mask
+
 if __name__=='__main__':
     start  = time()
     parser = ArgumentParser('Segment HPA data using Otsu\'s algorithm')
@@ -226,30 +248,7 @@ if __name__=='__main__':
     axs[1,1].axes.yaxis.set_ticks([]) 
     axs[1,1].set_title('Partitioned')
     
- 
-    contour_file = join(gettempdir(),f'{uuid4()}.txt')
-    
-    Areas = []
-    with open(contour_file,'w') as temp:
-        for Contour in remove_false_findings(Image,threshold=threshold,nx=nx,ny=ny):
-            if len(Contour)>1:
-                Areas.append(abs(find_area(Contour+Contour[0:1])))
-                #print (f'{Areas[-1]}')
-                temp.write(' '.join([f'({x},{y})' for x,y in Contour])  + '\n')
-            else:
-                print (' '.join([f'({x},{y})' for x,y in Contour]), 'dropped')
-    for a in sorted(Areas):
-        print (a)
-    print (f'{mean(Areas)} {std(Areas)}')
-    n,bins,_ = axs[1,2].hist(Areas,bins=25)        
-    Mask = zeros((nx,ny,3))        
-    with open(contour_file,'r') as temp:
-        for line in temp:
-            for i,j in [parse_tuple(s) for s in line.strip().split()]:
-                Mask[i,j,BLUE] = 1
-                
-    remove(contour_file)
-    axs[0,2].imshow(Mask)
+    axs[0,2].imshow(remove_false_findings(Image,threshold=threshold,nx=nx,ny=ny))
     
     fig.suptitle(f'{"+".join([Descriptions[label] for label in Training[image_id]])  }')
 
