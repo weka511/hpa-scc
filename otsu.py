@@ -15,14 +15,16 @@
 #
 #  To contact me, Simon Crase, email simon@greenweaves.nz
 
-import matplotlib.pyplot as plt
-from   matplotlib.image import imread
-from   matplotlib       import cm
-from   os.path          import join,basename
-import numpy            as np
-from   argparse         import ArgumentParser
-from   random           import choice
-from   time             import time
+from   argparse          import ArgumentParser
+from   matplotlib.pyplot import figure, show
+from   matplotlib.image  import imread
+from   matplotlib        import cm
+from   numpy             import zeros, array, var, mean, std
+from   os                import remove
+from   os.path           import join,basename
+from   tempfile          import gettempdir
+from   time              import time
+from   uuid              import uuid4
 
 Descriptions = [
     'Nucleoplasm',
@@ -54,6 +56,13 @@ colours     = ['red',  'green', 'blue', 'yellow']
 meanings    = ['Microtubules', 'Nuclei channels', 'Protein/antibody', 'Endoplasmic reticulum channels']
 image_id    = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0'
 
+def find_area(array):  # snarfed from https://arachnoid.com/area_irregular_polygon/index.html
+    a = 0
+    ox,oy = array[0]
+    for x,y in array[1:]:
+        a += (x*oy-y*ox)
+        ox,oy = x,y
+    return a/2
 
 def read_training_expectations(path=r'C:\data\hpa-scc',file_name='train.csv'):
     header    = True
@@ -78,7 +87,7 @@ def read_image(path        = r'C:\data\hpa-scc',
             image_mono = imread(path_name)
             if index==0:
                 nx,ny   = image_mono.shape
-                Image   = np.zeros((nx,ny,4))
+                Image   = zeros((nx,ny,4))
             Image[:,:,index] = image_mono
     return Image        
 
@@ -88,8 +97,8 @@ def create_selection(Image,
                      [0,1,0,1],
                      [0,0,1,0]]):
     nx,ny,_ = Image.shape
-    Product = np.zeros((nx,ny,3))
-    Matrix  = np.array(Selector)
+    Product = zeros((nx,ny,3))
+    Matrix  = array(Selector)
     for i in range(nx):
         for j in range(ny):
             for k in range(3):
@@ -105,10 +114,10 @@ def remove_false_findings(Image,threshold=0.5,nx=512,ny=512):
                     return i,j
     
                        
-    Closed = np.zeros((nx,ny),dtype=bool)
-    Open   = np.zeros((nx,ny),dtype=bool)
-    Mask   = np.zeros_like(Image)
-    
+    Closed  = zeros((nx,ny),dtype=bool)
+    Open    = zeros((nx,ny),dtype=bool)
+    Counts  = []
+    Contour = []
     for i in range(nx):
         for j in range(ny):
             if Image[i,j,BLUE]>threshold:
@@ -118,7 +127,7 @@ def remove_false_findings(Image,threshold=0.5,nx=512,ny=512):
         while len(Ripe)>0:
             i,j         = Ripe.pop()
             Closed[i,j] = True
-            Mask[i,j]   = 1
+            Contour.append((i,j))
             for delta_i in [-1,0,1]:
                 for delta_j in [-1,0,1]:
                     if delta_i==0 and delta_j==0: continue
@@ -128,10 +137,12 @@ def remove_false_findings(Image,threshold=0.5,nx=512,ny=512):
                     if j1<0 or j1>=ny: continue
                     if Image[i1,j1,BLUE]>threshold and not Closed[i1,j1] and not (i1,j1) in Ripe:
                         Ripe.add((i1,j1))
+        yield Contour
+        
         next_set = find_first_ripe()
-        if next_set == None: break
-        Ripe = set([next_set])               
-    return Mask
+        if next_set == None: return
+        Ripe    = set([next_set])               
+        Contour = []
 
   
                     
@@ -140,8 +151,8 @@ def otsu(Image,nx,ny,tolerance=0.0001,N=50,ax1=None,ax2=None):
     def get_icv(threshold):
         P1   = [blue for blue in Blues if blue<threshold]
         P2   = [blue for blue in Blues if blue>threshold]        
-        var1 = np.var(P1)
-        var2 = np.var(P2)
+        var1 = var(P1)
+        var2 = var(P2)
         return (len(P1)*var1 + len(P2)*var2)/(len(P1) + len(P2))  
     
     Blues = [Image[i,j,BLUE] for i in range(nx) for j in range(ny)]
@@ -151,7 +162,7 @@ def otsu(Image,nx,ny,tolerance=0.0001,N=50,ax1=None,ax2=None):
     threshold2 = bins[-2]
     icv1       = get_icv(threshold1)
     icv2       = get_icv(threshold2)
-    ICVs      = [icv1,icv2]
+    ICVs      =  [icv1,icv2]
     Thresholds = [threshold1,threshold2]
     for _ in range(N):
         if abs(icv1-icv2)<tolerance: break
@@ -178,6 +189,9 @@ def otsu(Image,nx,ny,tolerance=0.0001,N=50,ax1=None,ax2=None):
     
     return threshold_mid,icv_mid
 
+def parse_tuple(s):
+    return tuple([int(x) for x in s[1:-1].split(',')])
+    
 if __name__=='__main__':
     start  = time()
     parser = ArgumentParser('Segment HPA data using Otsu\'s algorithm')
@@ -192,7 +206,7 @@ if __name__=='__main__':
     Image    = read_image(path=args.path,image_id=args.image_id,image_set=args.image_set)
     nx,ny,_  = Image.shape
     
-    fig      = plt.figure(figsize=(20,20))
+    fig      = figure(figsize=(20,20))
     axs      = fig.subplots(2, 3) 
 
     im       = axs[0,0].imshow(Image[:,:,BLUE],cmap=cm.get_cmap('Blues'))
@@ -202,7 +216,7 @@ if __name__=='__main__':
     fig.colorbar(im, ax=axs[0,0], orientation='vertical')
     
     threshold,icv = otsu(Image,nx,ny,ax1=axs[0,1],ax2=axs[1,0])
-    Partitioned   = np.zeros((nx,ny,3))
+    Partitioned   = zeros((nx,ny,3))
     for i in range(nx):
         for j in range(ny):
             if Image[i,j,BLUE]>threshold:
@@ -212,11 +226,34 @@ if __name__=='__main__':
     axs[1,1].axes.yaxis.set_ticks([]) 
     axs[1,1].set_title('Partitioned')
     
-    Mask = remove_false_findings(Image,threshold=threshold,nx=nx,ny=ny)
+ 
+    contour_file = join(gettempdir(),f'{uuid4()}.txt')
+    
+    Areas = []
+    with open(contour_file,'w') as temp:
+        for Contour in remove_false_findings(Image,threshold=threshold,nx=nx,ny=ny):
+            if len(Contour)>1:
+                Areas.append(abs(find_area(Contour+Contour[0:1])))
+                #print (f'{Areas[-1]}')
+                temp.write(' '.join([f'({x},{y})' for x,y in Contour])  + '\n')
+            else:
+                print (' '.join([f'({x},{y})' for x,y in Contour]), 'dropped')
+    for a in sorted(Areas):
+        print (a)
+    print (f'{mean(Areas)} {std(Areas)}')
+    n,bins,_ = axs[1,2].hist(Areas,bins=25)        
+    Mask = zeros((nx,ny,3))        
+    with open(contour_file,'r') as temp:
+        for line in temp:
+            for i,j in [parse_tuple(s) for s in line.strip().split()]:
+                Mask[i,j,BLUE] = 1
+                
+    remove(contour_file)
     axs[0,2].imshow(Mask)
+    
     fig.suptitle(f'{"+".join([Descriptions[label] for label in Training[image_id]])  }')
 
-    plt.savefig(f'{basename(__file__).split(".")[0]}.png')
+    fig.savefig(f'{basename(__file__).split(".")[0]}.png')
     
     elapsed = time() - start
     minutes = int(elapsed/60)
@@ -224,4 +261,4 @@ if __name__=='__main__':
     print (f'Elapsed Time {minutes} m {seconds:.2f} s')
     
     if args.show:
-        plt.show()
+        show()
