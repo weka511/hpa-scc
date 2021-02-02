@@ -6,8 +6,7 @@
 |File|Description|
 |-----------------|-------------------------------------------------------------------------------------------------|
 ||Segmentation|
-|segmentation.py|Segment cells|
-|otsu.py|Otsu's method|
+|segment.py|Segment images using Otsu's method|
 |watershed.py|Naive Watershed segmentation|
 ||Download and summarize data|
 |download.py|Download training images from kaggle|
