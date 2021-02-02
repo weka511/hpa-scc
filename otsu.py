@@ -97,11 +97,49 @@ def create_selection(Image,
   
     return Product
 
+def remove_false_findings(Image,threshold=0.5,nx=512,ny=512):
+    def find_first_ripe():
+        for i in range(nx):
+            for j in range(ny):
+                if Open[i,j] and not Closed[i,j]:
+                    return i,j
+    
+                       
+    Closed = np.zeros((nx,ny),dtype=bool)
+    Open   = np.zeros((nx,ny),dtype=bool)
+    Mask   = np.zeros_like(Image)
+    
+    for i in range(nx):
+        for j in range(ny):
+            if Image[i,j,BLUE]>threshold:
+                Open[i,j] = True
+    Ripe = set([find_first_ripe()])
+    while True:
+        while len(Ripe)>0:
+            i,j         = Ripe.pop()
+            Closed[i,j] = True
+            Mask[i,j]   = 1
+            for delta_i in [-1,0,1]:
+                for delta_j in [-1,0,1]:
+                    if delta_i==0 and delta_j==0: continue
+                    i1 = i+delta_i
+                    if i1<0 or i1>=nx: continue
+                    j1 = j+delta_j
+                    if j1<0 or j1>=ny: continue
+                    if Image[i1,j1,BLUE]>threshold and not Closed[i1,j1] and not (i1,j1) in Ripe:
+                        Ripe.add((i1,j1))
+        next_set = find_first_ripe()
+        if next_set == None: break
+        Ripe = set([next_set])               
+    return Mask
+
+  
+                    
 
 def otsu(Image,nx,ny,tolerance=0.0001,N=50,ax1=None,ax2=None):
     def get_icv(threshold):
-        P1  = [blue for blue in Blues if blue<threshold]
-        P2 = [blue for blue in Blues if blue>threshold]        
+        P1   = [blue for blue in Blues if blue<threshold]
+        P2   = [blue for blue in Blues if blue>threshold]        
         var1 = np.var(P1)
         var2 = np.var(P2)
         return (len(P1)*var1 + len(P2)*var2)/(len(P1) + len(P2))  
@@ -135,7 +173,7 @@ def otsu(Image,nx,ny,tolerance=0.0001,N=50,ax1=None,ax2=None):
     ax2t = ax2.twinx()
     ax2t.plot(range(len(Thresholds)),Thresholds,c='b', label='Threshold')
     ax2t.set_ylabel('Threshold')
-    ax2.legend(loc='lower center')
+    ax2.legend(loc='lower center',framealpha=0.5)
     ax2t.legend(loc='center right')
     
     return threshold_mid,icv_mid
@@ -155,7 +193,7 @@ if __name__=='__main__':
     nx,ny,_  = Image.shape
     
     fig      = plt.figure(figsize=(20,20))
-    axs      = fig.subplots(2, 2) 
+    axs      = fig.subplots(2, 3) 
 
     im       = axs[0,0].imshow(Image[:,:,BLUE],cmap=cm.get_cmap('Blues'))
     axs[0,0].axes.xaxis.set_ticks([])
@@ -173,6 +211,9 @@ if __name__=='__main__':
     axs[1,1].axes.xaxis.set_ticks([])
     axs[1,1].axes.yaxis.set_ticks([]) 
     axs[1,1].set_title('Partitioned')
+    
+    Mask = remove_false_findings(Image,threshold=threshold,nx=nx,ny=ny)
+    axs[0,2].imshow(Mask)
     fig.suptitle(f'{"+".join([Descriptions[label] for label in Training[image_id]])  }')
 
     plt.savefig(f'{basename(__file__).split(".")[0]}.png')
