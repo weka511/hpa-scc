@@ -177,7 +177,7 @@ def generate8components(Image,threshold=0.5,nx=512,ny=512,deltas=[-1,0,1]):
 def parse_tuple(s):
     return tuple([int(x) for x in s[1:-1].split(',')])
 
-def remove_false_findings(Image,threshold=-1,nx=256,ny=256):
+def remove_false_findings(Image,threshold=-1,nx=256,ny=256,nsigma=1.0):
     component_file = join(gettempdir(),f'{uuid4()}.txt')
     
     Areas = []
@@ -188,11 +188,9 @@ def remove_false_findings(Image,threshold=-1,nx=256,ny=256):
                 Areas.append(len(Component))
                 temp.write(' '.join([f'({x},{y})' for x,y in Component])  + '\n')
                 
-    P = mean(Areas)- std(Areas)
-    
+    P      = mean(Areas)- nsigma*std(Areas)
     n,bins = histogram(Areas,bins=25)    
-    
-    Mask = zeros((nx,ny,3)) 
+    Mask   = zeros((nx,ny,3)) 
     
     with open(component_file,'r') as temp:
         for line in temp:
@@ -205,11 +203,25 @@ def remove_false_findings(Image,threshold=-1,nx=256,ny=256):
     
     return Mask,n,bins
 
-def plot_hist(n,bins,axs=None,title=''):
-    width = 0.7 * (bins[1] - bins[0])
-    center = (bins[:-1] + bins[1:]) / 2
-    axs.bar(center, n, align='center', width=width)    
-    axs.set_title(title) 
+# plot_hist
+#
+# Plot a histogram from numpy
+#
+# Parameters:
+#     n
+#     bins
+#     axs
+#     title
+
+def plot_hist(n,bins,axs=None,title=None): 
+    axs.bar((bins[:-1] + bins[1:]) / 2,
+            n,
+            align='center',
+            width=0.7 * (bins[1] - bins[0]))
+    axs.axes.xaxis.set_ticks([])
+    axs.axes.yaxis.set_ticks([])
+    if title!= None:
+        axs.set_title(title) 
     
 def segment(args,image_id):    
     Image    = read_image(path=args.path,image_id=image_id,image_set=args.image_set)
