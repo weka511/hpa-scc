@@ -55,9 +55,10 @@ GREEN       = 1
 BLUE        = 2
 YELLOW      = 3
 colours     = ['red',  'green', 'blue', 'yellow']
-meanings    = ['Microtubules', 'Nuclei channels', 'Protein/antibody', 'Endoplasmic reticulum channels']
+meanings    = ['Microtubules', 'Protein/antibody', 'Nuclei channels', 'Endoplasmic reticulum channels']
 image_id    = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0'
 
+# read_training_expectations
 
 def read_training_expectations(path=r'C:\data\hpa-scc',file_name='train.csv'):
     header    = True
@@ -69,6 +70,8 @@ def read_training_expectations(path=r'C:\data\hpa-scc',file_name='train.csv'):
         trimmed = line.strip().split(',')
         Training[trimmed[0]] =  [int(l) for l in trimmed[1].split('|')]
     return Training
+
+# read_image
 
 def read_image(path        = r'C:\data\hpa-scc',
                image_set   = 'train512512',
@@ -86,6 +89,8 @@ def read_image(path        = r'C:\data\hpa-scc',
             Image[:,:,index] = image_mono
     return Image        
 
+# create_selection
+
 def create_selection(Image,
                  Selector = [
                      [1,0,0,1],
@@ -101,16 +106,28 @@ def create_selection(Image,
   
     return Product
 
-def otsu(Image,nx,ny,tolerance=0.0001,N=50):
+# otsu
+#
+# Segment image using Otsu's method
+#
+# Parameters:
+#     Image
+#     nx
+#     ny
+#     tolerance
+#     N
+#     index
+
+def otsu(Image,nx=256,ny=256,tolerance=0.0001,N=50,index=BLUE):
     def get_icv(threshold):
-        P1   = [blue for blue in Blues if blue<threshold]
-        P2   = [blue for blue in Blues if blue>threshold]        
+        P1   = [intensity for intensity in Intensities if intensity<threshold]
+        P2   = [intensity for intensity in Intensities if intensity>threshold]        
         var1 = var(P1)
         var2 = var(P2)
         return (len(P1)*var1 + len(P2)*var2)/(len(P1) + len(P2))  
     
-    Blues = [Image[i,j,BLUE] for i in range(nx) for j in range(ny)]
-    n, bins = histogram(Blues)
+    Intensities = [Image[i,j,index] for i in range(nx) for j in range(ny)]
+    n, bins = histogram(Intensities)
 
     threshold1 = bins[1]
     threshold2 = bins[-2]
@@ -134,7 +151,7 @@ def otsu(Image,nx,ny,tolerance=0.0001,N=50):
     return Thresholds,ICVs,n, bins
 
 
-def generate8components(Image,threshold=0.5,nx=512,ny=512,deltas=[-1,0,1]):
+def generate8components(Image,threshold=0.5,nx=512,ny=512,deltas=[-1,0,1],index=BLUE):
     def find_first_ripe():
         for i in range(nx):
             for j in range(ny):
@@ -145,7 +162,7 @@ def generate8components(Image,threshold=0.5,nx=512,ny=512,deltas=[-1,0,1]):
     
     for i in range(nx):
         for j in range(ny):
-            if Image[i,j,BLUE]>threshold:
+            if Image[i,j,index]>threshold:
                 Open[i,j] = True
                 
     Closed    = zeros((nx,ny),dtype=bool)  # Set of points that have been processed already
@@ -164,7 +181,7 @@ def generate8components(Image,threshold=0.5,nx=512,ny=512,deltas=[-1,0,1]):
                     j1 = j+delta_j
                     if i1<0 or i1>=nx or j1<0 or j1>=ny: continue   # Don't move outside image
                     
-                    if Image[i1,j1,BLUE]>threshold and not Closed[i1,j1] and not (i1,j1) in Ripe:
+                    if Image[i1,j1,index]>threshold and not Closed[i1,j1] and not (i1,j1) in Ripe:
                         Ripe.add((i1,j1))
         yield Component
         
@@ -173,17 +190,20 @@ def generate8components(Image,threshold=0.5,nx=512,ny=512,deltas=[-1,0,1]):
         Ripe    = set([next_set])               
 
 
+# parse_tuple
 
 def parse_tuple(s):
     return tuple([int(x) for x in s[1:-1].split(',')])
 
-def remove_false_findings(Image,threshold=-1,nx=256,ny=256,nsigma=1.0):
+# remove_false_findings
+
+def remove_false_findings(Image,threshold=-1,nx=256,ny=256,nsigma=1.0,index=BLUE):
     component_file = join(gettempdir(),f'{uuid4()}.txt')
     
     Areas = []
     
     with open(component_file,'w') as temp:
-        for Component in generate8components(Image,threshold=threshold,nx=nx,ny=ny):
+        for Component in generate8components(Image,threshold=threshold,nx=nx,ny=ny,index=index):
             if len(Component)>1:
                 Areas.append(len(Component))
                 temp.write(' '.join([f'({x},{y})' for x,y in Component])  + '\n')
@@ -197,7 +217,7 @@ def remove_false_findings(Image,threshold=-1,nx=256,ny=256,nsigma=1.0):
             Component = [parse_tuple(s) for s in line.strip().split()]
             if len(Component)>P:
                 for i,j in Component:
-                    Mask[i,j,BLUE] = 1
+                    Mask[i,j,index] = 1
                 
     remove(component_file)
     
@@ -213,31 +233,32 @@ def remove_false_findings(Image,threshold=-1,nx=256,ny=256,nsigma=1.0):
 #     axs
 #     title
 
-def plot_hist(n,bins,axs=None,title=None): 
+def plot_hist(n,bins,axs=None,title=None,index=BLUE): 
     axs.bar((bins[:-1] + bins[1:]) / 2,
             n,
-            align='center',
-            width=0.7 * (bins[1] - bins[0]))
+            align = 'center',
+            width = 0.7 * (bins[1] - bins[0]),
+            color = colours[index][0])
     axs.axes.xaxis.set_ticks([])
     axs.axes.yaxis.set_ticks([])
     if title!= None:
         axs.set_title(title) 
     
-def segment(args,image_id):    
-    Image    = read_image(path=args.path,image_id=image_id,image_set=args.image_set)
+def segment(Image,image_id,index=BLUE,cmap='Blues',figs='./',show=False):    
+    
     nx,ny,_  = Image.shape
     
     fig      = figure(figsize=(20,20))
     axs      = fig.subplots(2, 3) 
 
-    im       = axs[0,0].imshow(Image[:,:,BLUE],cmap=cm.get_cmap('Blues'))
+    im       = axs[0,0].imshow(Image[:,:,index],cmap=cm.get_cmap(cmap))
     axs[0,0].axes.xaxis.set_ticks([])
     axs[0,0].axes.yaxis.set_ticks([]) 
     axs[0,0].set_title(image_id)
     fig.colorbar(im, ax=axs[0,0], orientation='vertical')
     
-    Thresholds,ICVs,n,bins = otsu(Image,nx,ny)
-    plot_hist(n,bins,axs=axs[1,1],title='Blue levels')
+    Thresholds,ICVs,n,bins = otsu(Image,nx,ny,index=index)
+    plot_hist(n,bins,axs=axs[1,1],title=meanings[index],index=index)
 
     axs[1,0].plot(range(len(ICVs)),ICVs, c='r', label='ICV')
     axs[1,0].set_title('Intra-class variance')
@@ -252,24 +273,24 @@ def segment(args,image_id):
     Partitioned   = zeros((nx,ny,3))
     for i in range(nx):
         for j in range(ny):
-            if Image[i,j,BLUE]>Thresholds[-1]:
-                Partitioned[i,j,BLUE] = Image[i,j,BLUE]
+            if Image[i,j,index]>Thresholds[-1]:
+                Partitioned[i,j,index] = Image[i,j,index]   # FIXME - yellow!
                 
     axs[0,1].imshow(Partitioned) 
     axs[0,1].axes.xaxis.set_ticks([])
     axs[0,1].axes.yaxis.set_ticks([]) 
     axs[0,1].set_title('Partitioned')
     
-    Mask,n,bins = remove_false_findings(Image,threshold=Thresholds[-1],nx=nx,ny=ny)
+    Mask,n,bins = remove_false_findings(Image,threshold=Thresholds[-1],nx=nx,ny=ny,index=index)
     
-    plot_hist(n,bins,axs=axs[1,2])
+    plot_hist(n,bins,axs=axs[1,2],index=index)
     axs[0,2].imshow(Mask)
     
     fig.suptitle(f'{"+".join([Descriptions[label] for label in Training[image_id]])  }')
 
-    fig.savefig(join(args.figs,f'{image_id}.png'))
+    fig.savefig(join(figs,f'{image_id}_{colours[index]}.png'))
     
-    if not args.show:
+    if not show:
         close(fig)
     
 if __name__=='__main__':
@@ -288,15 +309,18 @@ if __name__=='__main__':
     if args.sample:
         for image_id in sample(list(Training.keys()),args.sample):
             print (f'{image_id}.')
-            segment(args,image_id)     
+            segment(args,image_id)                     #FIXME
     elif args.all:
         n = len(Training)
         for image_id in sorted(Training.keys()):
             print (f'{image_id}. {n} remaining')
-            segment(args,image_id) 
+            segment(args,image_id)                       #FIXME
             n -= 1
     else:
-        segment(args,args.image_id)
+        Image = read_image(path=args.path,image_id=image_id,image_set=args.image_set)
+        segment(Image, args.image_id, index=BLUE,                 figs=args.figs, show=args.show)
+        segment(Image, args.image_id, index=RED,   cmap='Reds',   figs=args.figs, show=args.show)
+        segment(Image, args.image_id, index=GREEN, cmap='Greens', figs=args.figs, show=args.show)
 
     
     elapsed = time() - start
