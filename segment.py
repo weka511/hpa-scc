@@ -20,9 +20,10 @@
 from   argparse          import ArgumentParser
 from   matplotlib.pyplot import figure, show, cm, close
 from   matplotlib.image  import imread
-from   numpy             import zeros, array, var, mean, std
+from   numpy             import zeros, array, var, mean, std, histogram
 from   os                import remove
 from   os.path           import join,basename
+from   random            import sample
 from   tempfile          import gettempdir
 from   time              import time
 from   uuid              import uuid4
@@ -100,7 +101,7 @@ def create_selection(Image,
   
     return Product
 
-def otsu(Image,nx,ny,tolerance=0.0001,N=50,ax1=None,ax2=None):
+def otsu(Image,nx,ny,tolerance=0.0001,N=50):
     def get_icv(threshold):
         P1   = [blue for blue in Blues if blue<threshold]
         P2   = [blue for blue in Blues if blue>threshold]        
@@ -109,8 +110,8 @@ def otsu(Image,nx,ny,tolerance=0.0001,N=50,ax1=None,ax2=None):
         return (len(P1)*var1 + len(P2)*var2)/(len(P1) + len(P2))  
     
     Blues = [Image[i,j,BLUE] for i in range(nx) for j in range(ny)]
-    n,bins,_ = ax1.hist(Blues)
-    ax1.set_title('Blue levels')
+    n, bins = histogram(Blues)
+
     threshold1 = bins[1]
     threshold2 = bins[-2]
     icv1       = get_icv(threshold1)
@@ -118,9 +119,9 @@ def otsu(Image,nx,ny,tolerance=0.0001,N=50,ax1=None,ax2=None):
     ICVs      =  [icv1,icv2]
     Thresholds = [threshold1,threshold2]
     for _ in range(N):
-        if abs(icv1-icv2)<tolerance: break
         threshold_mid = 0.5*(threshold1 + threshold2)
         icv_mid       = get_icv(threshold_mid)
+        if abs(icv1-icv2)<tolerance: break
         if icv1<icv2:
             threshold2 = threshold_mid
             icv2       = icv_mid
@@ -129,18 +130,8 @@ def otsu(Image,nx,ny,tolerance=0.0001,N=50,ax1=None,ax2=None):
             icv1       = icv_mid
         ICVs.append(icv_mid)
         Thresholds.append(threshold_mid)
-        
-    ax2.plot(range(len(ICVs)),ICVs, c='r', label='ICV')
-    ax2.set_title('Intra-class variance')
-    ax2.set_xlabel('Iteration')
-    ax2.set_ylabel('ICV')
-    ax2t = ax2.twinx()
-    ax2t.plot(range(len(Thresholds)),Thresholds,c='b', label='Threshold')
-    ax2t.set_ylabel('Threshold')
-    ax2.legend(loc='lower center',framealpha=0.5)
-    ax2t.legend(loc='center right')
-    
-    return threshold_mid,icv_mid
+         
+    return Thresholds,ICVs,n, bins
 
 
 def generate8components(Image,threshold=0.5,nx=512,ny=512,deltas=[-1,0,1]):
@@ -186,7 +177,7 @@ def generate8components(Image,threshold=0.5,nx=512,ny=512,deltas=[-1,0,1]):
 def parse_tuple(s):
     return tuple([int(x) for x in s[1:-1].split(',')])
 
-def remove_false_findings(Image,threshold=-1,nx=256,ny=256,axs=None):
+def remove_false_findings(Image,threshold=-1,nx=256,ny=256):
     component_file = join(gettempdir(),f'{uuid4()}.txt')
     
     Areas = []
@@ -196,14 +187,10 @@ def remove_false_findings(Image,threshold=-1,nx=256,ny=256,axs=None):
             if len(Component)>1:
                 Areas.append(len(Component))
                 temp.write(' '.join([f'({x},{y})' for x,y in Component])  + '\n')
-            else:
-                print (' '.join([f'({x},{y})' for x,y in Component]), 'dropped')
                 
-    for a in sorted(Areas):
-        print (a)
     P = mean(Areas)- std(Areas)
-    print (f'{mean(Areas):0f} {std(Areas):0f}')
-    n,bins,_ = axs.hist(Areas,bins=25)    
+    
+    n,bins = histogram(Areas,bins=25)    
     
     Mask = zeros((nx,ny,3)) 
     
@@ -216,8 +203,14 @@ def remove_false_findings(Image,threshold=-1,nx=256,ny=256,axs=None):
                 
     remove(component_file)
     
-    return Mask
+    return Mask,n,bins
 
+def plot_hist(n,bins,axs=None,title=''):
+    width = 0.7 * (bins[1] - bins[0])
+    center = (bins[:-1] + bins[1:]) / 2
+    axs.bar(center, n, align='center', width=width)    
+    axs.set_title(title) 
+    
 def segment(args,image_id):    
     Image    = read_image(path=args.path,image_id=image_id,image_set=args.image_set)
     nx,ny,_  = Image.shape
@@ -231,11 +224,23 @@ def segment(args,image_id):
     axs[0,0].set_title(image_id)
     fig.colorbar(im, ax=axs[0,0], orientation='vertical')
     
-    threshold,icv = otsu(Image,nx,ny,ax1=axs[1,1],ax2=axs[1,0])
+    Thresholds,ICVs,n,bins = otsu(Image,nx,ny)
+    plot_hist(n,bins,axs=axs[1,1],title='Blue levels')
+
+    axs[1,0].plot(range(len(ICVs)),ICVs, c='r', label='ICV')
+    axs[1,0].set_title('Intra-class variance')
+    axs[1,0].set_xlabel('Iteration')
+    axs[1,0].set_ylabel('ICV')
+    ax2t = axs[1,0].twinx()
+    ax2t.plot(range(len(Thresholds)),Thresholds,c='b', label='Threshold')
+    ax2t.set_ylabel('Threshold')
+    axs[1,0].legend(loc='lower center',framealpha=0.5)
+    ax2t.legend(loc='center right')
+    
     Partitioned   = zeros((nx,ny,3))
     for i in range(nx):
         for j in range(ny):
-            if Image[i,j,BLUE]>threshold:
+            if Image[i,j,BLUE]>Thresholds[-1]:
                 Partitioned[i,j,BLUE] = Image[i,j,BLUE]
                 
     axs[0,1].imshow(Partitioned) 
@@ -243,7 +248,10 @@ def segment(args,image_id):
     axs[0,1].axes.yaxis.set_ticks([]) 
     axs[0,1].set_title('Partitioned')
     
-    axs[0,2].imshow(remove_false_findings(Image,threshold=threshold,nx=nx,ny=ny,axs=axs[1,2]))
+    Mask,n,bins = remove_false_findings(Image,threshold=Thresholds[-1],nx=nx,ny=ny)
+    
+    plot_hist(n,bins,axs=axs[1,2])
+    axs[0,2].imshow(Mask)
     
     fig.suptitle(f'{"+".join([Descriptions[label] for label in Training[image_id]])  }')
 
@@ -261,13 +269,20 @@ if __name__=='__main__':
     parser.add_argument('--show',                default=False, action='store_true')
     parser.add_argument('--figs',                default= './figs')
     parser.add_argument('--all',                 default=False, action='store_true')
+    parser.add_argument('--sample', type=int,    default=0)
     args     = parser.parse_args()
     
     Training = read_training_expectations(path=args.path)
-    if args.all:
+    if args.sample:
+        for image_id in sample(list(Training.keys()),args.sample):
+            print (f'{image_id}.')
+            segment(args,image_id)     
+    elif args.all:
+        n = len(Training)
         for image_id in sorted(Training.keys()):
-            print (image_id)
-            segment(args,image_id)    
+            print (f'{image_id}. {n} remaining')
+            segment(args,image_id) 
+            n -= 1
     else:
         segment(args,args.image_id)
 
