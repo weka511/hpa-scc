@@ -54,6 +54,9 @@ RED         = 0
 GREEN       = 1
 BLUE        = 2
 YELLOW      = 3
+NCHANNELS   = 4
+NRGB        = 3
+
 colours     = ['red',  'green', 'blue', 'yellow']
 meanings    = ['Microtubules', 'Protein/antibody', 'Nuclei channels', 'Endoplasmic reticulum channels']
 image_id    = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0'
@@ -77,16 +80,14 @@ def read_image(path        = r'C:\data\hpa-scc',
                image_set   = 'train512512',
                image_id    = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0'):
     Image = None
-    for i in range(2):
-        for j in range(2):
-            channel      = 2*i+j
-            file_name  = f'{image_id}_{colours[channel]}.png'
-            path_name  = join(path,image_set,file_name)
-            image_mono = imread(path_name)
-            if channel==0:
-                nx,ny   = image_mono.shape
-                Image   = zeros((nx,ny,4))
-            Image[:,:,channel] = image_mono
+    for channel in range(NCHANNELS):
+        image_mono = imread(join(path,
+                                 image_set,
+                                 f'{image_id}_{colours[channel]}.png'))
+        if channel==0:
+            nx,ny          = image_mono.shape
+            Image          = zeros((nx,ny,NCHANNELS))
+        Image[:,:,channel] = image_mono
     return Image        
 
 # create_selection
@@ -97,12 +98,12 @@ def create_selection(Image,
                      [0,1,0,1],
                      [0,0,1,0]]):
     nx,ny,_ = Image.shape
-    Product = zeros((nx,ny,3))
+    Product = zeros((nx,ny,NRGB))
     Matrix  = array(Selector)
     for i in range(nx):
         for j in range(ny):
-            for k in range(3):
-                Product[i,j,k] = sum([Matrix[k,l] * Image[i,j,l] for l in range(4)])
+            for k in range(NRGB):
+                Product[i,j,k] = sum([Matrix[k,l] * Image[i,j,l] for l in range(NCHANNELS)])
   
     return Product
 
@@ -197,8 +198,14 @@ def parse_tuple(s):
 
 # remove_false_findings
 
-def remove_false_findings(Image,threshold=-1,nx=256,ny=256,nsigma=1.0,channel=BLUE):
-    component_file = join(gettempdir(),f'{uuid4()}.txt')
+def remove_false_findings(Image,
+                          threshold=-1,
+                          nx=256,
+                          ny=256,
+                          nsigma=1.0,
+                          channel=BLUE,
+                          component_file = join(gettempdir(),f'{uuid4()}.txt')):
+    
     
     Areas = []
     
@@ -210,7 +217,7 @@ def remove_false_findings(Image,threshold=-1,nx=256,ny=256,nsigma=1.0,channel=BL
                 
     P      = mean(Areas)- nsigma*std(Areas)
     n,bins = histogram(Areas,bins=25)    
-    Mask   = zeros((nx,ny,4)) 
+    Mask   = zeros((nx,ny,NCHANNELS)) 
     
     with open(component_file,'r') as temp:
         for line in temp:
@@ -218,8 +225,6 @@ def remove_false_findings(Image,threshold=-1,nx=256,ny=256,nsigma=1.0,channel=BL
             if len(Component)>P:
                 for i,j in Component:
                     Mask[i,j,channel] = 1
-                
-    remove(component_file)
     
     return Mask,n,bins
 
@@ -244,7 +249,13 @@ def plot_hist(n,bins,axs=None,title=None,channel=BLUE):
     if title!= None:
         axs.set_title(title) 
     
-def segment_channel(Image,image_id,channel=BLUE,cmap='Blues',figs='./',show=False):    
+def segment_channel(Image,
+                    image_id,
+                    channel=BLUE,
+                    cmap='Blues',
+                    figs='./',
+                    show=False,
+                    component_file = join(gettempdir(),f'{uuid4()}.txt')):    
     
     nx,ny,_  = Image.shape
     
@@ -270,7 +281,7 @@ def segment_channel(Image,image_id,channel=BLUE,cmap='Blues',figs='./',show=Fals
     axs[1,0].legend(loc='lower center',framealpha=0.5)
     ax2t.legend(loc='center right')
     
-    Partitioned   = zeros((nx,ny,3))
+    Partitioned   = zeros((nx,ny,NRGB))
     for i in range(nx):
         for j in range(ny):
             if Image[i,j,channel]>Thresholds[-1]:
@@ -285,15 +296,20 @@ def segment_channel(Image,image_id,channel=BLUE,cmap='Blues',figs='./',show=Fals
     axs[0,1].axes.yaxis.set_ticks([]) 
     axs[0,1].set_title('Partitioned')
     
-    Mask,n,bins = remove_false_findings(Image,threshold=Thresholds[-1],nx=nx,ny=ny,channel=channel)
+    Mask,n,bins = remove_false_findings(Image,
+                                        threshold=Thresholds[-1],
+                                        nx=nx,
+                                        ny=ny,
+                                        channel=channel,
+                                        component_file=component_file)
     
     plot_hist(n,bins,axs=axs[1,2],channel=channel)
     if channel==YELLOW:
         for i in range(nx):
             for j in range(ny):
-                Mask[i,j,RED] = Mask[i,j,YELLOW]
+                Mask[i,j,RED]   = Mask[i,j,YELLOW]
                 Mask[i,j,GREEN] = Mask[i,j,YELLOW]
-    axs[0,2].imshow(Mask[:,:,0:3])
+    axs[0,2].imshow(Mask[:,:,0:-1])
     
     fig.suptitle(f'{"+".join([Descriptions[label] for label in Training[image_id]])  }')
 
@@ -302,18 +318,31 @@ def segment_channel(Image,image_id,channel=BLUE,cmap='Blues',figs='./',show=Fals
     if not show:
         close(fig)
 
+# segment
+#
+# Segment all channels for image_id 
+#
+# Parameters:
+#     Image
+#     image_id
+#     figs
+#     show
+
 def segment(Image, image_id, figs='./', show=False):
-    segment_channel(Image, image_id, channel=BLUE,                 figs=figs, show=show)
-    segment_channel(Image, image_id, channel=RED,   cmap='Reds',   figs=figs, show=show)
-    segment_channel(Image, image_id, channel=GREEN, cmap='Greens', figs=figs, show=show)
-    segment_channel(Image, image_id, channel=YELLOW, cmap='YlGn', figs=figs, show=show)
+    component_files = [join(gettempdir(),f'{uuid4()}.txt') for _ in range(NCHANNELS)]
+    segment_channel(Image, image_id, channel=BLUE,                  figs=figs, show=show, component_file=component_files[BLUE])
+    segment_channel(Image, image_id, channel=RED,    cmap='Reds',   figs=figs, show=show, component_file=component_files[RED])
+    segment_channel(Image, image_id, channel=GREEN,  cmap='Greens', figs=figs, show=show, component_file=component_files[GREEN])
+    segment_channel(Image, image_id, channel=YELLOW, cmap='YlGn',   figs=figs, show=show, component_file=component_files[YELLOW])
+    for component_file in component_files:
+        remove(component_file)
     
 if __name__=='__main__':
     start  = time()
     parser = ArgumentParser('Segment HPA data using Otsu\'s algorithm')
     parser.add_argument('--path',                default=r'C:\data\hpa-scc')
     parser.add_argument('--image_set',           default = 'train512x512')
-    parser.add_argument('--image_id',            default = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0')
+    parser.add_argument('--image_id',            default = '5c27f04c-bb99-11e8-b2b9-ac1f6b6445d0')
     parser.add_argument('--show',                default=False, action='store_true')
     parser.add_argument('--figs',                default= './figs')
     parser.add_argument('--all',                 default=False, action='store_true')
@@ -334,8 +363,8 @@ if __name__=='__main__':
             segment(Image, image_id, figs=args.figs, show=args.show)
             n -= 1
     else:
-        Image = read_image(path=args.path,image_id=image_id,image_set=args.image_set)
-        segment(Image, image_id, figs=args.figs, show=args.show)
+        segment(read_image(path=args.path,image_id=image_id,image_set=args.image_set),
+                image_id, figs=args.figs, show=args.show)
 
 
     
