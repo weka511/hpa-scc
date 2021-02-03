@@ -65,7 +65,7 @@ def read_training_expectations(path=r'C:\data\hpa-scc',file_name='train.csv'):
     return Training
 
 def read_image(path        = r'C:\data\hpa-scc',
-               image_set   = 'train512512',
+               image_set   = 'train512x512',
                image_id    = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0'):
     Image = None
     for i in range(2):
@@ -98,7 +98,7 @@ def create_selection(Image,
 if __name__=='__main__':
     parser = argparse.ArgumentParser('Visualize HPA data')
     parser.add_argument('--path',      default=r'C:\data\hpa-scc')
-    parser.add_argument('--image_set', default = 'train512512')
+    parser.add_argument('--image_set', default = 'train512x512')
     parser.add_argument('--image_id',  default = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0')
     args     = parser.parse_args()
     
@@ -108,7 +108,7 @@ if __name__=='__main__':
     fig = plt.figure(figsize=(20,20))
     axs = fig.subplots(2, 4)
     
-    axs[0,0].imshow(create_selection(Image)) #(Image[:,:,[0,2,3]])
+    axs[0,0].imshow(create_selection(Image))
     axs[0,0].axes.xaxis.set_ticks([])
     axs[0,0].axes.yaxis.set_ticks([])
     nx,ny,_  = Image.shape
