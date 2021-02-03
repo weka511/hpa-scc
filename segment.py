@@ -79,14 +79,14 @@ def read_image(path        = r'C:\data\hpa-scc',
     Image = None
     for i in range(2):
         for j in range(2):
-            index      = 2*i+j
-            file_name  = f'{image_id}_{colours[index]}.png'
+            channel      = 2*i+j
+            file_name  = f'{image_id}_{colours[channel]}.png'
             path_name  = join(path,image_set,file_name)
             image_mono = imread(path_name)
-            if index==0:
+            if channel==0:
                 nx,ny   = image_mono.shape
                 Image   = zeros((nx,ny,4))
-            Image[:,:,index] = image_mono
+            Image[:,:,channel] = image_mono
     return Image        
 
 # create_selection
@@ -116,9 +116,9 @@ def create_selection(Image,
 #     ny
 #     tolerance
 #     N
-#     index
+#     channel
 
-def otsu(Image,nx=256,ny=256,tolerance=0.0001,N=50,index=BLUE):
+def otsu(Image,nx=256,ny=256,tolerance=0.0001,N=50,channel=BLUE):
     def get_icv(threshold):
         P1   = [intensity for intensity in Intensities if intensity<threshold]
         P2   = [intensity for intensity in Intensities if intensity>threshold]        
@@ -126,7 +126,7 @@ def otsu(Image,nx=256,ny=256,tolerance=0.0001,N=50,index=BLUE):
         var2 = var(P2)
         return (len(P1)*var1 + len(P2)*var2)/(len(P1) + len(P2))  
     
-    Intensities = [Image[i,j,index] for i in range(nx) for j in range(ny)]
+    Intensities = [Image[i,j,channel] for i in range(nx) for j in range(ny)]
     n, bins = histogram(Intensities)
 
     threshold1 = bins[1]
@@ -151,7 +151,7 @@ def otsu(Image,nx=256,ny=256,tolerance=0.0001,N=50,index=BLUE):
     return Thresholds,ICVs,n, bins
 
 
-def generate8components(Image,threshold=0.5,nx=512,ny=512,deltas=[-1,0,1],index=BLUE):
+def generate8components(Image,threshold=0.5,nx=512,ny=512,deltas=[-1,0,1],channel=BLUE):
     def find_first_ripe():
         for i in range(nx):
             for j in range(ny):
@@ -162,7 +162,7 @@ def generate8components(Image,threshold=0.5,nx=512,ny=512,deltas=[-1,0,1],index=
     
     for i in range(nx):
         for j in range(ny):
-            if Image[i,j,index]>threshold:
+            if Image[i,j,channel]>threshold:
                 Open[i,j] = True
                 
     Closed    = zeros((nx,ny),dtype=bool)  # Set of points that have been processed already
@@ -181,7 +181,7 @@ def generate8components(Image,threshold=0.5,nx=512,ny=512,deltas=[-1,0,1],index=
                     j1 = j+delta_j
                     if i1<0 or i1>=nx or j1<0 or j1>=ny: continue   # Don't move outside image
                     
-                    if Image[i1,j1,index]>threshold and not Closed[i1,j1] and not (i1,j1) in Ripe:
+                    if Image[i1,j1,channel]>threshold and not Closed[i1,j1] and not (i1,j1) in Ripe:
                         Ripe.add((i1,j1))
         yield Component
         
@@ -197,27 +197,27 @@ def parse_tuple(s):
 
 # remove_false_findings
 
-def remove_false_findings(Image,threshold=-1,nx=256,ny=256,nsigma=1.0,index=BLUE):
+def remove_false_findings(Image,threshold=-1,nx=256,ny=256,nsigma=1.0,channel=BLUE):
     component_file = join(gettempdir(),f'{uuid4()}.txt')
     
     Areas = []
     
     with open(component_file,'w') as temp:
-        for Component in generate8components(Image,threshold=threshold,nx=nx,ny=ny,index=index):
+        for Component in generate8components(Image,threshold=threshold,nx=nx,ny=ny,channel=channel):
             if len(Component)>1:
                 Areas.append(len(Component))
                 temp.write(' '.join([f'({x},{y})' for x,y in Component])  + '\n')
                 
     P      = mean(Areas)- nsigma*std(Areas)
     n,bins = histogram(Areas,bins=25)    
-    Mask   = zeros((nx,ny,3)) 
+    Mask   = zeros((nx,ny,4)) 
     
     with open(component_file,'r') as temp:
         for line in temp:
             Component = [parse_tuple(s) for s in line.strip().split()]
             if len(Component)>P:
                 for i,j in Component:
-                    Mask[i,j,index] = 1
+                    Mask[i,j,channel] = 1
                 
     remove(component_file)
     
@@ -233,32 +233,32 @@ def remove_false_findings(Image,threshold=-1,nx=256,ny=256,nsigma=1.0,index=BLUE
 #     axs
 #     title
 
-def plot_hist(n,bins,axs=None,title=None,index=BLUE): 
+def plot_hist(n,bins,axs=None,title=None,channel=BLUE): 
     axs.bar((bins[:-1] + bins[1:]) / 2,
             n,
             align = 'center',
             width = 0.7 * (bins[1] - bins[0]),
-            color = colours[index][0])
+            color = colours[channel][0])
     axs.axes.xaxis.set_ticks([])
     axs.axes.yaxis.set_ticks([])
     if title!= None:
         axs.set_title(title) 
     
-def segment(Image,image_id,index=BLUE,cmap='Blues',figs='./',show=False):    
+def segment_channel(Image,image_id,channel=BLUE,cmap='Blues',figs='./',show=False):    
     
     nx,ny,_  = Image.shape
     
     fig      = figure(figsize=(20,20))
     axs      = fig.subplots(2, 3) 
 
-    im       = axs[0,0].imshow(Image[:,:,index],cmap=cm.get_cmap(cmap))
+    im       = axs[0,0].imshow(Image[:,:,channel],cmap=cm.get_cmap(cmap))
     axs[0,0].axes.xaxis.set_ticks([])
     axs[0,0].axes.yaxis.set_ticks([]) 
     axs[0,0].set_title(image_id)
     fig.colorbar(im, ax=axs[0,0], orientation='vertical')
     
-    Thresholds,ICVs,n,bins = otsu(Image,nx,ny,index=index)
-    plot_hist(n,bins,axs=axs[1,1],title=meanings[index],index=index)
+    Thresholds,ICVs,n,bins = otsu(Image,nx,ny,channel=channel)
+    plot_hist(n,bins,axs=axs[1,1],title=meanings[channel],channel=channel)
 
     axs[1,0].plot(range(len(ICVs)),ICVs, c='r', label='ICV')
     axs[1,0].set_title('Intra-class variance')
@@ -273,25 +273,40 @@ def segment(Image,image_id,index=BLUE,cmap='Blues',figs='./',show=False):
     Partitioned   = zeros((nx,ny,3))
     for i in range(nx):
         for j in range(ny):
-            if Image[i,j,index]>Thresholds[-1]:
-                Partitioned[i,j,index] = Image[i,j,index]   # FIXME - yellow!
+            if Image[i,j,channel]>Thresholds[-1]:
+                if channel<YELLOW:
+                    Partitioned[i,j,channel] = Image[i,j,channel]
+                else:
+                    Partitioned[i,j,RED] = Image[i,j,channel]
+                    Partitioned[i,j,GREEN] = Image[i,j,channel]
                 
     axs[0,1].imshow(Partitioned) 
     axs[0,1].axes.xaxis.set_ticks([])
     axs[0,1].axes.yaxis.set_ticks([]) 
     axs[0,1].set_title('Partitioned')
     
-    Mask,n,bins = remove_false_findings(Image,threshold=Thresholds[-1],nx=nx,ny=ny,index=index)
+    Mask,n,bins = remove_false_findings(Image,threshold=Thresholds[-1],nx=nx,ny=ny,channel=channel)
     
-    plot_hist(n,bins,axs=axs[1,2],index=index)
-    axs[0,2].imshow(Mask)
+    plot_hist(n,bins,axs=axs[1,2],channel=channel)
+    if channel==YELLOW:
+        for i in range(nx):
+            for j in range(ny):
+                Mask[i,j,RED] = Mask[i,j,YELLOW]
+                Mask[i,j,GREEN] = Mask[i,j,YELLOW]
+    axs[0,2].imshow(Mask[:,:,0:3])
     
     fig.suptitle(f'{"+".join([Descriptions[label] for label in Training[image_id]])  }')
 
-    fig.savefig(join(figs,f'{image_id}_{colours[index]}.png'))
+    fig.savefig(join(figs,f'{image_id}_{colours[channel]}.png'))
     
     if not show:
         close(fig)
+
+def segment(Image, image_id, figs='./', show=False):
+    segment_channel(Image, image_id, channel=BLUE,                 figs=figs, show=show)
+    segment_channel(Image, image_id, channel=RED,   cmap='Reds',   figs=figs, show=show)
+    segment_channel(Image, image_id, channel=GREEN, cmap='Greens', figs=figs, show=show)
+    segment_channel(Image, image_id, channel=YELLOW, cmap='YlGn', figs=figs, show=show)
     
 if __name__=='__main__':
     start  = time()
@@ -309,18 +324,19 @@ if __name__=='__main__':
     if args.sample:
         for image_id in sample(list(Training.keys()),args.sample):
             print (f'{image_id}.')
-            segment(args,image_id)                     #FIXME
+            Image = read_image(path=args.path,image_id=image_id,image_set=args.image_set)
+            segment(Image, image_id, figs=args.figs, show=args.show)            
     elif args.all:
         n = len(Training)
         for image_id in sorted(Training.keys()):
             print (f'{image_id}. {n} remaining')
-            segment(args,image_id)                       #FIXME
+            Image = read_image(path=args.path,image_id=image_id,image_set=args.image_set)
+            segment(Image, image_id, figs=args.figs, show=args.show)
             n -= 1
     else:
         Image = read_image(path=args.path,image_id=image_id,image_set=args.image_set)
-        segment(Image, args.image_id, index=BLUE,                 figs=args.figs, show=args.show)
-        segment(Image, args.image_id, index=RED,   cmap='Reds',   figs=args.figs, show=args.show)
-        segment(Image, args.image_id, index=GREEN, cmap='Greens', figs=args.figs, show=args.show)
+        segment(Image, image_id, figs=args.figs, show=args.show)
+
 
     
     elapsed = time() - start
