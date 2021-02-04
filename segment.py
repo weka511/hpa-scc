@@ -18,6 +18,7 @@
 # Segment images using Otsu's method
 
 from   argparse          import ArgumentParser
+from   csv               import reader
 from   math              import isqrt
 from   matplotlib.pyplot import figure, show, cm, close
 from   matplotlib.image  import imread
@@ -30,7 +31,20 @@ from   tempfile          import gettempdir
 from   time              import time
 from   uuid              import uuid4
 
-Descriptions = [
+RED                = 0      # Channel number for Microtubules 
+GREEN              = 1      # Channel number for Protein of interest
+BLUE               = 2      # Channel number for Nucelus
+YELLOW             = 3      # Channel number for Endoplasmic reticulum
+NCHANNELS          = 4      # Number of channels
+NRGB               = 3      # Number of actual channels for graphcs
+
+COLOUR_NAMES       = ['red',  'green', 'blue', 'yellow']
+IMAGE_LEVEL_LABELS = ['Microtubules', 
+                      'Protein/antibody',
+                      'Nuclei channels',
+                      'Endoplasmic reticulum channels']
+
+DESCRIPTIONS       = [
     'Nucleoplasm',
     'Nuclear membrane',
     'Nucleoli',
@@ -52,31 +66,32 @@ Descriptions = [
     'Negative'
 ]
 
-RED         = 0
-GREEN       = 1
-BLUE        = 2
-YELLOW      = 3
-NCHANNELS   = 4
-NRGB        = 3
 
-colours     = ['red',  'green', 'blue', 'yellow']
-meanings    = ['Microtubules', 'Protein/antibody', 'Nuclei channels', 'Endoplasmic reticulum channels']
-image_id    = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0'
+
 
 # read_training_expectations
+# 
+# Read and parse the  training image-level labels 
+#
+# Parameters:
+#     path       Path to image-level labels 
+#     file_name  Name of image-level labels file
 
 def read_training_expectations(path=r'C:\data\hpa-scc',file_name='train.csv'):
-    header    = True
-    Training  = {}
-    for line in open(join(path,file_name)):
-        if header:
-            header = False
-            continue
-        trimmed = line.strip().split(',')
-        Training[trimmed[0]] =  [int(l) for l in trimmed[1].split('|')]
-    return Training
+    with open(join(path,file_name)) as train:
+        rows = reader(train)
+        next(rows)
+        return {row[0]: [int(label) for label in row[1].split('|')] for row in rows}
+
 
 # read_image
+#
+# Read set of images (keeping Yellow separate)
+#
+# Parameters:
+#    path            Location of data
+#    image_set       Identifies high or low res
+#    image_id        Identified image
 
 def read_image(path        = r'C:\data\hpa-scc',
                image_set   = 'train512512',
@@ -85,7 +100,7 @@ def read_image(path        = r'C:\data\hpa-scc',
     for channel in range(NCHANNELS):
         image_mono = imread(join(path,
                                  image_set,
-                                 f'{image_id}_{colours[channel]}.png'))
+                                 f'{image_id}_{COLOUR_NAMES[channel]}.png'))
         if channel==0:
             nx,ny          = image_mono.shape
             Image          = zeros((nx,ny,NCHANNELS))
@@ -124,7 +139,7 @@ def plot_hist(n,bins,axs=None,title=None,channel=BLUE):
             n,
             align = 'center',
             width = 0.7 * (bins[1] - bins[0]),
-            color = colours[channel][0])
+            color = COLOUR_NAMES[channel][0])
     axs.axes.xaxis.set_ticks([])
     axs.axes.yaxis.set_ticks([])
     if title!= None:
@@ -280,7 +295,7 @@ def segment_channel(Image,
     fig.colorbar(im, ax=axs[0,0], orientation='vertical')
     
     Thresholds,ICVs,n,bins = otsu(Image,nx,ny,channel=channel)
-    plot_hist(n,bins,axs=axs[1,1],title=meanings[channel],channel=channel)
+    plot_hist(n,bins,axs=axs[1,1],title=IMAGE_LEVEL_LABELS[channel],channel=channel)
 
     axs[1,0].plot(range(len(ICVs)),ICVs, c='r', label='ICV')
     axs[1,0].set_title('Intra-class variance')
@@ -322,9 +337,9 @@ def segment_channel(Image,
                 Mask[i,j,GREEN] = Mask[i,j,YELLOW]
     axs[0,2].imshow(Mask[:,:,0:-1])
     
-    fig.suptitle(f'{"+".join([Descriptions[label] for label in Training[image_id]])  }')
+    fig.suptitle(f'{"+".join([DESCRIPTIONS[label] for label in Training[image_id]])  }')
 
-    fig.savefig(join(figs,f'{image_id}_{colours[channel]}.png'))
+    fig.savefig(join(figs,f'{image_id}_{COLOUR_NAMES[channel]}.png'))
     
     if not show:
         close(fig)
@@ -413,7 +428,7 @@ if __name__=='__main__':
     parser = ArgumentParser('Segment HPA data using Otsu\'s algorithm')
     parser.add_argument('--path',                default=r'C:\data\hpa-scc')
     parser.add_argument('--image_set',           default = 'train512x512')
-    parser.add_argument('--image_id',            default = '5c27f04c-bb99-11e8-b2b9-ac1f6b6445d0')
+    parser.add_argument('--image_id',            default = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0')
     parser.add_argument('--show',                default=False, action='store_true')
     parser.add_argument('--figs',                default= './figs')
     parser.add_argument('--all',                 default=False, action='store_true')
@@ -434,8 +449,8 @@ if __name__=='__main__':
             segment(Image, image_id, figs=args.figs, show=args.show)
             n -= 1
     else:
-        segment(read_image(path=args.path,image_id=image_id,image_set=args.image_set),
-                image_id, figs=args.figs, show=args.show)
+        segment(read_image(path=args.path,image_id=args.image_id,image_set=args.image_set),
+                image_id=args.image_id, figs=args.figs, show=args.show)
 
 
     
