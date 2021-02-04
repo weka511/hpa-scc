@@ -18,12 +18,14 @@
 # Segment images using Otsu's method
 
 from   argparse          import ArgumentParser
+from   math              import isqrt
 from   matplotlib.pyplot import figure, show, cm, close
 from   matplotlib.image  import imread
 from   numpy             import zeros, array, var, mean, std, histogram
 from   os                import remove
 from   os.path           import join,basename
 from   random            import sample
+from   sys               import float_info
 from   tempfile          import gettempdir
 from   time              import time
 from   uuid              import uuid4
@@ -107,6 +109,27 @@ def create_selection(Image,
   
     return Product
 
+# plot_hist
+#
+# Plot a histogram from numpy
+#
+# Parameters:
+#     n
+#     bins
+#     axs
+#     title
+
+def plot_hist(n,bins,axs=None,title=None,channel=BLUE): 
+    axs.bar((bins[:-1] + bins[1:]) / 2,
+            n,
+            align = 'center',
+            width = 0.7 * (bins[1] - bins[0]),
+            color = colours[channel][0])
+    axs.axes.xaxis.set_ticks([])
+    axs.axes.yaxis.set_ticks([])
+    if title!= None:
+        axs.set_title(title) 
+        
 # otsu
 #
 # Segment image using Otsu's method
@@ -152,6 +175,8 @@ def otsu(Image,nx=256,ny=256,tolerance=0.0001,N=50,channel=BLUE):
     return Thresholds,ICVs,n, bins
 
 
+# generate8components
+
 def generate8components(Image,threshold=0.5,nx=512,ny=512,deltas=[-1,0,1],channel=BLUE):
     def find_first_ripe():
         for i in range(nx):
@@ -196,14 +221,23 @@ def generate8components(Image,threshold=0.5,nx=512,ny=512,deltas=[-1,0,1],channe
 def parse_tuple(s):
     return tuple([int(x) for x in s[1:-1].split(',')])
 
+# generate_components
+
+def generate_components(component_file,P=0):
+    with open(component_file,'r') as temp:
+        for line in temp:
+            Component = [parse_tuple(s) for s in line.strip().split()]
+            if len(Component)>P:
+                yield Component
+                
 # remove_false_findings
 
 def remove_false_findings(Image,
-                          threshold=-1,
-                          nx=256,
-                          ny=256,
-                          nsigma=1.0,
-                          channel=BLUE,
+                          threshold      = -1,
+                          nx             = 256,
+                          ny             = 256,
+                          nsigma         = 1.0,
+                          channel        = BLUE,
                           component_file = join(gettempdir(),f'{uuid4()}.txt')):
     
     
@@ -215,40 +249,17 @@ def remove_false_findings(Image,
                 Areas.append(len(Component))
                 temp.write(' '.join([f'({x},{y})' for x,y in Component])  + '\n')
                 
-    P      = mean(Areas)- nsigma*std(Areas)
+    P      = mean(Areas) - nsigma*std(Areas)
     n,bins = histogram(Areas,bins=25)    
     Mask   = zeros((nx,ny,NCHANNELS)) 
+  
+    for component in generate_components(component_file,P=P):
+        for i,j in Component:
+            Mask[i,j,channel] = 1
     
-    with open(component_file,'r') as temp:
-        for line in temp:
-            Component = [parse_tuple(s) for s in line.strip().split()]
-            if len(Component)>P:
-                for i,j in Component:
-                    Mask[i,j,channel] = 1
-    
-    return Mask,n,bins
+    return Mask,n,bins,P
 
-# plot_hist
-#
-# Plot a histogram from numpy
-#
-# Parameters:
-#     n
-#     bins
-#     axs
-#     title
 
-def plot_hist(n,bins,axs=None,title=None,channel=BLUE): 
-    axs.bar((bins[:-1] + bins[1:]) / 2,
-            n,
-            align = 'center',
-            width = 0.7 * (bins[1] - bins[0]),
-            color = colours[channel][0])
-    axs.axes.xaxis.set_ticks([])
-    axs.axes.yaxis.set_ticks([])
-    if title!= None:
-        axs.set_title(title) 
-    
 def segment_channel(Image,
                     image_id,
                     channel=BLUE,
@@ -296,12 +307,12 @@ def segment_channel(Image,
     axs[0,1].axes.yaxis.set_ticks([]) 
     axs[0,1].set_title('Partitioned')
     
-    Mask,n,bins = remove_false_findings(Image,
-                                        threshold=Thresholds[-1],
-                                        nx=nx,
-                                        ny=ny,
-                                        channel=channel,
-                                        component_file=component_file)
+    Mask,n,bins,P = remove_false_findings(Image,
+                                        threshold      = Thresholds[-1],
+                                        nx             = nx,
+                                        ny             = ny,
+                                        channel        = channel,
+                                        component_file = component_file)
     
     plot_hist(n,bins,axs=axs[1,2],channel=channel)
     if channel==YELLOW:
@@ -317,7 +328,64 @@ def segment_channel(Image,
     
     if not show:
         close(fig)
+        
+    return P
 
+# combine
+
+def anchor_components(Image,image_id, channels=[BLUE,RED],figs='./', show=False, component_files=[],P=[],nx=512,ny=512): #FIXME
+    def get_centroid(component):
+        sum_x = 0
+        sum_y = 0
+        for x,y in component:
+            sum_x += x
+            sum_y += y
+        return (sum_x/len(component),sum_y/len(component))
+    
+    def get_nearest_centroid(x,y,Centroids):
+        min_distance = float_info.max
+        index        = None
+        for i in range(len(Centroids)):
+            x0,y0    = Centroids[i]
+            distance = (x0-x)**2 + (y0-y)**2
+            if distance<min_distance:
+                index         = i
+                min_distance = distance
+        return index
+    
+    Base      = []
+    Centroids = []
+    for component in generate_components(component_files[channels[0]],P=P[channels[0]]):
+        Base.append(component)
+        Centroids.append(get_centroid(component))
+        
+    Assignments=[]
+    for component in generate_components(component_files[channels[1]],P=P[channels[1]]):
+        x,y   = get_centroid(component)
+        index = get_nearest_centroid(x,y,Centroids)
+        Assignments.append(index)
+        x0,y0 = Centroids[index]
+        print (x,y,x0,y0)
+    nrows    = isqrt(len(Centroids))
+    ncols    = len(Centroids)//nrows + len(Centroids)%nrows
+    fig      = figure(figsize=(20,20))
+    axs      = fig.subplots(nrows,ncols)
+    i        = 0
+    for base in generate_components(component_files[channels[0]],P=P[channels[0]]):
+        Matrix = zeros((nx,ny,NRGB))
+        for x,y in base:
+            Matrix[x,y,channels[0]] = 1
+        j = 0
+        for component in generate_components(component_files[channels[1]],P=P[channels[1]]):
+            if Assignments[j]==i:
+                for x,y in component:
+                    Matrix[x,y,channels[1]] = 1                
+            j+=1
+        row = i//ncols
+        col =  i%ncols
+        axs[row,col].imshow(Matrix)
+        i+= 1
+                
 # segment
 #
 # Segment all channels for image_id 
@@ -330,13 +398,16 @@ def segment_channel(Image,
 
 def segment(Image, image_id, figs='./', show=False):
     component_files = [join(gettempdir(),f'{uuid4()}.txt') for _ in range(NCHANNELS)]
-    segment_channel(Image, image_id, channel=BLUE,                  figs=figs, show=show, component_file=component_files[BLUE])
-    segment_channel(Image, image_id, channel=RED,    cmap='Reds',   figs=figs, show=show, component_file=component_files[RED])
-    segment_channel(Image, image_id, channel=GREEN,  cmap='Greens', figs=figs, show=show, component_file=component_files[GREEN])
-    segment_channel(Image, image_id, channel=YELLOW, cmap='YlGn',   figs=figs, show=show, component_file=component_files[YELLOW])
+    P2 = segment_channel(Image, image_id, channel=BLUE,                  figs=figs, show=show, component_file=component_files[BLUE])
+    P0 = segment_channel(Image, image_id, channel=RED,    cmap='Reds',   figs=figs, show=show, component_file=component_files[RED])
+    P1 = segment_channel(Image, image_id, channel=GREEN,  cmap='Greens', figs=figs, show=show, component_file=component_files[GREEN])
+    P3 = segment_channel(Image, image_id, channel=YELLOW, cmap='YlGn',   figs=figs, show=show, component_file=component_files[YELLOW])
+    anchor_components(Image,image_id, channels=[BLUE,RED],figs=figs, show=show, component_files=component_files, P=[P0,P1,P2,P3])
     for component_file in component_files:
         remove(component_file)
-    
+        
+
+
 if __name__=='__main__':
     start  = time()
     parser = ArgumentParser('Segment HPA data using Otsu\'s algorithm')
