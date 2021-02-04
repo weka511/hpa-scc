@@ -242,6 +242,7 @@ def generate_components(component_file,P=0):
     with open(component_file,'r') as temp:
         for line in temp:
             Component = [parse_tuple(s) for s in line.strip().split()]
+            ll = len(Component)
             if len(Component)>P:
                 yield Component
                 
@@ -268,7 +269,7 @@ def remove_false_findings(Image,
     n,bins = histogram(Areas,bins=25)    
     Mask   = zeros((nx,ny,NCHANNELS)) 
   
-    for component in generate_components(component_file,P=P):
+    for Component in generate_components(component_file,P=P):
         for i,j in Component:
             Mask[i,j,channel] = 1
     
@@ -323,14 +324,15 @@ def segment_channel(Image,
     axs[0,1].axes.yaxis.set_ticks([]) 
     axs[0,1].set_title('Partitioned')
     
-    Mask,n,bins,P = remove_false_findings(Image,
-                                        threshold      = Thresholds[-1],
-                                        nx             = nx,
-                                        ny             = ny,
-                                        channel        = channel,
-                                        component_file = component_file)
+    Mask,n,bins,P = remove_false_findings(
+                          Image,
+                          threshold      = Thresholds[-1],
+                          nx             = nx,
+                          ny             = ny,
+                          channel        = channel,
+                          component_file = component_file)
     
-    plot_hist(n,bins,axs=axs[1,2],channel=channel)
+    plot_hist(n,bins,axs=axs[1,2],channel=channel,title='Components')
     if channel==YELLOW:
         for i in range(nx):
             for j in range(ny):
@@ -366,7 +368,8 @@ def segment(Image, image_id,
             path     = './', 
             show     = False,
             channels = [BLUE, RED, GREEN, YELLOW],
-            cmaps    = {BLUE:'Blues', RED:'Reds', GREEN:'Greens', YELLOW:'YlOrBr'}):
+            cmaps    = {BLUE:'Blues', RED:'Reds', GREEN:'Greens', YELLOW:'YlOrBr'},
+            keep_temp = False):
     component_files = []
     try:
         for channel in channels:
@@ -380,6 +383,7 @@ def segment(Image, image_id,
     except Exception as _:
         print (f'{image_id} {exc_info()[0]}')
     finally:
+        if keep_temp: return
         for component_file in component_files:
             if exists(component_file):  # If there was an exception, file might not actually exist!
                 remove(component_file)
@@ -389,13 +393,14 @@ def segment(Image, image_id,
 if __name__=='__main__':
     start  = time()
     parser = ArgumentParser('Segment HPA data using Otsu\'s algorithm')
-    parser.add_argument('--path',                default=r'C:\data\hpa-scc')
-    parser.add_argument('--image_set',           default = 'train512x512')
-    parser.add_argument('--image_id',            default = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0')
-    parser.add_argument('--show',                default=False, action='store_true')
-    parser.add_argument('--figs',                default= './figs')
-    parser.add_argument('--all',                 default=False, action='store_true')
-    parser.add_argument('--sample', type=int,    default=0)
+    parser.add_argument('--path',             default=r'C:\data\hpa-scc')
+    parser.add_argument('--image_set',        default = 'train512x512')
+    parser.add_argument('--image_id',         default = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0')
+    parser.add_argument('--show',             default=False, action='store_true')
+    parser.add_argument('--figs',             default= './figs')
+    parser.add_argument('--all',              default=False, action='store_true')
+    parser.add_argument('--sample', type=int, default=0)
+    parser.add_argument('--keep_temp',        default=False, action='store_true')
     args     = parser.parse_args()
     
     Training = read_training_expectations(path=args.path)
@@ -425,9 +430,10 @@ if __name__=='__main__':
         segment(read_image(path      = args.path,
                            image_id  = args.image_id,
                            image_set = args.image_set),
-                image_id = args.image_id,
-                path     = args.figs,
-                show     = args.show)
+                image_id  = args.image_id,
+                path      = args.figs,
+                show      = args.show,
+                keep_temp = args.keep_temp)
   
     elapsed = time() - start
     minutes = int(elapsed/60)
