@@ -24,9 +24,9 @@ from   matplotlib.pyplot import figure, show, cm, close
 from   matplotlib.image  import imread
 from   numpy             import zeros, array, var, mean, std, histogram
 from   os                import remove
-from   os.path           import join,basename
+from   os.path           import join,basename,exists
 from   random            import sample
-from   sys               import float_info
+from   sys               import float_info, exc_info
 from   tempfile          import gettempdir
 from   time              import time
 from   uuid              import uuid4
@@ -274,13 +274,14 @@ def remove_false_findings(Image,
     
     return Mask,n,bins,P
 
+# segment_channel
 
 def segment_channel(Image,
                     image_id,
-                    channel=BLUE,
-                    cmap='Blues',
-                    figs='./',
-                    show=False,
+                    channel        = BLUE,
+                    cmap           = 'Blues',
+                    path           = './',
+                    show           = False,
                     component_file = join(gettempdir(),f'{uuid4()}.txt')):    
     
     nx,ny,_  = Image.shape
@@ -339,12 +340,104 @@ def segment_channel(Image,
     
     fig.suptitle(f'{"+".join([DESCRIPTIONS[label] for label in Training[image_id]])  }')
 
-    fig.savefig(join(figs,f'{image_id}_{COLOUR_NAMES[channel]}.png'))
+    fig.savefig(join(path,f'{image_id}_{COLOUR_NAMES[channel]}.png'))
     
     if not show:
         close(fig)
         
     return P
+
+
+                
+# segment
+#
+# Segment all channels for one image. This is the supervisor that coordinates  functions that
+# perform the actual detailed work
+#
+# Parameters:
+#     Image       The image to ge segmented
+#     image_id    Image Identifier for use in headings
+#     path        Location of plot files
+#     show        Indicates whter images are to be displayed (or only saved)
+#     channels    The channels to be segments
+#     cmaps       Colour maps for displaying each channel
+
+def segment(Image, image_id, 
+            path     = './', 
+            show     = False,
+            channels = [BLUE, RED, GREEN, YELLOW],
+            cmaps    = {BLUE:'Blues', RED:'Reds', GREEN:'Greens', YELLOW:'YlOrBr'}):
+    component_files = []
+    try:
+        for channel in channels:
+            component_files.append(join(gettempdir(),f'{uuid4()}.txt'))
+            segment_channel(Image, image_id, 
+                            channel        = channel, 
+                            cmap           = cmaps[channel],
+                            path           = path,
+                            show           = show,
+                            component_file = component_files[-1])
+    except Exception as _:
+        print (f'{image_id} {exc_info()[0]}')
+    finally:
+        for component_file in component_files:
+            if exists(component_file):  # If there was an exception, file might not actually exist!
+                remove(component_file)
+        
+
+
+if __name__=='__main__':
+    start  = time()
+    parser = ArgumentParser('Segment HPA data using Otsu\'s algorithm')
+    parser.add_argument('--path',                default=r'C:\data\hpa-scc')
+    parser.add_argument('--image_set',           default = 'train512x512')
+    parser.add_argument('--image_id',            default = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0')
+    parser.add_argument('--show',                default=False, action='store_true')
+    parser.add_argument('--figs',                default= './figs')
+    parser.add_argument('--all',                 default=False, action='store_true')
+    parser.add_argument('--sample', type=int,    default=0)
+    args     = parser.parse_args()
+    
+    Training = read_training_expectations(path=args.path)
+    if args.sample:
+        n = args.sample
+        for image_id in sample(list(Training.keys()),args.sample):
+            print (f'{image_id}. {n} remaining')
+            segment(read_image(path      = args.path,
+                               image_id  = image_id,
+                               image_set = args.image_set),
+                    image_id = image_id,
+                    path     = args.figs,
+                    show     = args.show)
+            n-=1
+    elif args.all:
+        n = len(Training)
+        for image_id in sorted(Training.keys()):
+            print (f'{image_id}. {n} remaining')
+            segment(read_image(path      = args.path,
+                               image_id  = image_id,
+                               image_set = args.image_set),
+                    image_id = image_id,
+                    path     = args.figs,
+                    show     = args.show)
+            n -= 1
+    else:
+        segment(read_image(path      = args.path,
+                           image_id  = args.image_id,
+                           image_set = args.image_set),
+                image_id = args.image_id,
+                path     = args.figs,
+                show     = args.show)
+  
+    elapsed = time() - start
+    minutes = int(elapsed/60)
+    seconds = elapsed - 60*minutes
+    print (f'Elapsed Time {minutes} m {seconds:.2f} s')
+    
+    if args.show:
+        show()
+        
+# obsolete
 
 # combine
 
@@ -400,64 +493,3 @@ def anchor_components(Image,image_id, channels=[BLUE,RED],figs='./', show=False,
         col =  i%ncols
         axs[row,col].imshow(Matrix)
         i+= 1
-                
-# segment
-#
-# Segment all channels for image_id 
-#
-# Parameters:
-#     Image
-#     image_id
-#     figs
-#     show
-
-def segment(Image, image_id, figs='./', show=False):
-    component_files = [join(gettempdir(),f'{uuid4()}.txt') for _ in range(NCHANNELS)]
-    P2 = segment_channel(Image, image_id, channel=BLUE,                  figs=figs, show=show, component_file=component_files[BLUE])
-    P0 = segment_channel(Image, image_id, channel=RED,    cmap='Reds',   figs=figs, show=show, component_file=component_files[RED])
-    P1 = segment_channel(Image, image_id, channel=GREEN,  cmap='Greens', figs=figs, show=show, component_file=component_files[GREEN])
-    P3 = segment_channel(Image, image_id, channel=YELLOW, cmap='YlGn',   figs=figs, show=show, component_file=component_files[YELLOW])
-    anchor_components(Image,image_id, channels=[BLUE,RED],figs=figs, show=show, component_files=component_files, P=[P0,P1,P2,P3])
-    for component_file in component_files:
-        remove(component_file)
-        
-
-
-if __name__=='__main__':
-    start  = time()
-    parser = ArgumentParser('Segment HPA data using Otsu\'s algorithm')
-    parser.add_argument('--path',                default=r'C:\data\hpa-scc')
-    parser.add_argument('--image_set',           default = 'train512x512')
-    parser.add_argument('--image_id',            default = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0')
-    parser.add_argument('--show',                default=False, action='store_true')
-    parser.add_argument('--figs',                default= './figs')
-    parser.add_argument('--all',                 default=False, action='store_true')
-    parser.add_argument('--sample', type=int,    default=0)
-    args     = parser.parse_args()
-    
-    Training = read_training_expectations(path=args.path)
-    if args.sample:
-        for image_id in sample(list(Training.keys()),args.sample):
-            print (f'{image_id}.')
-            Image = read_image(path=args.path,image_id=image_id,image_set=args.image_set)
-            segment(Image, image_id, figs=args.figs, show=args.show)            
-    elif args.all:
-        n = len(Training)
-        for image_id in sorted(Training.keys()):
-            print (f'{image_id}. {n} remaining')
-            Image = read_image(path=args.path,image_id=image_id,image_set=args.image_set)
-            segment(Image, image_id, figs=args.figs, show=args.show)
-            n -= 1
-    else:
-        segment(read_image(path=args.path,image_id=args.image_id,image_set=args.image_set),
-                image_id=args.image_id, figs=args.figs, show=args.show)
-
-
-    
-    elapsed = time() - start
-    minutes = int(elapsed/60)
-    seconds = elapsed - 60*minutes
-    print (f'Elapsed Time {minutes} m {seconds:.2f} s')
-    
-    if args.show:
-        show()
