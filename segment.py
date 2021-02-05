@@ -20,7 +20,7 @@
 from   argparse          import ArgumentParser
 from   csv               import reader
 from   math              import isqrt
-from   matplotlib.pyplot import figure, show, cm, close
+from   matplotlib.pyplot import figure, show, cm, close,scatter
 from   matplotlib.image  import imread
 from   numpy             import zeros, array, var, mean, std, histogram
 from   os                import remove
@@ -380,7 +380,21 @@ def display_channel(Image, image_id,
     
     if not show:
         close(fig)
-                
+
+def get_thinned(Component,delta=[-1,0,1]):
+    def is_isolated(point,n=4+1):
+        count = 0
+        x,y = point
+        for dx in delta:
+            for dy in delta:
+                if (x+dx,y+dy) in Neighbours:
+                    count+=1
+                    if count>n:
+                        return False
+        return True
+    Neighbours = set(Component)
+    return [point for point in Component if is_isolated(point)]
+
 # segment
 #
 # Segment all channels for one image. This is the supervisor that coordinates  functions that
@@ -401,6 +415,7 @@ def segment(Image, image_id,
             cmaps    = {BLUE:'Blues', RED:'Reds', GREEN:'Greens', YELLOW:'YlOrBr'},
             keep_temp = False):
     component_files = []
+    Thinned         = []
     try:
         for channel in channels:
             component_files.append(join(gettempdir(),f'{uuid4()}.txt'))
@@ -421,6 +436,20 @@ def segment(Image, image_id,
                             path           = path,
                             show           = show)
             
+            Thinned.append([get_thinned(Component) for Component  in generate_components(component_files[-1],P=P)])
+    
+        fig = figure(figsize=(10,10))
+        axs = fig.subplots(2, 3)
+        index = 0
+        for channel in [BLUE, RED, GREEN, YELLOW]:
+            xs0 = [x for  tt in Thinned[0] for (x,y) in tt]
+            ys0 = [y for tt in Thinned[0] for (x,y) in tt]            
+            axs[index//2][index%2].scatter(xs0,ys0,s=1,c='b')
+            if channel!=BLUE:
+                xs = [x for  tt in Thinned[index] for (x,y) in tt]
+                ys = [y for tt in Thinned[index] for (x,y) in tt]
+                axs[index//2][index%2].scatter(xs,ys,s=1,c=['b','r','g','y'][index])
+            index += 1
     except Exception as _:
         print (f'{image_id} {exc_info()[0]}')
     finally:
