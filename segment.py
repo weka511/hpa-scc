@@ -232,21 +232,38 @@ def generate8components(Image,threshold=0.5,nx=512,ny=512,deltas=[-1,0,1],channe
 
 
 # parse_tuple
-
+# 
+# Parse a character representation of a tuple '(a,b)' into an actual tuple (a,b)
+# 
 def parse_tuple(s):
     return tuple([int(x) for x in s[1:-1].split(',')])
 
 # generate_components
+#
+# Generte components whose area exceeds a specified minimum 
+# (using len as a proxy for area)
+#
+# Parameters:
+#      component_file
+#      P               Minimum area
 
 def generate_components(component_file,P=0):
     with open(component_file,'r') as temp:
         for line in temp:
             Component = [parse_tuple(s) for s in line.strip().split()]
-            ll = len(Component)
             if len(Component)>P:
                 yield Component
                 
 # remove_false_findings
+#
+# Paramaters
+#      Image
+#      threshold      = -1,
+#      nx             = 256,
+#      ny             = 256,
+#      nsigma         = 1.0,
+#      channel        = BLUE,
+#      component_file 
 
 def remove_false_findings(Image,
                           threshold      = -1,
@@ -275,16 +292,43 @@ def remove_false_findings(Image,
     
     return Mask,n,bins,P
 
+
+        
 # segment_channel
 
 def segment_channel(Image,
                     image_id,
                     channel        = BLUE,
-                    cmap           = 'Blues',
-                    path           = './',
-                    show           = False,
                     component_file = join(gettempdir(),f'{uuid4()}.txt')):    
     
+    nx,ny,_  = Image.shape
+    
+    Thresholds,ICVs,n,bins = otsu(Image,nx,ny,channel=channel)
+    
+    Mask,n1,bins1,P = remove_false_findings(
+                          Image,
+                          threshold      = Thresholds[-1],
+                          nx             = nx,
+                          ny             = ny,
+                          channel        = channel,
+                          component_file = component_file)
+        
+    return P,Thresholds,ICVs,n,bins,n1,bins1,Mask
+
+# display_channel
+
+def display_channel(Image, image_id,
+                    Thresholds = [],
+                    ICVs       = [],
+                    n          = [],
+                    bins       = [],
+                    n1         = [],
+                    bins1      = [],
+                    Mask       = None,
+                    channel    = BLUE,
+                    cmap       = 'Blues',
+                    path       = './',
+                    show       = False):
     nx,ny,_  = Image.shape
     
     fig      = figure(figsize=(20,20))
@@ -296,7 +340,6 @@ def segment_channel(Image,
     axs[0,0].set_title(image_id)
     fig.colorbar(im, ax=axs[0,0], orientation='vertical')
     
-    Thresholds,ICVs,n,bins = otsu(Image,nx,ny,channel=channel)
     plot_hist(n,bins,axs=axs[1,1],title=IMAGE_LEVEL_LABELS[channel],channel=channel)
 
     axs[1,0].plot(range(len(ICVs)),ICVs, c='r', label='ICV')
@@ -307,7 +350,7 @@ def segment_channel(Image,
     ax2t.plot(range(len(Thresholds)),Thresholds,c='b', label='Threshold')
     ax2t.set_ylabel('Threshold')
     axs[1,0].legend(loc='lower center',framealpha=0.5)
-    ax2t.legend(loc='center right')
+    ax2t.legend(loc='center right') 
     
     Partitioned   = zeros((nx,ny,NRGB))
     for i in range(nx):
@@ -318,21 +361,12 @@ def segment_channel(Image,
                 else:
                     Partitioned[i,j,RED] = Image[i,j,channel]
                     Partitioned[i,j,GREEN] = Image[i,j,channel]
-                
+
     axs[0,1].imshow(Partitioned) 
     axs[0,1].axes.xaxis.set_ticks([])
     axs[0,1].axes.yaxis.set_ticks([]) 
-    axs[0,1].set_title('Partitioned')
-    
-    Mask,n,bins,P = remove_false_findings(
-                          Image,
-                          threshold      = Thresholds[-1],
-                          nx             = nx,
-                          ny             = ny,
-                          channel        = channel,
-                          component_file = component_file)
-    
-    plot_hist(n,bins,axs=axs[1,2],channel=channel,title='Components')
+    axs[0,1].set_title('Partitioned')    
+    plot_hist(n1,bins1,axs=axs[1,2],channel=channel,title='Components')
     if channel==YELLOW:
         for i in range(nx):
             for j in range(ny):
@@ -346,10 +380,6 @@ def segment_channel(Image,
     
     if not show:
         close(fig)
-        
-    return P
-
-
                 
 # segment
 #
@@ -374,12 +404,23 @@ def segment(Image, image_id,
     try:
         for channel in channels:
             component_files.append(join(gettempdir(),f'{uuid4()}.txt'))
-            segment_channel(Image, image_id, 
+            P,Thresholds,ICVs,n,bins,n1,bins1,Mask = segment_channel(
+                                                            Image, image_id, 
+                                                            channel        = channel, 
+                                                            component_file = component_files[-1])
+            display_channel(Image, image_id, 
+                            Thresholds     = Thresholds,
+                            ICVs           = ICVs,
+                            n              = n,
+                            bins           = bins,
+                            n1             = n1,
+                            bins1          = bins1,
+                            Mask           = Mask,
                             channel        = channel, 
                             cmap           = cmaps[channel],
                             path           = path,
-                            show           = show,
-                            component_file = component_files[-1])
+                            show           = show)
+            
     except Exception as _:
         print (f'{image_id} {exc_info()[0]}')
     finally:
