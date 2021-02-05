@@ -30,6 +30,7 @@ from   sys               import float_info, exc_info
 from   tempfile          import gettempdir
 from   time              import time
 from   uuid              import uuid4
+from   traceback         import print_exc
 
 RED                = 0      # Channel number for Microtubules 
 GREEN              = 1      # Channel number for Protein of interest
@@ -297,7 +298,6 @@ def remove_false_findings(Image,
 # segment_channel
 
 def segment_channel(Image,
-                    image_id,
                     channel        = BLUE,
                     component_file = join(gettempdir(),f'{uuid4()}.txt')):    
     
@@ -381,8 +381,8 @@ def display_channel(Image, image_id,
     if not show:
         close(fig)
 
-def get_thinned(Component,delta=[-1,0,1]):
-    def is_isolated(point,n=4+1):
+def get_thinned(Component,delta=[-1,0,1],n=4+1):
+    def is_isolated(point):
         count = 0
         x,y = point
         for dx in delta:
@@ -420,7 +420,7 @@ def segment(Image, image_id,
         for channel in channels:
             component_files.append(join(gettempdir(),f'{uuid4()}.txt'))
             P,Thresholds,ICVs,n,bins,n1,bins1,Mask = segment_channel(
-                                                            Image, image_id, 
+                                                            Image, 
                                                             channel        = channel, 
                                                             component_file = component_files[-1])
             display_channel(Image, image_id, 
@@ -436,22 +436,40 @@ def segment(Image, image_id,
                             path           = path,
                             show           = show)
             
-            Thinned.append([get_thinned(Component) for Component  in generate_components(component_files[-1],P=P)])
+            Thinned.append([get_thinned(Component,n=6) for Component  in generate_components(component_files[-1],P=P)])
     
-        fig = figure(figsize=(10,10))
-        axs = fig.subplots(2, 3)
+        fig   = figure(figsize=(10,10))
+        axs   = fig.subplots(2, 2)
         index = 0
+        nx,ny,_  = Image.shape
         for channel in [BLUE, RED, GREEN, YELLOW]:
-            xs0 = [x for  tt in Thinned[0] for (x,y) in tt]
-            ys0 = [y for tt in Thinned[0] for (x,y) in tt]            
-            axs[index//2][index%2].scatter(xs0,ys0,s=1,c='b')
-            if channel!=BLUE:
-                xs = [x for  tt in Thinned[index] for (x,y) in tt]
-                ys = [y for tt in Thinned[index] for (x,y) in tt]
-                axs[index//2][index%2].scatter(xs,ys,s=1,c=['b','r','g','y'][index])
+            Mask = zeros((nx,ny,NCHANNELS))
+            
+            for  tt in Thinned[0]:
+                for (x,y) in tt:
+                    Mask[x,y,BLUE] = 1
+                    
+            if channel ==RED or channel==GREEN:
+                for  tt in Thinned[index]:
+                    for (x,y) in tt:
+                        Mask[x,y,channel] = 1
+            elif channel==YELLOW:
+                for  tt in Thinned[index]:
+                    for (x,y) in tt:
+                        Mask[x,y,GREEN] = 1
+                        Mask[x,y,RED] = 1
+            
+            for i in range(nx):
+                for j in range(nx):
+                    if all(Mask[i,j,k]==0 for k in range(3)):
+                        for k in range(3):
+                            Mask[i,j,k] = 0.5
+                            
+            axs[index//2][index%2].imshow(Mask[:,:,0:-1])
             index += 1
     except Exception as _:
         print (f'{image_id} {exc_info()[0]}')
+        print_exc() 
     finally:
         if keep_temp: return
         for component_file in component_files:
