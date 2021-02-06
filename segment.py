@@ -39,7 +39,11 @@ YELLOW             = 3      # Channel number for Endoplasmic reticulum
 NCHANNELS          = 4      # Number of channels
 NRGB               = 3      # Number of actual channels for graphcs
 
-COLOUR_NAMES       = ['red',  'green', 'blue', 'yellow']
+COLOUR_NAMES       = ['red',
+                      'green',
+                      'blue', 
+                      'yellow']
+
 IMAGE_LEVEL_LABELS = ['Microtubules', 
                       'Protein/antibody',
                       'Nuclei channels',
@@ -145,7 +149,55 @@ def plot_hist(n,bins,axs=None,title=None,channel=BLUE):
     axs.axes.yaxis.set_ticks([])
     if title!= None:
         axs.set_title(title) 
+
+# generate_neighbours
+#
+# Used to iterate through neighbours of a point
+#
+# Parameters:
+#     x
+#     y
+#     delta
+
+def generate_neighbours(x,y,delta=[-1,0,1]):
+    for dx in delta:
+        for dy in delta:
+            if dx==0 and dy==0: continue
+            yield x + dx, y + dy
+
+# parse_tuple
+# 
+# Parse a character representation of a tuple '(a,b)' into an actual tuple (a,b)
+# 
+def parse_tuple(s):
+    return tuple([int(x) for x in s[1:-1].split(',')])
+
+
+class CMask:
+    def __init__(self,nx,ny,n_channels=NCHANNELS):
+        self.nx         = nx
+        self.ny         = ny
+        self.n_channels = n_channels
+        self.Mask       = zeros((nx,ny,n_channels))
         
+    def set(self,x,y,channel,value=1):
+        if channel ==YELLOW:
+            self.Mask[x,y,RED] = value
+            self.Mask[x,y,GREEN] = value
+        else:
+            self.Mask[x,y,channel] = value
+            
+    def establish_background(self,background=0.5):
+        for i in range(self.nx):
+            for j in range(self.nx):
+                if all(self.Mask[i,j,k]==0 for k in range(self.n_channels)):
+                    for k in range(3):
+                            self.Mask[i,j,k] = background
+     
+    def show(self,ax):
+        ax.imshow(self.Mask[:,:,0:-1])
+
+            
 # otsu
 #
 # Segment image using Otsu's method
@@ -216,15 +268,10 @@ def generate8components(Image,threshold=0.5,nx=512,ny=512,deltas=[-1,0,1],channe
             i,j         = Ripe.pop()
             Closed[i,j] = True
             Component.append((i,j))
-            for delta_i in deltas:
-                for delta_j in deltas:
-                    if delta_i==0 and delta_j==0: continue     # ignore case where we don't move
-                    i1 = i+delta_i
-                    j1 = j+delta_j
-                    if i1<0 or i1>=nx or j1<0 or j1>=ny: continue   # Don't move outside image
-                    
-                    if Image[i1,j1,channel]>threshold and not Closed[i1,j1] and not (i1,j1) in Ripe:
-                        Ripe.add((i1,j1))
+            for i1,j1 in generate_neighbours(i,j):
+                if i1<0 or i1>=nx or j1<0 or j1>=ny: continue   # Don't move outside image       
+                if Image[i1,j1,channel]>threshold and not Closed[i1,j1] and not (i1,j1) in Ripe:
+                    Ripe.add((i1,j1))
         yield Component
         
         next_set = find_first_ripe()
@@ -232,12 +279,7 @@ def generate8components(Image,threshold=0.5,nx=512,ny=512,deltas=[-1,0,1],channe
         Ripe    = set([next_set])               
 
 
-# parse_tuple
-# 
-# Parse a character representation of a tuple '(a,b)' into an actual tuple (a,b)
-# 
-def parse_tuple(s):
-    return tuple([int(x) for x in s[1:-1].split(',')])
+
 
 # generate_components
 #
@@ -285,11 +327,11 @@ def remove_false_findings(Image,
                 
     P      = mean(Areas) - nsigma*std(Areas)
     n,bins = histogram(Areas,bins=25)    
-    Mask   = zeros((nx,ny,NCHANNELS)) 
-  
+    
+    Mask    = CMask(nx,ny)
     for Component in generate_components(component_file,P=P):
         for i,j in Component:
-            Mask[i,j,channel] = 1
+            Mask.set(i,j,channel)
     
     return Mask,n,bins,P
 
@@ -367,12 +409,9 @@ def display_channel(Image, image_id,
     axs[0,1].axes.yaxis.set_ticks([]) 
     axs[0,1].set_title('Partitioned')    
     plot_hist(n1,bins1,axs=axs[1,2],channel=channel,title='Components')
-    if channel==YELLOW:
-        for i in range(nx):
-            for j in range(ny):
-                Mask[i,j,RED]   = Mask[i,j,YELLOW]
-                Mask[i,j,GREEN] = Mask[i,j,YELLOW]
-    axs[0,2].imshow(Mask[:,:,0:-1])
+ 
+    Mask.establish_background()
+    Mask.show( axs[0,2])
     
     fig.suptitle(f'{"+".join([DESCRIPTIONS[label] for label in Training[image_id]])  }')
 
@@ -381,19 +420,52 @@ def display_channel(Image, image_id,
     if not show:
         close(fig)
 
-def get_thinned(Component,delta=[-1,0,1],n=4+1):
-    def is_isolated(point):
+
+            
+# get_thinned
+#
+# Eliminate interior points from compoent
+
+def get_thinned(Component,n=4):
+    # is_isolated
+    #
+    # Establish whether point is isolated by counting neighbours.
+    
+    def is_isolated(x,y):
         count = 0
-        x,y = point
-        for dx in delta:
-            for dy in delta:
-                if (x+dx,y+dy) in Neighbours:
-                    count+=1
-                    if count>n:
-                        return False
+        for x1,y1 in generate_neighbours(x,y,delta=[-1,0,1]):
+            if (x1,y1) in Neighbours:
+                count+=1
+                if count>n:
+                    return False
         return True
     Neighbours = set(Component)
-    return [point for point in Component if is_isolated(point)]
+    return [(x,y) for (x,y) in Component if is_isolated(x,y)]
+
+
+        
+def display_thinned(Thinned,Image, background = 0.5):
+    fig        = figure(figsize=(10,10))
+    axs        = fig.subplots(2, 2)
+    index      = 0
+    nx,ny,_    = Image.shape
+
+    for channel in [BLUE, RED, GREEN, YELLOW]:
+        Mask = CMask(nx,ny)
+        
+        for  point in Thinned[0]:
+            for (x,y) in point:
+                Mask.set(x,y,BLUE)
+        
+        if channel!=BLUE:
+            for  point in Thinned[index]:
+                for (x,y) in point:
+                    Mask.set(x,y,channel)
+          
+        Mask.establish_background()
+        Mask.show(axs[index//2][index%2])
+        index += 1
+
 
 # segment
 #
@@ -436,37 +508,10 @@ def segment(Image, image_id,
                             path           = path,
                             show           = show)
             
-            Thinned.append([get_thinned(Component,n=6) for Component  in generate_components(component_files[-1],P=P)])
-    
-        fig   = figure(figsize=(10,10))
-        axs   = fig.subplots(2, 2)
-        index = 0
-        nx,ny,_  = Image.shape
-        for channel in [BLUE, RED, GREEN, YELLOW]:
-            Mask = zeros((nx,ny,NCHANNELS))
+            Thinned.append([get_thinned(Component,n=5) for Component  in generate_components(component_files[-1],P=P)])
             
-            for  tt in Thinned[0]:
-                for (x,y) in tt:
-                    Mask[x,y,BLUE] = 1
-                    
-            if channel ==RED or channel==GREEN:
-                for  tt in Thinned[index]:
-                    for (x,y) in tt:
-                        Mask[x,y,channel] = 1
-            elif channel==YELLOW:
-                for  tt in Thinned[index]:
-                    for (x,y) in tt:
-                        Mask[x,y,GREEN] = 1
-                        Mask[x,y,RED] = 1
+        display_thinned(Thinned,Image)
             
-            for i in range(nx):
-                for j in range(nx):
-                    if all(Mask[i,j,k]==0 for k in range(3)):
-                        for k in range(3):
-                            Mask[i,j,k] = 0.5
-                            
-            axs[index//2][index%2].imshow(Mask[:,:,0:-1])
-            index += 1
     except Exception as _:
         print (f'{image_id} {exc_info()[0]}')
         print_exc() 
