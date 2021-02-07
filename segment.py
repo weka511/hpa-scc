@@ -112,22 +112,6 @@ def read_image(path        = r'C:\data\hpa-scc',
         Image[:,:,channel] = image_mono
     return Image        
 
-# create_selection
-
-def create_selection(Image,
-                 Selector = [
-                     [1,0,0,1],
-                     [0,1,0,1],
-                     [0,0,1,0]]):
-    nx,ny,_ = Image.shape
-    Product = zeros((nx,ny,NRGB))
-    Matrix  = array(Selector)
-    for i in range(nx):
-        for j in range(ny):
-            for k in range(NRGB):
-                Product[i,j,k] = sum([Matrix[k,l] * Image[i,j,l] for l in range(NCHANNELS)])
-  
-    return Product
 
 # plot_hist
 #
@@ -171,22 +155,37 @@ def generate_neighbours(x,y,delta=[-1,0,1]):
 # 
 def parse_tuple(s):
     return tuple([int(x) for x in s[1:-1].split(',')])
-
+# CMask
+#
+# A class used for diplaying 4 colour data in RGB
 
 class CMask:
+    YGweight = 0.5
+    YRweight = 1.0
+    
     def __init__(self,nx,ny,n_channels=NCHANNELS):
         self.nx         = nx
         self.ny         = ny
         self.n_channels = n_channels
         self.Mask       = zeros((nx,ny,n_channels))
         
+    # set
+    #
+    # Set value of specified pixel
+    
+    # For wesights, see Darien Schettler's comment 
+    # https://www.kaggle.com/c/hpa-single-cell-image-classification/discussion/214863
     def set(self,x,y,channel,value=1):
         if channel ==YELLOW:
-            self.Mask[x,y,RED] = value
-            self.Mask[x,y,GREEN] = value
+            self.Mask[x,y,RED]   = CMask.YRweight * value
+            self.Mask[x,y,GREEN] = CMask.YGweight * value 
         else:
             self.Mask[x,y,channel] = value
-            
+     
+    # establish_background
+    #
+    # Set background to specified shade of grey
+    
     def establish_background(self,background=0.5):
         for i in range(self.nx):
             for j in range(self.nx):
@@ -194,6 +193,10 @@ class CMask:
                     for k in range(3):
                             self.Mask[i,j,k] = background
      
+    # show
+    #
+    # Display data as RGB
+    
     def show(self,ax):
         ax.imshow(self.Mask[:,:,0:-1])
 
@@ -444,7 +447,7 @@ def get_thinned(Component,n=4):
 
 
         
-def display_thinned(Thinned,Image, background = 0.5):
+def display_thinned(image_id,Thinned,Image, background = 0.5,path='./'):
     fig        = figure(figsize=(10,10))
     axs        = fig.subplots(2, 2)
     index      = 0
@@ -465,7 +468,10 @@ def display_thinned(Thinned,Image, background = 0.5):
         Mask.establish_background()
         Mask.show(axs[index//2][index%2])
         index += 1
-
+        fig.suptitle(f'Segmenting {image_id}')
+    
+        fig.savefig(join(path,f'{image_id}-segment.png'))
+     
 
 # segment
 #
@@ -510,7 +516,7 @@ def segment(Image, image_id,
             
             Thinned.append([get_thinned(Component,n=5) for Component  in generate_components(component_files[-1],P=P)])
             
-        display_thinned(Thinned,Image)
+        display_thinned(image_id,Thinned,Image,path=path)
             
     except Exception as _:
         print (f'{image_id} {exc_info()[0]}')
@@ -526,28 +532,68 @@ def segment(Image, image_id,
 if __name__=='__main__':
     start  = time()
     parser = ArgumentParser('Segment HPA data using Otsu\'s algorithm')
-    parser.add_argument('--path',             default=r'C:\data\hpa-scc')
-    parser.add_argument('--image_set',        default = 'train512x512')
-    parser.add_argument('--image_id',         default = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0')
-    parser.add_argument('--show',             default=False, action='store_true')
-    parser.add_argument('--figs',             default= './figs')
-    parser.add_argument('--all',              default=False, action='store_true')
-    parser.add_argument('--sample', type=int, default=0)
-    parser.add_argument('--keep_temp',        default=False, action='store_true')
+    parser.add_argument('--path',
+                        default = r'C:\data\hpa-scc',
+                        help    = 'Path to data')
+    parser.add_argument('--image_set',
+                        default = 'train512x512',
+                        help    = 'Identified subset of data-- e.g. train512x512')
+    parser.add_argument('--image_id',
+                        default = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
+                        help    = 'Identifies image to be segmented (if only one). See --sample, --all, and --read')
+    parser.add_argument('--show', 
+                        default = False,
+                        action  = 'store_true',
+                        help    = 'Display plots')
+    parser.add_argument('--figs',   
+                        default = './figs',
+                        help    = 'Identifies where to store plots')
+    parser.add_argument('--all', 
+                        default = False,
+                        action  = 'store_true',
+                        help    = 'Specifes that all images are to be processed')
+    parser.add_argument('--sample',
+                        type    = int, 
+                        default = 0,
+                        help    = 'Specified number of images are to be sampled at random and processed')
+    parser.add_argument('--keep_temp', 
+                        default = False,
+                        action  = 'store_true',
+                        help    = 'Retain temporary files after processing')
+    parser.add_argument('--history',
+                        default = 'history.txt',
+                        help    = 'File name for keeping list of files processed (only if --sample)')
+    parser.add_argument('--read', 
+                        default = '',
+                        help    = 'Used to process i,mages whose names are specified in file')
     args     = parser.parse_args()
     
     Training = read_training_expectations(path=args.path)
-    if args.sample:
+    if len(args.read)>0:
+        with open(args.read) as history:
+            for line in history:
+                image_id = line.strip()
+                print (f'{image_id}')
+                segment(read_image(path      = args.path,
+                                   image_id  = image_id,
+                                   image_set = args.image_set),
+                        image_id = image_id,
+                        path     = args.figs,
+                        show     = args.show)                
+    elif args.sample:
         n = args.sample
-        for image_id in sample(list(Training.keys()),args.sample):
-            print (f'{image_id}. {n} remaining')
-            segment(read_image(path      = args.path,
-                               image_id  = image_id,
-                               image_set = args.image_set),
-                    image_id = image_id,
-                    path     = args.figs,
-                    show     = args.show)
-            n-=1
+        
+        with open(args.history,'w') as history:
+            for image_id in sample(list(Training.keys()),args.sample):
+                print (f'{image_id}. {n} remaining')
+                history.write(f'{image_id}\n')
+                segment(read_image(path      = args.path,
+                                   image_id  = image_id,
+                                   image_set = args.image_set),
+                        image_id = image_id,
+                        path     = args.figs,
+                        show     = args.show)
+                n-=1
     elif args.all:
         n = len(Training)
         for image_id in sorted(Training.keys()):
@@ -576,59 +622,3 @@ if __name__=='__main__':
     if args.show:
         show()
         
-# obsolete
-
-# combine
-
-def anchor_components(Image,image_id, channels=[BLUE,RED],figs='./', show=False, component_files=[],P=[],nx=512,ny=512): #FIXME
-    def get_centroid(component):
-        sum_x = 0
-        sum_y = 0
-        for x,y in component:
-            sum_x += x
-            sum_y += y
-        return (sum_x/len(component),sum_y/len(component))
-    
-    def get_nearest_centroid(x,y,Centroids):
-        min_distance = float_info.max
-        index        = None
-        for i in range(len(Centroids)):
-            x0,y0    = Centroids[i]
-            distance = (x0-x)**2 + (y0-y)**2
-            if distance<min_distance:
-                index         = i
-                min_distance = distance
-        return index
-    
-    Base      = []
-    Centroids = []
-    for component in generate_components(component_files[channels[0]],P=P[channels[0]]):
-        Base.append(component)
-        Centroids.append(get_centroid(component))
-        
-    Assignments=[]
-    for component in generate_components(component_files[channels[1]],P=P[channels[1]]):
-        x,y   = get_centroid(component)
-        index = get_nearest_centroid(x,y,Centroids)
-        Assignments.append(index)
-        x0,y0 = Centroids[index]
-        print (x,y,x0,y0)
-    nrows    = isqrt(len(Centroids))
-    ncols    = len(Centroids)//nrows + len(Centroids)%nrows
-    fig      = figure(figsize=(20,20))
-    axs      = fig.subplots(nrows,ncols)
-    i        = 0
-    for base in generate_components(component_files[channels[0]],P=P[channels[0]]):
-        Matrix = zeros((nx,ny,NRGB))
-        for x,y in base:
-            Matrix[x,y,channels[0]] = 1
-        j = 0
-        for component in generate_components(component_files[channels[1]],P=P[channels[1]]):
-            if Assignments[j]==i:
-                for x,y in component:
-                    Matrix[x,y,channels[1]] = 1                
-            j+=1
-        row = i//ncols
-        col =  i%ncols
-        axs[row,col].imshow(Matrix)
-        i+= 1
