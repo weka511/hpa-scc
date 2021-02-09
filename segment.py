@@ -527,8 +527,6 @@ def segment(Image, image_id,
             if exists(component_file):  # If there was an exception, file might not actually exist!
                 remove(component_file)
         
-
-
 if __name__=='__main__':
     start  = time()
     parser = ArgumentParser('Segment HPA data using Otsu\'s algorithm')
@@ -565,7 +563,7 @@ if __name__=='__main__':
                         help    = 'File name for keeping list of files processed (only if --sample)')
     parser.add_argument('--read', 
                         default = '',
-                        help    = 'Used to process i,mages whose names are specified in file')
+                        help    = 'Used to process images whose names are specified in file')
     args     = parser.parse_args()
     
     Training = read_training_expectations(path=args.path)

@@ -18,7 +18,7 @@
 #  Find images  that have only one label
 
 from   argparse          import ArgumentParser
-from   csv               import writer, QUOTE_MINIMAL
+from   csv               import writer
 from   segment           import read_training_expectations
 from   time              import time
 
