@@ -17,7 +17,8 @@
 
 
 \documentclass[]{article}
-\usepackage[acronym,toc]{glossaries}
+\usepackage[acronym,toc,nonumberlist]{glossaries}
+\usepackage{glossaries-extra}
 \usepackage{url}
 \usepackage{float}
 \usepackage{caption}
@@ -26,9 +27,9 @@
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{tocloft}
-\loadglsentries{glossary-entries}
-
+\usepackage[document]{ragged2e}
 \makeglossaries
+\loadglsentries{glossary-entries}
 
 %opening
 \title{Human Protein Atlas - Single Cell Classification\\Notes}
@@ -61,42 +62,55 @@ My notes on the Human Protein Atlas - Single Cell Classification project.
 	- Green looks to be in the Nucleoplasm and Mitochondria. Therefore, the cell level label is Nucleoplasm and Mitochondria
 	
 	Cell 4:
-	- No green or green is not present in any organelle. Therefore, the cell level label is Negative. \cite{Schettler2021}
+	- No green or green is not present in any organelle. Therefore, the cell level label is Negative. \cite{schettler2021}
 \end{quotation}
 
 \begin{table}[H]
 	\begin{center}
 		\caption{Labels}
 		\begin{tabular}{|r|l|} \hline
-				 0&\gls{nucleoplasm}\\ \hline
-				 1&\gls{nuclear_membrane}\\ \hline
-				 2&\glspl{nucleolus}\\ \hline
-				 3&\gls{nucleolus_fibrillar_center}\\ \hline
-				 4&\gls{nuclear_speckles}\\ \hline
-				 5&\gls{nuclear_bodies}\\ \hline
-				 6&\gls{endoplasmic_reticulum}\\ \hline
-				 7&\gls{golgi_apparatus}\\ \hline
-				 8&\gls{intermediate_filament}\\ \hline
-				 9&\gls{actin} filaments\\\hline
-				 10&\gls{microtubules}\\\hline
-				 11&\gls{mitotic_spindle}\\\hline
-				 12&\gls{centrosome}\\\hline
-				 13&\gls{plasma_membrane}\\\hline
-				 14&\glspl{mitochondrion}\\\hline
-				 15&\gls{aggresome}\\\hline
-				 16&\gls{cytosol}\\\hline
-				 17&\glspl{vesicle} and \gls{punctate} cytosolic patterns\\\hline
+				 0&\Gls{nucleoplasm}\\ \hline
+				 1&\Gls{nuclear_membrane}\\ \hline
+				 2&\Glspl{nucleolus}\\ \hline
+				 3&\Gls{nucleolus_fibrillar_center}\\ \hline
+				 4&\Gls{nuclear_speckles}\\ \hline
+				 5&\Gls{nuclear_bodies}\\ \hline
+				 6&\Gls{endoplasmic_reticulum}\\ \hline
+				 7&\Gls{golgi_apparatus}\\ \hline
+				 8&\Gls{intermediate_filament}\\ \hline
+				 9&\Gls{actin} filaments\\\hline
+				 10&\Gls{microtubules}\\\hline
+				 11&\Gls{mitotic_spindle}\\\hline
+				 12&\Gls{centrosome}\\\hline
+				 13&\Gls{plasma_membrane}\\\hline
+				 14&\Glspl{mitochondrion}\\\hline
+				 15&\Gls{aggresome}\\\hline
+				 16&\Gls{cytosol}\\\hline
+				 17&\Glspl{vesicle} and \gls{punctate} cytosolic patterns\\\hline
 				 18&Negative \\ \hline
 		\end{tabular}
 	\end{center}
 \end{table}
 
+Metric for evaluation--\gls{mAP}.
+
 \section{Segmentation}
 
-\cite{otsu1979threshold} \cite{win2018comparative}
+\begin{itemize}
+	\item Usually in biological images, cells are crowded and cell borders are hard to tell (especially in tissue), so a common protocol is to segment the nuclei first, and use them as seeds to segment the cells--\cite{liao2021ground}.
+	\item My first na\"ive version of Watershed wasn't successful, but check out \cite{najman1994watershed}.
+	\item Try Otsu's method \cite{otsu1979threshold} combined with exploration of 8-connected neighbourhood.
+	 \cite{win2018comparative}
+	\item \cite{jo2021puzzle}
+\end{itemize}
+
+
+
 
 \clearpage
 
+
+\printacronyms
 \printglossary
 
 \bibliographystyle{unsrt}

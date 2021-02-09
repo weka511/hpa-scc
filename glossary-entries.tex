@@ -19,8 +19,11 @@
 
 \newacronym{ER}{ER}{Endoplasmic reticulum}
 
+\newacronym{mAP}{mAP}{mean average precision\cite{hio2018mAP,mobassir2020understanding}}
+
 \newacronym{MTOC}{MTOC}{microtubule-organizing centre}
 
+\newacronym{ROI}{RO}{region of interest\cite{kumar2019instance}}
 
 \newglossaryentry{actin}{
 	name={actin},
@@ -45,7 +48,7 @@
 	description={Unstructured aqueous phase of the \gls{cytoplasm} excluding organelles, membranes, and insoluble cytoskeletal  components\cite{lodish2003molecular}}}
 
 \newglossaryentry{endoplasmic_reticulum}{
-	name= {Endoplasmic reticulum},
+	name= {endoplasmic reticulum},
 	description={Network of interconnected membranous structures within the \gls{cytoplasm} of eukaryotic cells continquous with the outer nuclear envelope. The rough \gls{ER}, which is associated with ribosomes, funstions in the synthesis and processing of secreted and membrane proteins; the smooth \gls{ER}, which lacks ribosomes, functions in lipid synthesis\cite{lodish2003molecular}}}
 
 
@@ -64,46 +67,46 @@
 
 
 \newglossaryentry{microtubules} {
-	name= {Microtubules} ,
+	name= {microtubules} ,
 	description={Cytoskeletal fiber that is formed by polymerization of $\alpha,\beta$-tubulin monomers, and exhibits structural and functional polarity. Microtubes are important components of cilia, flagella, the \gls{mitotic_spindle}, and other cellular structures\cite{lodish2003molecular}}}
 
 
 \newglossaryentry{mitochondrion} {
-	name= {Mitochondrion},
+	name= {mitochondrion},
 	plural={mitochondria},
 	description={Large \gls{organelle} that is surrounded by two phosphlipid bilayer membranes, contyains DNA, and carries out osidative phosphorylation, thereby producting much of the \gls{ATP} in eukaryotic cells\cite{lodish2003molecular} }}
 
 
 \newglossaryentry{mitotic_spindle} {
-	name={Mitotic spindle},
+	name={mitotic spindle},
 	description={The mitotic spindle is a microtubule-made machine required for chromosome segregation during mitosis. Several pathways and molecules contribute to the assembly of this structure, which shows intrinsic dynamic properties. The dynamic nature of spindle microtubules plays a key role in error correction, as well as in the generation of force necessary to move chromosomes. Additionally, several molecular motors use spindle microtubules as tracks and, together with microtubule stabilizing as well as destabilizing proteins, they participate in proper spindle assembly and function. Here we summarize the essential concepts and principles behind the formation of this robust chromosome segregation machine\cite{bradshaw2015encyclopedia}}}
 
 \newglossaryentry{nuclear_bodies} {
-	name= {Nuclear bodies},
+	name= {nuclear bodies},
 	description={Nuclear bodies including nucleoli, Cajal bodies, nuclear speckles, Polycomb bodies, and paraspeckles are membrane-less subnuclear organelles. They are steady-state structures that dynamically respond to basic physiological processes as well as various forms of stress, altered metabolic conditions and alterations in cellular signaling. The formation of specific nuclear bodies has been suggested to follow stochastic and ordered assembly models. In addition, a seeding mechanism has been proposed to assemble, maintain, and regulate particular nuclear bodies. In coordination with noncoding RNAs, chromatin modifiers and other machineries, various nuclear bodies have been shown to sequester and modify proteins, process RNAs and assemble ribonucleoprotein complexes, as well as epigenetically regulate gene expression. Understanding the functional relationships between the three-dimensional organization of the genome and nuclear bodies is essential to fully uncover the regulation of gene expression and its implications in human diseases.\cite{mao2011biogenesis}}}
 
 \newglossaryentry{nuclear_membrane}{
-	name={Nuclear membrane},
+	name={nuclear membrane},
 	description={A nuclear membrane is a double membrane that encloses the cell nucleus. It serves to separate the chromosomes from the rest of the cell. The nuclear membrane includes an array of small holes or pores that permit the passage of certain materials, such as nucleic acids and proteins, between the nucleus and cytoplasm.\cite{segre2021}}}
 
 \newglossaryentry{nuclear_speckles}{
-	name={Nuclear speckles},
+	name={nuclear speckles},
 	description={Nuclear speckles, also known as interchromatin granule clusters, are nuclear domains enriched in pre-mRNA splicing factors, located in the interchromatin regions of the nucleoplasm of mammalian cells. When observed by immunofluorescence microscopy, they usually appear as 20–50 irregularly shaped structures that vary in size. Speckles are dynamic structures, and their constituents can exchange continuously with the nucleoplasm and other nuclear locations, including active transcription sites. Studies on the composition, structure, and dynamics of speckles have provided an important paradigm for understanding the functional organization of the nucleus and the dynamics of the gene expression machinery.\cite{spector2011nuclear}}}
 
 
 \newglossaryentry{nucleolus_fibrillar_center}{
-	name={Nucleolus fibrillar center},
+	name={nucleolus fibrillar center},
 	description={The nucleolus fibrillar center (FC) is a sub-compartment of most metazoan nucleoli. The transcription of ribosomal RNA (rRNA) genes generates 2 structures that are found in all nucleoli: the dense fibrillar component (DFC) and the granular component (GC). The DFC contains newly synthesized preribosomal RNA and a collection of proteins; the GC is made up of nearly completed preribosomal particles destined for the cytoplasm. In most metazoans, but generally not in lower eukaryotes, a third component, the FC, can be seen. The FC is surrounded by the DFC. The zone of transcription from multiple copy rRNA genes is in the border region between these 2 structures\cite{nucleolus:fibrillar:center}}}
 
 
 \newglossaryentry{nucleolus} {
-	name= {Nucleolus},
+	name= {nucleolus},
 	plural={Nucleoli},
 	description={Large structure in the nucleus of eukaryotic cells where rRNA synthesis and processing occurs anr ribosome subunits are assembled\cite{lodish2003molecular}}}
 
 
 \newglossaryentry{nucleoplasm} {
-	name={Nucleoplasm},
+	name={nucleoplasm},
 	description={Similar to the cytoplasm of a cell, the nucleus contains nucleoplasm, also known as karyoplasm, or karyolymph or nucleus sap. The nucleoplasm is a type of protoplasm, and is enveloped by the nuclear envelope (also known as the nuclear membrane). The nucleoplasm includes the chromosomes and nucleolus. Many substances such as nucleotides (necessary for purposes such as DNA replication) and enzymes (which direct activities that take place in the nucleus) are dissolved in the nucleoplasm. The soluble, liquid portion of the nucleoplasm is called the nucleosol or nuclear hyaloplasm\cite{enwiki:972970373}}}
 
 \newglossaryentry{organelle}{
@@ -111,18 +114,13 @@
 	description={Any membrane-limited subcellular structure find in eukaroyic cells\cite{lodish2003molecular}}}
 	
 \newglossaryentry{plasma_membrane} {
-	name={Plasma membrane},
+	name={plasma membrane},
 	description={The membrane surrounding a cell that separated the cell from its external environment; it consists of a phospholipid bilayer and associated membrane lipids and proteins\cite{lodish2003molecular}}}
 
 \newglossaryentry{punctate} {
 	name= {punctate},
 	description={Marked with dots}}
 
-
-
 \newglossaryentry{vesicle}{
-	name= {Vesicle},
-	description={A vesicle is a structure within or outside a cell, consisting of liquid or cytoplasm enclosed by a lipid bilayer. Vesicles form naturally during the processes of secretion (exocytosis), uptake (endocytosis) and transport of materials within the plasma membrane. Alternatively, they may be prepared artificially, in which case they are called liposomes (not to be confused with lysosomes). If there is only one phospholipid bilayer, they are called unilamellar liposome vesicles; otherwise they are called multilamellar. The membrane enclosing the vesicle is also a lamellar phase, similar to that of the plasma membrane, and intracellular vesicles can fuse with the plasma membrane to release their contents outside the cell. Vesicles can also fuse with other organelles within the cell. A vesicle released from the cell is known as an extracellular vesicle\cite{enwiki:1000372338} }}
-
-
-
+	name= {vesicle},
+	description={A vesicle is a structure within or outside a cell, consisting of liquid or cytoplasm enclosed by a lipid bilayer. Vesicles form naturally during the processes of secretion (exocytosis), uptake (endocytosis) and transport of materials within the plasma membrane. Alternatively, they may be prepared artificially, in which case they are called liposomes (not to be confused with lysosomes). If there is only one phospholipid bilayer, they are called unilamellar liposome vesicles; otherwise they are called multilamellar. The membrane enclosing the vesicle is also a lamellar phase, similar to that of the plasma membrane, and intracellular vesicles can fuse with the plasma membrane to release their contents outside the cell. Vesicles can also fuse with other organelles within the cell. A vesicle released from the cell is known as an extracellular vesicle\cite{enwiki:1000372338}}}
