@@ -19,6 +19,7 @@
 
 from   argparse          import ArgumentParser
 from   csv               import writer
+from   random            import shuffle
 from   segment           import read_training_expectations
 from   time              import time
 
@@ -26,11 +27,22 @@ if __name__=='__main__':
     start  = time()
     parser = ArgumentParser('Find images  that have only one label')
     parser.add_argument('--path',
-                        default = r'C:\data\hpa-scc',
+                        default = r'd:\data\hpa-scc',
                         help    = 'Path to data')
     parser.add_argument('--out',
                         default = 'singletons.csv',
                         help    = 'Output file')
+    parser.add_argument('--selection',
+                        default = 'selection.txt',
+                        help    = 'Selection of files to be processed by segment.py')
+    parser.add_argument('--classes',
+                        default = ['all'],
+                        nargs   = '+',
+                        help    = 'List of classes to be processed by segment.py')
+    parser.add_argument('--n',
+                        default = 1,
+                        type    = int,
+                        help    = 'Number of instances of each class to be processed by segment.py')
     args     = parser.parse_args()
     
     with open(args.out,'w',newline='') as csvfile:
@@ -39,7 +51,21 @@ if __name__=='__main__':
              for image_id,labels in read_training_expectations(path=args.path).items()
                 if len(labels)==1],key=lambda s:s[1]):
             singleton_writer.writerow([label,image_id])
-        
+   
+    if len(args.classes)>0:
+        classes = list(range(18)) if args.classes[0]=='all' else args.classes
+        counts  = [0 for _ in classes]
+        with open(args.selection,'w') as out:
+            singletons   = {image_id:label[0] for image_id,label in read_training_expectations(path=args.path).items() if len(label)==1}
+            file_names   = list(singletons.keys())
+            shuffle(file_names)
+            for i in range(len(file_names)):
+                if min(counts)>=args.n: break
+                j = singletons[file_names[i]]
+                if j < len(counts) and counts[j]<args.n:
+                    out.write(f'{file_names[i]}\n')
+                    counts[j] += 1
+                
     elapsed = time() - start
     minutes = int(elapsed/60)
     seconds = elapsed - 60*minutes
