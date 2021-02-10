@@ -82,7 +82,7 @@ DESCRIPTIONS       = [
 #     path       Path to image-level labels 
 #     file_name  Name of image-level labels file
 
-def read_training_expectations(path=r'C:\data\hpa-scc',file_name='train.csv'):
+def read_training_expectations(path=r'd:\data\hpa-scc',file_name='train.csv'):
     with open(join(path,file_name)) as train:
         rows = reader(train)
         next(rows)
@@ -531,7 +531,7 @@ if __name__=='__main__':
     start  = time()
     parser = ArgumentParser('Segment HPA data using Otsu\'s algorithm')
     parser.add_argument('--path',
-                        default = r'C:\data\hpa-scc',
+                        default = r'd:\data\hpa-scc',
                         help    = 'Path to data')
     parser.add_argument('--image_set',
                         default = 'train512x512',
