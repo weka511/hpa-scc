@@ -15,12 +15,13 @@
 #
 #  To contact me, Simon Crase, email simon@greenweaves.nz
 #
-#  Find images  that have only one label
+#  1. Find images  that have only one label
+#  2. Prepare list of files for segment.py, making sure that specified types/classes are present
 
 from   argparse          import ArgumentParser
 from   csv               import writer
 from   random            import shuffle
-from   segment           import read_training_expectations
+from   segment           import read_training_expectations,DESCRIPTIONS
 from   time              import time
 
 if __name__=='__main__':
@@ -44,16 +45,16 @@ if __name__=='__main__':
                         type    = int,
                         help    = 'Number of instances of each class to be processed by segment.py')
     args     = parser.parse_args()
-    
+
     with open(args.out,'w',newline='') as csvfile:
-        singleton_writer = writer(csvfile)        
-        for image_id,label in sorted([(image_id,labels[0]) 
+        singleton_writer = writer(csvfile)
+        for image_id,label in sorted([(image_id,labels[0])
              for image_id,labels in read_training_expectations(path=args.path).items()
                 if len(labels)==1],key=lambda s:s[1]):
             singleton_writer.writerow([label,image_id])
-   
+
     if len(args.classes)>0:
-        classes = list(range(18)) if args.classes[0]=='all' else args.classes
+        classes = list(range(len(DESCRIPTIONS)+1)) if args.classes[0]=='all' else args.classes
         counts  = [0 for _ in classes]
         with open(args.selection,'w') as out:
             singletons   = {image_id:label[0] for image_id,label in read_training_expectations(path=args.path).items() if len(label)==1}
@@ -65,8 +66,8 @@ if __name__=='__main__':
                 if j < len(counts) and counts[j]<args.n:
                     out.write(f'{file_names[i]}\n')
                     counts[j] += 1
-                
+
     elapsed = time() - start
     minutes = int(elapsed/60)
     seconds = elapsed - 60*minutes
-    print (f'Elapsed Time {minutes} m {seconds:.2f} s')    
+    print (f'Elapsed Time {minutes} m {seconds:.2f} s')
