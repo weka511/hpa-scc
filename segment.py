@@ -19,7 +19,7 @@
 
 from   argparse          import ArgumentParser
 from   csv               import reader
-from   math              import isqrt
+from   math              import isqrt, sqrt
 from   matplotlib.pyplot import figure, show, cm, close,scatter
 from   matplotlib.image  import imread
 from   numpy             import zeros, array, var, mean, std, histogram
@@ -288,11 +288,11 @@ def generate8components(Image,threshold=0.5,nx=512,ny=512,deltas=[-1,0,1],channe
 
 # generate_components
 #
-# Generte components whose area exceeds a specified minimum
+# Generate components whose area exceeds a specified minimum
 # (using len as a proxy for area)
 #
 # Parameters:
-#      component_file
+#      component_file  Name of file that contains connected components
 #      P               Minimum area
 
 def generate_components(component_file,P=0):
@@ -491,6 +491,28 @@ def display_thinned(image_id,Thinned,Image, background = 0.5,path='./'):
         fig.savefig(join(path,f'{image_id}-segment.png'))
 
 
+def get_centroid(component):
+    return (mean([x for (x,_) in component]),
+            mean([y for (_,y) in component]))
+
+def get_distance(p1,p2):
+    x1,y1 = p1
+    x2,y2 = p2
+    return sqrt((x1-x2)*(x1-x2) + (y1-y2)*(y1-y2))
+
+def get_nearest_centroid(component,
+                         Centroids    = [],
+                         maximum_gap  = 0):
+    nearest_centroid = None
+    minimum_distance =  float_info.max
+    for point in component:
+        for i in range(len(Centroids)):
+            distance = get_distance(point,Centroids[i])
+            if distance < min(maximum_gap,minimum_distance):
+                nearest_centroid = i
+                minimum_distance = distance
+    return (nearest_centroid,minimum_distance)
+
 # segment
 #
 # Segment all channels for one image. This is the supervisor that coordinates  functions that
@@ -515,10 +537,9 @@ def segment(Image, image_id,
     try:
         for channel in channels:
             component_files.append(join(gettempdir(),f'{uuid4()}.txt'))
-            P,Thresholds,ICVs,n_otsu,bins_otsu,n_component,bins_component,Mask = segment_channel(
-                                                            Image,
-                                                            channel        = channel,
-                                                            component_file = component_files[-1])
+            P,Thresholds,ICVs,n_otsu,bins_otsu,n_component,bins_component,Mask = segment_channel(Image,
+                                                                                                 channel        = channel,
+                                                                                                 component_file = component_files[-1])
             display_channel(Image, image_id,
                             Thresholds     = Thresholds,
                             ICVs           = ICVs,
@@ -534,7 +555,42 @@ def segment(Image, image_id,
 
             Thinned.append([get_thinned(Component,n=5) for Component  in generate_components(component_files[-1],P=P)])
 
-        display_thinned(image_id,Thinned,Image,path=path)
+        # display_thinned(image_id,Thinned,Image,path=path)
+
+        nx,ny,_    = Image.shape
+        blue_index        = channels.index(BLUE)
+        NuclearCentroids  = [get_centroid(component) for component in Thinned[blue_index]]
+        min_distance      = min([get_distance(NuclearCentroids[i], NuclearCentroids[j]) for  i in range(len(NuclearCentroids)) for j in range(i)])
+
+        mx = 2
+        my = 2
+        ix = 0
+        iy = 0
+        for channel in channels:
+            if channel == BLUE: continue
+            for centroid_index in range(len(NuclearCentroids)):
+                if ix==0 and iy ==0:
+                    fig        = figure(figsize=(10,10))
+                    axs        = fig.subplots(mx, my)
+                Mask       = CMask(nx,ny)
+
+                for (x,y) in Thinned[blue_index][centroid_index]:
+                    Mask.set(x,y,BLUE)
+
+                for component in generate_components(component_files[channel]):
+                    centroid_index1,minimum_distance = get_nearest_centroid(component,Centroids=NuclearCentroids,maximum_gap=min_distance)
+                    if centroid_index == centroid_index1:
+                        for (x,y) in component:
+                            Mask.set(x,y,channel)
+
+                Mask.establish_background()
+                Mask.show(axs[ix][iy])
+                ix += 1
+                if ix == mx:
+                    ix = 0
+                    iy += 1
+                    if iy == my:
+                        iy = 0
 
     except Exception as _:
         print (f'{image_id} {exc_info()[0]}')
@@ -544,6 +600,10 @@ def segment(Image, image_id,
         for component_file in component_files:
             if exists(component_file):  # If there was an exception, file might not actually exist!
                 remove(component_file)
+
+# get_channel
+#
+# Convert colour name to channel number
 
 def get_channel(c):
     if c.lower() == 'blue':
