@@ -465,13 +465,13 @@ def get_thinned(Component,n=4):
 
 
 
-def display_thinned(image_id,Thinned,Image, background = 0.5,path='./'):
+def display_thinned(image_id,Thinned,Image, background = 0.5,path='./',channels=[BLUE, RED, GREEN, YELLOW]):
     fig        = figure(figsize=(10,10))
     axs        = fig.subplots(2, 2)
     index      = 0
     nx,ny,_    = Image.shape
 
-    for channel in [BLUE, RED, GREEN, YELLOW]:
+    for channel in channels:
         Mask = CMask(nx,ny)
 
         for  point in Thinned[0]:
@@ -555,43 +555,45 @@ def segment(Image, image_id,
 
             Thinned.append([get_thinned(Component,n=5) for Component  in generate_components(component_files[-1],P=P)])
 
-        # display_thinned(image_id,Thinned,Image,path=path)
+
 
         nx,ny,_    = Image.shape
         blue_index        = channels.index(BLUE)
         NuclearCentroids  = [get_centroid(component) for component in Thinned[blue_index]]
         min_distance      = min([get_distance(NuclearCentroids[i], NuclearCentroids[j]) for  i in range(len(NuclearCentroids)) for j in range(i)])
 
-        mx = 2
-        my = 2
-        ix = 0
-        iy = 0
-        for channel in channels:
-            if channel == BLUE: continue
-            for centroid_index in range(len(NuclearCentroids)):
-                if ix==0 and iy ==0:
-                    fig        = figure(figsize=(10,10))
-                    axs        = fig.subplots(mx, my)
-                Mask       = CMask(nx,ny)
+        mx                = 2
+        my                = 2
+        ix                = 0
+        iy                = 0
 
-                for (x,y) in Thinned[blue_index][centroid_index]:
-                    Mask.set(x,y,BLUE)
 
+        for centroid_index in range(len(NuclearCentroids)):
+            if ix==0 and iy ==0:
+                fig        = figure(figsize=(10,10))
+                axs        = fig.subplots(mx, my)
+            Mask       = CMask(nx,ny)
+
+            for (x,y) in Thinned[blue_index][centroid_index]:
+                Mask.set(x,y,BLUE)
+            for channel in channels:
+                if channel == BLUE: continue
                 for component in generate_components(component_files[channel]):
                     centroid_index1,minimum_distance = get_nearest_centroid(component,Centroids=NuclearCentroids,maximum_gap=min_distance)
                     if centroid_index == centroid_index1:
                         for (x,y) in component:
                             Mask.set(x,y,channel)
 
-                Mask.establish_background()
-                Mask.show(axs[ix][iy])
-                ix += 1
-                if ix == mx:
-                    ix = 0
-                    iy += 1
-                    if iy == my:
-                        iy = 0
+            Mask.establish_background()
+            Mask.show(axs[ix][iy])
+            ix += 1
+            if ix == mx:
+                ix = 0
+                iy += 1
+                if iy == my:
+                    iy = 0
 
+        display_thinned(image_id,Thinned,Image,path=path,channels=channels)
     except Exception as _:
         print (f'{image_id} {exc_info()[0]}')
         print_exc()
@@ -601,11 +603,11 @@ def segment(Image, image_id,
             if exists(component_file):  # If there was an exception, file might not actually exist!
                 remove(component_file)
 
-# get_channel
+# colour2channel
 #
 # Convert colour name to channel number
 
-def get_channel(c):
+def colour2channel(c):
     if c.lower() == 'blue':
         return BLUE
     elif c.lower() == 'red':
@@ -661,7 +663,7 @@ if __name__=='__main__':
     args     = parser.parse_args()
 
     Training = read_training_expectations(path=args.path)
-    channels = [get_channel(c) for c in args.channels]
+    channels = [colour2channel(c) for c in args.channels]
 
     if len(args.read)>0:
         with open(args.read) as history:
