@@ -557,7 +557,7 @@ def segment(Image, image_id,
 
 
 
-        nx,ny,_    = Image.shape
+        nx,ny,_           = Image.shape
         blue_index        = channels.index(BLUE)
         NuclearCentroids  = [get_centroid(component) for component in Thinned[blue_index]]
         min_distance      = min([get_distance(NuclearCentroids[i], NuclearCentroids[j]) for  i in range(len(NuclearCentroids)) for j in range(i)])
@@ -566,7 +566,6 @@ def segment(Image, image_id,
         my                = 2
         ix                = 0
         iy                = 0
-
 
         for centroid_index in range(len(NuclearCentroids)):
             if ix==0 and iy ==0:
@@ -586,14 +585,23 @@ def segment(Image, image_id,
 
             Mask.establish_background()
             Mask.show(axs[ix][iy])
+            if ix==0 and iy ==0:
+                fig.suptitle(f'{image_id}')
+            x,y = NuclearCentroids[centroid_index]
+            axs[ix][iy].set_title(f'({x:.0f},{y:.0f})')
+
             ix += 1
             if ix == mx:
                 ix = 0
                 iy += 1
                 if iy == my:
                     iy = 0
+                    fig.savefig(join(path,f'{image_id}-{centroid_index}.png'))
+        if ix!=0 or iy!=0:
+            fig.savefig(join(path,f'{image_id}-{centroid_index}.png'))
 
         display_thinned(image_id,Thinned,Image,path=path,channels=channels)
+
     except Exception as _:
         print (f'{image_id} {exc_info()[0]}')
         print_exc()
