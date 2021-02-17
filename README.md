@@ -4,10 +4,12 @@
 ## Python Scripts
 
 |File|Description|
-|-----------------|-------------------------------------------------------------------------------------------------|
+|---------------------|-------------------------------------------------------------------------------------------------|
 ||Segmentation|
 |anayze-labels|Find images  that have only one label|
+|CellSegmenterTest.py|Demo for HPA cellsegmentator|
 |segment.py|Segment images using Otsu's method|
+|segment2.py|Segment images using HPA cellsegmentator|
 |watershed.py|Naive Watershed segmentation|
 ||Download and summarize data|
 |download.py|Download training images from kaggle|
