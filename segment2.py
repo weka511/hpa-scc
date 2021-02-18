@@ -22,7 +22,7 @@ from glob                       import glob
 from hpacellseg.cellsegmentator import CellSegmentator
 from hpacellseg.utils           import label_cell, label_nuclei
 from imageio                    import imwrite
-from matplotlib.pyplot          import figure, imread, imshow, axis, savefig, close
+from matplotlib.pyplot          import figure, imread, imshow, axis, savefig, close, show
 from numpy                      import dstack
 from os.path                    import join,basename
 from random                     import sample
@@ -30,7 +30,7 @@ from time                       import time
 
 if __name__=='__main__':
     start  = time()
-    parser = ArgumentParser('Segment HPA data using Otsu\'s algorithm')
+    parser = ArgumentParser('Segment HPA data using HPA Cell segmenter')
     parser.add_argument('--path',
                         default = r'd:\data\hpa-scc',
                         help    = 'Path to data')
@@ -47,11 +47,16 @@ if __name__=='__main__':
     parser.add_argument('--segments',
                         default = './segments',
                         help    = 'Identifies where to store plots')
-
     parser.add_argument('--NuclearModel',
-                        default = './nuclei-model.pth')
+                        default = './nuclei-model.pth',
+                        help    = 'Identifies where to store nuclear models')
     parser.add_argument('--CellModel',
-                        default = './cell-model.pth')
+                        default = './cell-model.pth',
+                        help    = 'Identifies where to store cell models')
+    parser.add_argument('--show',
+                        default = False,
+                        action  = 'store_true',
+                        help    = 'Display plots')
     args        = parser.parse_args()
 
     image_dir   = join(args.path,args.image_set)
@@ -70,7 +75,7 @@ if __name__=='__main__':
     )
 
     # For nuclei
-    nuc_segmentations = segmentator.pred_nuclei(images[2])
+    nuc_segmentations = segmentator.pred_nuclei(nu)
 
     # For full cells
     cell_segmentations = segmentator.pred_cells(images)
@@ -90,9 +95,12 @@ if __name__=='__main__':
         imshow(cell_mask, alpha=0.5)
         axis('off')
         savefig(join(args.figs,basename(mt[i]).replace('red','xx')))
-        close(fig)
+        if not args.show:
+            close(fig)
 
     elapsed = time() - start
     minutes = int(elapsed/60)
     seconds = elapsed - 60*minutes
     print (f'Elapsed Time {minutes} m {seconds:.2f} s')
+    if args.show:
+        show()
