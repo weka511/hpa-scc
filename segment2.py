@@ -22,9 +22,10 @@ from glob                       import glob
 from hpacellseg.cellsegmentator import CellSegmentator
 from hpacellseg.utils           import label_cell, label_nuclei
 from imageio                    import imwrite
-from matplotlib.pyplot          import figure, imread, imshow, axis, savefig
+from matplotlib.pyplot          import figure, imread, imshow, axis, savefig, close
 from numpy                      import dstack
 from os.path                    import join,basename
+from random                     import sample
 from time                       import time
 
 if __name__=='__main__':
@@ -36,17 +37,13 @@ if __name__=='__main__':
     parser.add_argument('--image_set',
                         default = 'train512x512',
                         help    = 'Identified subset of data-- e.g. train512x512')
-    parser.add_argument('--image_id',
-                        default = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
-                        help    = 'Identifies image to be segmented (if only one). See --sample, --all, and --read')
-    parser.add_argument('--show',
-                        default = False,
-                        action  = 'store_true',
-                        help    = 'Display plots')
     parser.add_argument('--figs',
                         default = './figs',
                         help    = 'Identifies where to store plots')
-
+    parser.add_argument('--sample',
+                        type    = int,
+                        default = 3,
+                        help    = 'Specifies number of images to be sampled at random and processed')
     parser.add_argument('--segments',
                         default = './segments',
                         help    = 'Identifies where to store plots')
@@ -58,7 +55,7 @@ if __name__=='__main__':
     args        = parser.parse_args()
 
     image_dir   = join(args.path,args.image_set)
-    mt          = glob(join(image_dir, '*_red.png'))
+    mt          = sample(glob(join(image_dir, '*_red.png')),args.sample)
     er          = [f.replace('red', 'yellow') for f in mt]
     nu          = [f.replace('red', 'blue') for f in mt]
     images      = [mt, er, nu]
@@ -88,17 +85,14 @@ if __name__=='__main__':
         microtubule    = imread(mt[i])
         endoplasmicrec = imread(er[i])
         nuclei         = imread(nu[i])
-        # mask           = imread(mt[i].replace('red','predictedmask'))
         img            = dstack((microtubule, endoplasmicrec, nuclei))
         imshow(img)
         imshow(cell_mask, alpha=0.5)
         axis('off')
         savefig(join(args.figs,basename(mt[i]).replace('red','xx')))
+        close(fig)
 
     elapsed = time() - start
     minutes = int(elapsed/60)
     seconds = elapsed - 60*minutes
     print (f'Elapsed Time {minutes} m {seconds:.2f} s')
-
-    if args.show:
-        show()
