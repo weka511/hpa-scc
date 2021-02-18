@@ -17,12 +17,15 @@
 #
 # Segment images using supplied CellSegmenter
 
-from hpacellseg.cellsegmentator  import CellSegmentator
-from hpacellseg.utils import label_cell, label_nuclei
-from argparse         import ArgumentParser
-from glob             import glob
-from os.path          import join
-from time             import time
+from argparse                   import ArgumentParser
+from glob                       import glob
+from hpacellseg.cellsegmentator import CellSegmentator
+from hpacellseg.utils           import label_cell, label_nuclei
+from imageio                    import imwrite
+from matplotlib.pyplot          import figure, imread, imshow, axis, savefig
+from numpy                      import dstack
+from os.path                    import join,basename
+from time                       import time
 
 if __name__=='__main__':
     start  = time()
@@ -43,17 +46,22 @@ if __name__=='__main__':
     parser.add_argument('--figs',
                         default = './figs',
                         help    = 'Identifies where to store plots')
+
+    parser.add_argument('--segments',
+                        default = './segments',
+                        help    = 'Identifies where to store plots')
+
     parser.add_argument('--NuclearModel',
                         default = './nuclei-model.pth')
     parser.add_argument('--CellModel',
                         default = './cell-model.pth')
-    args = parser.parse_args()
+    args        = parser.parse_args()
 
-    image_dir = join(args.path,args.image_set)
-    mt       = glob(join(image_dir, '*_red.png'))
-    er       = [f.replace('red', 'yellow') for f in mt]
-    nu       = [f.replace('red', 'blue') for f in mt]
-    images   = [mt, er, nu]
+    image_dir   = join(args.path,args.image_set)
+    mt          = glob(join(image_dir, '*_red.png'))
+    er          = [f.replace('red', 'yellow') for f in mt]
+    nu          = [f.replace('red', 'blue') for f in mt]
+    images      = [mt, er, nu]
 
     segmentator = CellSegmentator(
         nuclei_model        = args.NuclearModel,
@@ -63,6 +71,29 @@ if __name__=='__main__':
         padding             = False,
         multi_channel_model = True,
     )
+
+    # For nuclei
+    nuc_segmentations = segmentator.pred_nuclei(images[2])
+
+    # For full cells
+    cell_segmentations = segmentator.pred_cells(images)
+
+    # post-processing
+    for i, pred in enumerate(cell_segmentations):
+        nuclei_mask, cell_mask = label_cell(nuc_segmentations[i], cell_segmentations[i])
+        FOVname                = basename(mt[i]).replace('red','predictedmask')
+        print (FOVname)
+        imwrite(join(args.segments,FOVname), cell_mask)
+        fig            = figure(figsize=(19,10))
+        microtubule    = imread(mt[i])
+        endoplasmicrec = imread(er[i])
+        nuclei         = imread(nu[i])
+        # mask           = imread(mt[i].replace('red','predictedmask'))
+        img            = dstack((microtubule, endoplasmicrec, nuclei))
+        imshow(img)
+        imshow(cell_mask, alpha=0.5)
+        axis('off')
+        savefig(join(args.figs,basename(mt[i]).replace('red','xx')))
 
     elapsed = time() - start
     minutes = int(elapsed/60)
