@@ -23,10 +23,40 @@ from hpacellseg.cellsegmentator import CellSegmentator
 from hpacellseg.utils           import label_cell, label_nuclei
 from imageio                    import imwrite
 from matplotlib.pyplot          import figure, imread, imshow, axis, savefig, close, show
-from numpy                      import dstack
+from numpy                      import dstack,uint8
+import numpy as np
 from os.path                    import join,basename
 from random                     import sample
 from time                       import time
+from pycocotools import _mask as coco_mask
+import typing as t
+import zlib
+import base64
+def binary_mask_to_ascii(mask, mask_val=1): # https://www.kaggle.com/dschettler8845/hpa-cellwise-classification-inference
+    """Converts a binary mask into OID challenge encoding ascii text."""
+    mask = np.where(mask==mask_val, 1, 0).astype(np.bool)
+
+    # check input mask --
+    if mask.dtype != np.bool:
+        raise ValueError(f"encode_binary_mask expects a binary mask, received dtype == {mask.dtype}")
+
+    mask = np.squeeze(mask)
+    if len(mask.shape) != 2:
+        raise ValueError(f"encode_binary_mask expects a 2d mask, received shape == {mask.shape}")
+
+    # convert input mask to expected COCO API input --
+    mask_to_encode = mask.reshape(mask.shape[0], mask.shape[1], 1)
+    mask_to_encode = mask_to_encode.astype(np.uint8)
+    mask_to_encode = np.asfortranarray(mask_to_encode)
+
+    # RLE encode mask --
+    encoded_mask = coco_mask.encode(mask_to_encode)[0]["counts"]
+
+    # compress and base64 encoding --
+    binary_str = zlib.compress(encoded_mask, zlib.Z_BEST_COMPRESSION)
+    base64_str = base64.b64encode(binary_str)
+    return base64_str.decode()
+
 
 if __name__=='__main__':
     start  = time()
@@ -95,6 +125,9 @@ if __name__=='__main__':
         imshow(cell_mask, alpha=0.5)
         axis('off')
         savefig(join(args.figs,basename(mt[i]).replace('red','xx')))
+        ll = label_cell(nuc_segmentations[i], cell_segmentations[i])[1].astype(uint8)
+        bb = binary_mask_to_ascii(ll,i)
+        print (bb)
         if not args.show:
             close(fig)
 
