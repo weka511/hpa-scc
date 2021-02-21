@@ -3,27 +3,27 @@
 
 ## Python Scripts
 
-|File|Description|
-|---------------------|-------------------------------------------------------------------------------------------------|
-||Segmentation|
-|anayze-labels|Find images  that have only one label|
-|CellSegmenterTest.py|Demo for HPA cellsegmentator|
-|encoding.py|Example of encoding|
-|segment.py|Segment images using Otsu's method|
-|segment2.py|Segment images using HPA cellsegmentator|
-|watershed.py|Naive Watershed segmentation|
-||Download and summarize data|
-|download.py|Download training images from kaggle|
-|summarize.py|Organize image names by description|
-|unzip.py|Unzip downloaded files|
-|visualize.py|Visualize image files|
-||Miscellaneous|
-|hpa-scc.wpr|Python project|
+|File|Description|Active|
+|---------------------|-------------------------------------------------------------------------------------------------|--------|
+||Segmentation||
+|anayze-labels|Find images  that have only one label|Inactive|
+|CellSegmenterTest.py|Demo for HPA cellsegmentator|Inactive|
+|encoding.py|Example of encoding|Inactive|
+|segment.py|Segment images using Otsu's method|Inactive|
+|segment2.py|Segment images using HPA cellsegmentator|Active|
+|watershed.py|Naive Watershed segmentation|Inactive|
+||Download and summarize data||
+|download.py|Download training images from kaggle|Inactive|
+|summarize.py|Organize image names by description|Inactive|
+|unzip.py|Unzip downloaded files|Inactive|
+|visualize.py|Visualize image files|Inactive|
+||Miscellaneous||
+|hpa-scc.wpr|Python project|Inactive|
 
 
 ## Documentation
 
-|File|Description|
-|-----------------|-------------------------------------------------------------------------------------------------|
-|hpa-scc.bib|Bibliography|
-|Notes.tex|My notes|
+|File|Description|Active|
+|-----------------|-------------------------------------------------------------------------------------------------|--------|
+|hpa-scc.bib|Bibliography|Active|
+|Notes.tex|My notes|Active|
