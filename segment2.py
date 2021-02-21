@@ -24,6 +24,7 @@ from glob                       import glob
 from hpacellseg.cellsegmentator import CellSegmentator
 from hpacellseg.utils           import label_cell, label_nuclei
 from imageio                    import imwrite
+from math                       import isqrt
 from matplotlib.pyplot          import figure, imread, imshow, axis, savefig, close, show, title,suptitle
 from numpy                      import dstack,uint8, where, bool, squeeze, asfortranarray
 from os.path                    import join,basename
@@ -86,6 +87,12 @@ def binary_mask_to_ascii(mask, mask_val=1): # https://www.kaggle.com/dschettler8
     base64_str = b64encode(binary_str)
     return base64_str.decode()
 
+def segment_image(img_cell,binary_mask,class_id):
+    for i in range(len(img_cell)):
+        for j in range(len(img_cell[i])):
+            if binary_mask[i][j] != class_id:
+                img_cell[i][j]=0
+    return img_cell
 
 if __name__=='__main__':
     start  = time()
@@ -183,10 +190,26 @@ if __name__=='__main__':
         # FIXME - this doesn't handle multiple classes
         title(f'{file_list[i]} {classes[0]} {class_descriptions[0]}')
         axis('off')
-        savefig(join(args.figs,basename(mt[i]).replace('red','xx')))
-        ll = label_cell(nuc_segmentations[i], cell_segmentations[i])[1].astype(uint8)
-        bb = binary_mask_to_ascii(ll,i)
-        print (bb)
+        savefig(join(args.figs,basename(mt[i]).replace('red','full')))
+        if not args.show:
+            close(fig)
+        binary_mask = label_cell(nuc_segmentations[i], cell_segmentations[i])[1].astype(uint8)
+        number_of_segments = binary_mask.max()+1
+        fig      = figure(figsize=(20,20))
+        m1       = isqrt(number_of_segments)
+        m2       = number_of_segments // m1 + 1
+        axs      = fig.subplots(m1, m2,squeeze=False)
+        k1       = 0
+        k2       = 0
+        for j in range(1,binary_mask.max()+1):
+            img_cell = segment_image(dstack((microtubule, endoplasmicrec, nuclei)),binary_mask,j)
+            axs[k1][k2].imshow(img_cell)
+            ascii_mask = binary_mask_to_ascii(binary_mask,j)
+            k2 += 1
+            if k2>=len(axs[k1]):
+                k1+=1
+                k2=0
+        savefig(join(args.figs,basename(mt[i]).replace('red','segmented')))
         if not args.show:
             close(fig)
 
