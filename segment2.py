@@ -15,7 +15,7 @@
 #
 #  To contact me, Simon Crase, email simon@greenweaves.nz
 #
-# Segment images using supplied CellSegmenter
+# Segment images using CellSegmentator aupplied by HPA
 
 from argparse                   import ArgumentParser
 from base64                     import b64encode
@@ -106,6 +106,9 @@ if __name__=='__main__':
     parser.add_argument('--figs',
                         default = './figs',
                         help    = 'Identifies where to store plots')
+    parser.add_argument('--masks',
+                        default = './masks',
+                        help    = 'Identifies where to store ascii masks')
     parser.add_argument('--sample',
                         type    = int,
                         # default = 3,
@@ -193,23 +196,25 @@ if __name__=='__main__':
         savefig(join(args.figs,basename(mt[i]).replace('red','full')))
         if not args.show:
             close(fig)
-        binary_mask = label_cell(nuc_segmentations[i], cell_segmentations[i])[1].astype(uint8)
+        binary_mask        = label_cell(nuc_segmentations[i], cell_segmentations[i])[1].astype(uint8)
         number_of_segments = binary_mask.max()+1
-        fig      = figure(figsize=(20,20))
-        m1       = isqrt(number_of_segments)
-        m2       = number_of_segments // m1 + 1
-        axs      = fig.subplots(m1, m2,squeeze=False)
-        k1       = 0
-        k2       = 0
-        for j in range(1,binary_mask.max()+1):
-            img_cell = segment_image(dstack((microtubule, endoplasmicrec, nuclei)),binary_mask,j)
-            axs[k1][k2].imshow(img_cell)
-            ascii_mask = binary_mask_to_ascii(binary_mask,j)
-            k2 += 1
-            if k2>=len(axs[k1]):
-                k1+=1
-                k2=0
-        savefig(join(args.figs,basename(mt[i]).replace('red','segmented')))
+        fig                = figure(figsize=(20,20))
+        m1                 = isqrt(number_of_segments)
+        m2                 = number_of_segments // m1 + 1
+        axs                = fig.subplots(m1, m2,squeeze=False)
+        k                  = 0
+        l                  = 0
+        with open(join(args.masks,basename(mt[i]).replace('red','full').replace('png','txt')),'w') as ascii_mask_file:
+            for j in range(1,binary_mask.max()+1):
+                axs[k][l].imshow(segment_image(dstack((microtubule, endoplasmicrec, nuclei)),binary_mask,j))
+                ascii_mask = binary_mask_to_ascii(binary_mask,j)
+                ascii_mask_file.write(f'{j}\n')
+                ascii_mask_file.write(f'{ascii_mask}\n')
+                l += 1
+                if l>=len(axs[k]):
+                    k += 1
+                    l  = 0
+            savefig(join(args.figs,basename(mt[i]).replace('red','segmented')))
         if not args.show:
             close(fig)
 
