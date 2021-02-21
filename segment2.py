@@ -44,12 +44,22 @@ def create_descriptions(file_name='descriptions.csv'):
 # Parameters:
 #     path       Path to image-level labels
 #     file_name  Name of image-level labels file
+#
+#     Returns: dict of class assigments for each image name
+#
+# NB:  the  list of image classes contains non-unique entries --
+#      See Dan Presil's post of 2021 February 21
+#      https://www.kaggle.com/c/hpa-single-cell-image-classification/discussion/221025
+#      so we need to do a list(set(...)) below
 
 def read_training_expectations(path=r'd:\data\hpa-scc',file_name='train.csv'):
+
+    def unique(items):
+        return list(set(items))
     with open(join(path,file_name)) as train:
         rows = reader(train)
         next(rows)
-        return {row[0]: [int(label) for label in row[1].split('|')] for row in rows}
+        return {row[0]: unique([int(label) for label in row[1].split('|')]) for row in rows}
 
 def binary_mask_to_ascii(mask, mask_val=1): # https://www.kaggle.com/dschettler8845/hpa-cellwise-classification-inference
     """Converts a binary mask into OID challenge encoding ascii text."""
@@ -127,9 +137,13 @@ if __name__=='__main__':
         Expectations = {file_name:class_names for file_name,class_names in Expectations.items() if class_names[0] in classes}
 
     file_list   = list(Expectations.keys())
-    print (f'Processing {len(file_list)} slides')
+
     if args.sample!=None:
         file_list = sample(file_list,args.sample)
+        print (f'Processing {args.sample} slides')
+    else:
+        print (f'Processing {len(file_list)} slides')
+
     image_dir   = join(args.path,args.image_set)
     mt          = [join(image_dir,f'{name}_red.png') for name in file_list]
     er          = [f.replace('red', 'yellow') for f in mt]
