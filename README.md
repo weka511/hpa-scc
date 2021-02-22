@@ -15,6 +15,7 @@
 ||Download and summarize data||
 |download.py|Download training images from kaggle|Inactive|
 |summarize.py|Organize image names by description|Inactive|
+|train1.py|Build and train neual network|Active|
 |unzip.py|Unzip downloaded files|Inactive|
 |visualize.py|Visualize image files|Inactive|
 ||Miscellaneous||
