@@ -26,7 +26,7 @@ from hpacellseg.utils           import label_cell, label_nuclei
 from imageio                    import imwrite
 from math                       import isqrt
 from matplotlib.pyplot          import figure, imread, imshow, axis, savefig, close, show, title,suptitle
-from numpy                      import dstack,uint8, where, bool, squeeze, asfortranarray
+from numpy                      import dstack,uint8, where, bool, squeeze, asfortranarray, save
 from os.path                    import join,basename
 from pycocotools                import _mask as coco_mask
 from random                     import sample
@@ -62,6 +62,8 @@ def read_training_expectations(path=r'd:\data\hpa-scc',file_name='train.csv'):
         next(rows)
         return {row[0]: unique([int(label) for label in row[1].split('|')]) for row in rows}
 
+# binary_mask_to_ascii
+
 def binary_mask_to_ascii(mask, mask_val=1): # https://www.kaggle.com/dschettler8845/hpa-cellwise-classification-inference
     """Converts a binary mask into OID challenge encoding ascii text."""
     mask = where(mask==mask_val, 1, 0).astype(bool)
@@ -87,11 +89,15 @@ def binary_mask_to_ascii(mask, mask_val=1): # https://www.kaggle.com/dschettler8
     base64_str = b64encode(binary_str)
     return base64_str.decode()
 
+# segment_image
+#
+# Apply segmentation mask to determine which part of image should actually be shwon
+
 def segment_image(img_cell,binary_mask,class_id):
     for i in range(len(img_cell)):
         for j in range(len(img_cell[i])):
             if binary_mask[i][j] != class_id:
-                img_cell[i][j]=0
+                img_cell[i][j] = 0
     return img_cell
 
 if __name__=='__main__':
@@ -204,6 +210,8 @@ if __name__=='__main__':
         axs                = fig.subplots(m1, m2,squeeze=False)
         k                  = 0
         l                  = 0
+        with open(join(args.masks,basename(mt[i]).replace('red','full').replace('png','npy')),'wb') as binary_mask_file:
+            save(binary_mask_file,binary_mask)
         with open(join(args.masks,basename(mt[i]).replace('red','full').replace('png','txt')),'w') as ascii_mask_file:
             for j in range(1,binary_mask.max()+1):
                 axs[k][l].imshow(segment_image(dstack((microtubule, endoplasmicrec, nuclei)),binary_mask,j))
