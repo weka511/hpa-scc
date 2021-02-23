@@ -5,22 +5,22 @@
 
 |File|Description|Active|
 |---------------------|-------------------------------------------------------------------------------------------------|--------|
-||Segmentation||
+||Production|
+|hpa-scc.wpr|Python project|Active|
+|logs.py|Analze log files from train ing/testing|TBP|
+|segment.py|Segment images using HPA cellsegmentator|Active|
+|split.py|Partition datainto training and validation|TBP|
+|test.py|Execute network with test data|TBP|
+|train.py|Build and train neual network|Active|
 |anayze-labels|Find images  that have only one label|Inactive|
 |CellSegmenterTest.py|Demo for HPA cellsegmentator|Inactive|
 |encoding.py|Example of encoding|Inactive|
-|segment.py|Segment images using Otsu's method|Inactive|
-|segment2.py|Segment images using HPA cellsegmentator|Active|
+|otsu.py|Segment images using Otsu's method|Inactive|
 |watershed.py|Naive Watershed segmentation|Inactive|
-||Download and summarize data||
 |download.py|Download training images from kaggle|Inactive|
 |summarize.py|Organize image names by description|Inactive|
-|train1.py|Build and train neual network|Active|
 |unzip.py|Unzip downloaded files|Inactive|
 |visualize.py|Visualize image files|Inactive|
-||Miscellaneous||
-|hpa-scc.wpr|Python project|Inactive|
-
 
 ## Documentation
 

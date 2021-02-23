@@ -149,7 +149,7 @@ if __name__=='__main__':
     optimizer = SGD(model.parameters(), lr = args.lr, momentum = args.momentum)
 
     print (model)
-    with open('log.csv','w') as logfile:
+    with open(args.logfile,'w') as logfile:
         for epoch in range(1,args.n+1):  # loop over the dataset multiple times
             running_loss = 0.0
             for i, data in enumerate(training_loader, 0):
