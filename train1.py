@@ -15,15 +15,16 @@
 #
 #  To contact me, Simon Crase, email simon@greenweaves.nz
 
+# https://leonardoaraujosantos.gitbook.io/artificial-inteligence/appendix/pytorch/dataloader-and-datasets
+
 from argparse                   import ArgumentParser
 from matplotlib.pyplot          import figure, imread, imshow, axis, savefig, close, show, title,suptitle
-from numpy                      import array, clip
+from numpy                      import array, clip, asarray
 from os.path                    import join
 from segment2                   import read_training_expectations
-# from segment                    import read_image
 from skimage                    import io, transform
 from time                       import time
-from torch                      import from_numpy
+from torch                      import from_numpy,unsqueeze
 from torch.nn                   import Module, Conv2d, MaxPool2d, Linear,CrossEntropyLoss
 from torch.nn.functional        import relu
 from torch.optim                import SGD
@@ -50,34 +51,33 @@ class CellDataset(Dataset):
         image_name      = f'{image_id}_red.png'
         full_image_name = join(self.path,self.image_set,image_name)
         img             = io.imread(full_image_name)
-        # sample          = {'image': img}
 
         if self.transform:
             sample = self.transform(img)
-
-        return img,self.expectations[image_id]
+        img = from_numpy(asarray(img))
+        return unsqueeze(img,0),self.expectations[image_id]
 
 class Net(Module):
     def __init__(self):
         super(Net, self).__init__()
-        self.conv1 = Conv2d(in_channels  = 3,
+        self.conv1 = Conv2d(in_channels  = 1,
                             out_channels = 6,
                             kernel_size  = 5,
                             stride       = 1,
                             padding      = 1)
         self.pool  = MaxPool2d(2, 2)
-        # self.conv2 = Conv2d(6, 16, 5)
-        # self.fc1   = Linear(16 * 5 * 5, 120)
-        # self.fc2   = Linear(120, 84)
-        # self.fc3   = Linear(84, 10)
+        self.conv2 = Conv2d(6, 16, 5)
+        self.fc1   = Linear(16 * 5 * 5, 120)
+        self.fc2   = Linear(120, 84)
+        self.fc3   = Linear(84, 10)
 
     def forward(self, x):
-        x = self.pool(relu(self.conv1(x)))
-        # x = self.pool(relu(self.conv2(x)))
-        # x = x.view(-1, 16 * 5 * 5)
-        # x = relu(self.fc1(x))
-        # x = relu(self.fc2(x))
-        # x = self.fc3(x)
+        x = self.pool(relu(self.conv1(x.float())))
+        x = self.pool(relu(self.conv2(x)))
+        x = x.view(-1, 16 * 5 * 5)
+        x = relu(self.fc1(x))
+        x = relu(self.fc2(x))
+        x = self.fc3(x)
         return x
 
 def imshow1(inp, title=None):
@@ -97,36 +97,37 @@ if __name__=='__main__':
     parser.add_argument('--image_set',
                         default = 'train512x512',
                         help    = 'Identified subset of data-- e.g. train512x512')
-    parser.add_argument('--momentum', default = 0.9,   type=int)
+    parser.add_argument('--momentum', default = 0.9,   type=float)
     parser.add_argument('--lr',       default = 0.001, type=float)
+    parser.add_argument('--n',        default = 1,     type=int)
     args   = parser.parse_args()
 
     training_data   = CellDataset()
     training_loader = DataLoader(training_data,batch_size=4)
     # Get a batch of training data
-    inputs, classes = next(iter(training_loader))
+    # inputs, classes = next(iter(training_loader))
 
     # Make a grid from batch
-    out = utils.make_grid(inputs)
+    # out = utils.make_grid(inputs)
 
-    imshow1(out)
+    # imshow1(out)
 
-    net             = Net()
+    model     = Net()
     criterion = CrossEntropyLoss()
-    optimizer = SGD(net.parameters(),
-                          lr       = args.lr,
-                          momentum = args.momentum)
+    optimizer = SGD(model.parameters(),
+                    lr       = args.lr,
+                    momentum = args.momentum)
 
     losses    = []
-
-    for epoch in range(1):#args.n):  # loop over the dataset multiple times
+    print (model)
+    for epoch in range(1,args.n+1):  # loop over the dataset multiple times
         running_loss = 0.0
         for i, data in enumerate(training_loader, 0):
             inputs, labels = data # get the inputs; data is a list of [inputs, labels]
             optimizer.zero_grad()  # zero the parameter gradients
 
             # forward + backward + optimize
-            outputs = net(inputs)
+            outputs = model(inputs)
             loss    = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
