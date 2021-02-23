@@ -19,12 +19,12 @@
 
 from argparse                   import ArgumentParser
 from csv                        import reader
-from numpy                      import asarray
+from numpy                      import asarray, stack
 from os.path                    import join
 from skimage                    import io, transform
 from time                       import time
 from torch                      import from_numpy,unsqueeze,FloatTensor
-from torch.nn                   import Module, Conv2d, MaxPool2d, Linear,MSELoss
+from torch.nn                   import Module, Conv3d, MaxPool3d, Linear,MSELoss
 from torch.nn.functional        import relu
 from torch.optim                import SGD
 from torch.utils.data           import Dataset, DataLoader
@@ -57,30 +57,35 @@ class CellDataset(Dataset):
 
     def __getitem__(self, idx):
         image_id        = self.image_ids[idx]
-        image_name      = f'{image_id}_red.png'
-        full_image_name = join(self.path,self.image_set,image_name)
-        img             = io.imread(full_image_name)
+        imgs            = []
+        for colour in ['red','green','blue','yellow']:
+            image_name      = f'{image_id}_{colour}.png'
+            full_image_name = join(self.path,self.image_set,image_name)
+            img             = io.imread(full_image_name)
 
-        if self.transform:
-            sample = self.transform(img)
-        img = from_numpy(asarray(img))
+            if self.transform:
+                img = self.transform(img)
+            imgs.append(asarray(img))
+
+        img = from_numpy(stack(imgs))
 
         classes = [1 if i in self.expectations[image_id] else 0 for i in range(18)]
 
-        return unsqueeze(img,0),FloatTensor(classes)
+        # return img,FloatTensor(classes)
+        return unsqueeze(img,1),FloatTensor(classes)
 
 class Net(Module):
     def __init__(self):
         super(Net, self).__init__()
-        self.conv1 = Conv2d(in_channels  = 1,
+        self.conv1 = Conv3d(in_channels  = 4,
                             out_channels = 6,
-                            kernel_size  = 5,
+                            kernel_size  = (1,5,5),
                             stride       = 1,
                             padding      = 1)
-        self.pool  = MaxPool2d(2, 2)
-        self.conv2 = Conv2d(in_channels  = 6,
+        self.pool  = MaxPool3d(2)
+        self.conv2 = Conv3d(in_channels  = 6,
                             out_channels = 16,
-                            kernel_size  = 5,
+                            kernel_size  = (1,5,5),
                             stride       = 1,
                             padding      = 1)
         self.fc1   = Linear(in_features  = 16 * 126 * 126,
@@ -91,9 +96,13 @@ class Net(Module):
                             out_features = 18)
 
     def forward(self, x):
+        # print (x.shape)
         x = self.pool(relu(self.conv1(x.float())))
+        # print (x.shape)
         x = self.pool(relu(self.conv2(x)))
+        # print (x.shape)
         x = x.view(-1, 16 * 126 * 126)
+        # print (x.shape)
         x = relu(self.fc1(x))
         x = relu(self.fc2(x))
         x = self.fc3(x)
@@ -131,7 +140,7 @@ if __name__=='__main__':
     args   = parser.parse_args()
 
     training_data   = CellDataset()
-    training_loader = DataLoader(training_data,batch_size=4)
+    training_loader = DataLoader(training_data,batch_size=7)
 
     model     = Net()
     criterion = MSELoss()
