@@ -19,8 +19,10 @@
 
 from argparse                   import ArgumentParser
 from csv                        import reader
+from logs                       import get_logfile_names
 from numpy                      import asarray, stack
-from os.path                    import join
+from os.path                    import join, exists
+from os                         import walk
 from skimage                    import io, transform
 from time                       import time
 from torch                      import from_numpy,unsqueeze,FloatTensor
@@ -137,9 +139,19 @@ if __name__=='__main__':
     parser.add_argument('--n',
                         default = 10,
                         type    = int)
-    parser.add_argument('--logfile',
-                        default = 'log.csv')
-    args   = parser.parse_args()
+    parser.add_argument('--prefix',
+                        default = 'log')
+    parser.add_argument('--suffix',
+                        default = '.csv')
+
+    args          = parser.parse_args()
+
+    logs          = get_logfile_names(False,None,args.prefix,args.suffix)
+    i             = len(logs)
+    logfile_name = f'{args.prefix}{i+1}{args.suffix}'
+    while exists(logfile_name):
+        i += 1
+        logfile_name = f'{args.prefix}{i+1}{args.suffix}'
 
     training_data   = CellDataset()
     training_loader = DataLoader(training_data,batch_size=7)
@@ -149,7 +161,7 @@ if __name__=='__main__':
     optimizer = SGD(model.parameters(), lr = args.lr, momentum = args.momentum)
 
     print (model)
-    with open(args.logfile,'w') as logfile:
+    with open(logfile_name,'w') as logfile:
         logfile.write(f'image_set,{args.image_set}\n')
         logfile.write(f'lr,{args.lr}\n')
         logfile.write(f'momentum,{args.momentum}\n')
