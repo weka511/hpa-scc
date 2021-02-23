@@ -137,6 +137,8 @@ if __name__=='__main__':
     parser.add_argument('--n',
                         default = 10,
                         type    = int)
+    parser.add_argument('--logfile',
+                        default = 'log.csv')
     args   = parser.parse_args()
 
     training_data   = CellDataset()
@@ -146,26 +148,27 @@ if __name__=='__main__':
     criterion = MSELoss()
     optimizer = SGD(model.parameters(), lr = args.lr, momentum = args.momentum)
 
-    losses    = []
     print (model)
-    for epoch in range(1,args.n+1):  # loop over the dataset multiple times
-        running_loss = 0.0
-        for i, data in enumerate(training_loader, 0):
-            inputs, labels = data # get the inputs; data is a list of [inputs, labels]
-            optimizer.zero_grad()  # zero the parameter gradients
-
-            # forward + backward + optimize
-            outputs = model(inputs)
-            loss    = criterion(outputs, labels)
-            loss.backward()
-            optimizer.step()
-
-            # print statistics
-            running_loss += loss.item()
-            if i % args.freq == 0:
-                print(f'{epoch}, {i}, {running_loss / args.freq}')
-            losses.append(running_loss/args.freq)
+    with open('log.csv','w') as logfile:
+        for epoch in range(1,args.n+1):  # loop over the dataset multiple times
             running_loss = 0.0
+            for i, data in enumerate(training_loader, 0):
+                inputs, labels = data # get the inputs; data is a list of [inputs, labels]
+                optimizer.zero_grad()  # zero the parameter gradients
+
+                # forward + backward + optimize
+                outputs = model(inputs)
+                loss    = criterion(outputs, labels)
+                loss.backward()
+                optimizer.step()
+
+                # print statistics
+                running_loss += loss.item()
+                if i % args.freq == 0:
+                    print(f'{epoch}, {i}, {running_loss / args.freq}')
+                    logfile.write(f'{epoch}, {i}, {running_loss / args.freq}\n')
+                    logfile.flush()
+                running_loss = 0.0
 
 
     elapsed = time() - start
