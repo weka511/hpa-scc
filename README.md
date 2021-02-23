@@ -6,7 +6,7 @@
 |File|Description|Active|
 |---------------------|-------------------------------------------------------------------------------------------------|--------|
 ||Production|
-|descriptions.csv|Rext labels for classes|Active|
+|descriptions.csv|Text labels for classes|Active|
 |hpa-scc.wpr|Python project|Active|
 |logs.py|Analyze log files from training/testing|WIP|
 |segment.py|Segment images using HPA cellsegmentator|Active|
