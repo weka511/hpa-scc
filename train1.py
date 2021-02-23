@@ -24,8 +24,8 @@ from os.path                    import join
 from segment2                   import read_training_expectations
 from skimage                    import io, transform
 from time                       import time
-from torch                      import from_numpy,unsqueeze
-from torch.nn                   import Module, Conv2d, MaxPool2d, Linear,CrossEntropyLoss
+from torch                      import from_numpy,unsqueeze,FloatTensor
+from torch.nn                   import Module, Conv2d, MaxPool2d, Linear,MSELoss
 from torch.nn.functional        import relu
 from torch.optim                import SGD
 from torch.utils.data           import Dataset, DataLoader
@@ -55,7 +55,10 @@ class CellDataset(Dataset):
         if self.transform:
             sample = self.transform(img)
         img = from_numpy(asarray(img))
-        return unsqueeze(img,0),self.expectations[image_id]
+
+        classes = [1 if i in self.expectations[image_id] else 0 for i in range(18)]
+
+        return unsqueeze(img,0),FloatTensor(classes)
 
 class Net(Module):
     def __init__(self):
@@ -66,15 +69,19 @@ class Net(Module):
                             stride       = 1,
                             padding      = 1)
         self.pool  = MaxPool2d(2, 2)
-        self.conv2 = Conv2d(6, 16, 5)
-        self.fc1   = Linear(16 * 5 * 5, 120)
+        self.conv2 = Conv2d(in_channels  = 6,
+                            out_channels = 16,
+                            kernel_size  = 5,
+                            stride       = 1,
+                            padding      = 1)
+        self.fc1   = Linear(16 * 126 * 126, 120)
         self.fc2   = Linear(120, 84)
-        self.fc3   = Linear(84, 10)
+        self.fc3   = Linear(84, 18)
 
     def forward(self, x):
         x = self.pool(relu(self.conv1(x.float())))
         x = self.pool(relu(self.conv2(x)))
-        x = x.view(-1, 16 * 5 * 5)
+        x = x.view(-1, 16 * 126 * 126)
         x = relu(self.fc1(x))
         x = relu(self.fc2(x))
         x = self.fc3(x)
@@ -97,9 +104,10 @@ if __name__=='__main__':
     parser.add_argument('--image_set',
                         default = 'train512x512',
                         help    = 'Identified subset of data-- e.g. train512x512')
+    parser.add_argument('--freq',     default = 10,  type=int)
     parser.add_argument('--momentum', default = 0.9,   type=float)
     parser.add_argument('--lr',       default = 0.001, type=float)
-    parser.add_argument('--n',        default = 1,     type=int)
+    parser.add_argument('--n',        default = 10,     type=int)
     args   = parser.parse_args()
 
     training_data   = CellDataset()
@@ -113,7 +121,7 @@ if __name__=='__main__':
     # imshow1(out)
 
     model     = Net()
-    criterion = CrossEntropyLoss()
+    criterion = MSELoss()
     optimizer = SGD(model.parameters(),
                     lr       = args.lr,
                     momentum = args.momentum)
@@ -134,8 +142,8 @@ if __name__=='__main__':
 
             # print statistics
             running_loss += loss.item()
-            # if (i +1) % args.freq == 0:
-            print(f'{epoch + 1}, {i + 1}, {running_loss / args.freq}')
+            if (i +1) % args.freq == 0:
+                print(f'{epoch + 1}, {i + 1}, {running_loss / args.freq}')
             losses.append(running_loss/args.freq)
             running_loss = 0.0
 
