@@ -91,7 +91,7 @@ def binary_mask_to_ascii(mask, mask_val=1): # https://www.kaggle.com/dschettler8
 
 # segment_image
 #
-# Apply segmentation mask to determine which part of image should actually be shwon
+# Apply segmentation mask to determine which part of image should actually be shown
 
 def segment_image(img_cell,binary_mask,class_id):
     for i in range(len(img_cell)):
