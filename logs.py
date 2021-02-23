@@ -18,19 +18,26 @@
 from argparse import   ArgumentParser
 from csv               import reader
 from matplotlib.pyplot import figure,plot,show,title,legend,ylabel,savefig
+from os                import walk
 from os.path           import splitext
 
 def extract(row):
     return row[1]
 
+def is_logfile(filename,prefix='log',suffix='.csv'):
+    return filename.startswith(prefix) and splitext(filename)[-1]==suffix
+
+def get_logfile_names(notall,logfiles):
+    return logfiles if notall else [filename for _,_,filenames in walk('.') for filename in filenames if is_logfile(filename)]
+
 if __name__ == '__main__':
     parser = ArgumentParser('Analyze log files from training/testing')
-    parser.add_argument('--logfiles', nargs='+', default = ['log.csv'])
+    parser.add_argument('--logfiles', default = ['log.csv'], nargs='+')
+    parser.add_argument('--notall',   default = False,       action = 'store_true')
     parser.add_argument('--savefile', default='logs')
-    args = parser.parse_args()
-
-    fig  = figure(figsize=(20,20))
-    for logfile_name in args.logfiles:
+    args     = parser.parse_args()
+    fig      = figure(figsize=(20,20))
+    for logfile_name in get_logfile_names(args.notall,args.logfiles):
         with open(logfile_name) as logfile:
             data      = reader(logfile)
             image_set = extract(next(data))
