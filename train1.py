@@ -18,10 +18,9 @@
 # https://leonardoaraujosantos.gitbook.io/artificial-inteligence/appendix/pytorch/dataloader-and-datasets
 
 from argparse                   import ArgumentParser
-from matplotlib.pyplot          import figure, imread, imshow, axis, savefig, close, show, title,suptitle
-from numpy                      import array, clip, asarray
+from csv                        import reader
+from numpy                      import asarray
 from os.path                    import join
-from segment2                   import read_training_expectations
 from skimage                    import io, transform
 from time                       import time
 from torch                      import from_numpy,unsqueeze,FloatTensor
@@ -33,11 +32,21 @@ from torchvision                import transforms, utils
 
 class CellDataset(Dataset):
     def __init__(self,
-                 path         = r'd:\data\hpa-scc',
-                 image_set    = 'train512x512',
-                 file_name    = 'train.csv',
-                 transform    =  None):
-        self.expectations = read_training_expectations(path=path,file_name=file_name)
+                 path             = r'd:\data\hpa-scc',
+                 image_set        = 'train512x512',
+                 file_name        = 'train.csv',
+                 transform        =  None,
+                 allow_multiplets =  False,
+                 allow_negatives  =  False):
+        self.expectations = {}
+        with open(join(path,file_name)) as train:
+            rows = reader(train)
+            next(rows)
+            for row in rows:
+                class_ids = list(set([int(label) for label in row[1].split('|')]))
+                if allow_multiplets or len(class_ids)==1:
+                    if allow_negatives or 18 not in class_ids:
+                        self.expectations[row[0]] = class_ids
         self.image_ids    = list(self.expectations.keys())
         self.transform    = transform
         self.path         = path
@@ -74,9 +83,12 @@ class Net(Module):
                             kernel_size  = 5,
                             stride       = 1,
                             padding      = 1)
-        self.fc1   = Linear(16 * 126 * 126, 120)
-        self.fc2   = Linear(120, 84)
-        self.fc3   = Linear(84, 18)
+        self.fc1   = Linear(in_features  = 16 * 126 * 126,
+                            out_features = 120)
+        self.fc2   = Linear(in_features  = 120,
+                            out_features = 84)
+        self.fc3   = Linear(in_features  = 84,
+                            out_features = 18)
 
     def forward(self, x):
         x = self.pool(relu(self.conv1(x.float())))
@@ -104,27 +116,26 @@ if __name__=='__main__':
     parser.add_argument('--image_set',
                         default = 'train512x512',
                         help    = 'Identified subset of data-- e.g. train512x512')
-    parser.add_argument('--freq',     default = 10,  type=int)
-    parser.add_argument('--momentum', default = 0.9,   type=float)
-    parser.add_argument('--lr',       default = 0.001, type=float)
-    parser.add_argument('--n',        default = 10,     type=int)
+    parser.add_argument('--freq',
+                        default = 10,
+                        type    = int)
+    parser.add_argument('--momentum',
+                        default = 0.9,
+                        type    = float)
+    parser.add_argument('--lr',
+                        default = 0.001,
+                        type    = float)
+    parser.add_argument('--n',
+                        default = 10,
+                        type    = int)
     args   = parser.parse_args()
 
     training_data   = CellDataset()
     training_loader = DataLoader(training_data,batch_size=4)
-    # Get a batch of training data
-    # inputs, classes = next(iter(training_loader))
-
-    # Make a grid from batch
-    # out = utils.make_grid(inputs)
-
-    # imshow1(out)
 
     model     = Net()
     criterion = MSELoss()
-    optimizer = SGD(model.parameters(),
-                    lr       = args.lr,
-                    momentum = args.momentum)
+    optimizer = SGD(model.parameters(), lr = args.lr, momentum = args.momentum)
 
     losses    = []
     print (model)
@@ -142,8 +153,8 @@ if __name__=='__main__':
 
             # print statistics
             running_loss += loss.item()
-            if (i +1) % args.freq == 0:
-                print(f'{epoch + 1}, {i + 1}, {running_loss / args.freq}')
+            if i % args.freq == 0:
+                print(f'{epoch}, {i}, {running_loss / args.freq}')
             losses.append(running_loss/args.freq)
             running_loss = 0.0
 
@@ -152,4 +163,3 @@ if __name__=='__main__':
     minutes = int(elapsed/60)
     seconds = elapsed - 60*minutes
     print (f'Elapsed Time {minutes} m {seconds:.2f} s')
-    show()
