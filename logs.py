@@ -17,7 +17,8 @@
 
 from argparse import   ArgumentParser
 from csv               import reader
-from matplotlib.pyplot import figure,plot,show,title,legend,ylabel
+from matplotlib.pyplot import figure,plot,show,title,legend,ylabel,savefig
+from os.path           import splitext
 
 def extract(row):
     return row[1]
@@ -25,9 +26,10 @@ def extract(row):
 if __name__ == '__main__':
     parser = ArgumentParser('Analyze log files from training/testing')
     parser.add_argument('--logfiles', nargs='+', default = ['log.csv'])
+    parser.add_argument('--savefile', default='logs')
     args = parser.parse_args()
 
-    fig = figure(figsize=(20,20))
+    fig  = figure(figsize=(20,20))
     for logfile_name in args.logfiles:
         with open(logfile_name) as logfile:
             data      = reader(logfile)
@@ -36,7 +38,9 @@ if __name__ == '__main__':
             momentum  = float(extract(next(data)))
             errors    = [float(error) for _,_,error in data]
             plot (errors,label=f'lr={lr}, momentum={momentum}')
-        ylabel('Training Error')
-        title(f'{image_set}')
-        legend()
+
+    ylabel('Training Error')
+    title(f'Image set: {image_set}')
+    legend()
+    savefig (f'{args.savefile}.png' if len(splitext(args.savefile))==0 else args.savefile)
     show()
