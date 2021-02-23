@@ -5,7 +5,7 @@
 
 |File|Description|Active|
 |---------------------|-------------------------------------------------------------------------------------------------|--------|
-||Production|
+||Production||
 |descriptions.csv|Text labels for classes|Active|
 |hpa-scc.wpr|Python project|Active|
 |logs.py|Analyze log files from training/testing|WIP|
@@ -13,6 +13,7 @@
 |split.py|Partition datainto training and validation|TBP|
 |test.py|Execute network with test data|TBP|
 |train.py|Build and train neual network|Active|
+||Spikes||
 |anayze-labels|Find images  that have only one label|Inactive|
 |CellSegmenterTest.py|Demo for HPA cellsegmentator|Inactive|
 |encoding.py|Example of encoding|Inactive|
