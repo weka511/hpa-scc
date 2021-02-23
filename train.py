@@ -150,6 +150,9 @@ if __name__=='__main__':
 
     print (model)
     with open(args.logfile,'w') as logfile:
+        logfile.write(f'image_set,{args.image_set}\n')
+        logfile.write(f'lr,{args.lr}\n')
+        logfile.write(f'momentum,{args.momentum}\n')
         for epoch in range(1,args.n+1):  # loop over the dataset multiple times
             running_loss = 0.0
             for i, data in enumerate(training_loader, 0):
