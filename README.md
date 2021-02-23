@@ -9,8 +9,8 @@
 |hpa-scc.wpr|Python project|Active|
 |logs.py|Analyze log files from training/testing|WIP|
 |segment.py|Segment images using HPA cellsegmentator|Active|
-|split.py|Partition datainto training and validation|WIP|
-|test.py|Execute network with test data|WIP|
+|split.py|Partition datainto training and validation|TBP|
+|test.py|Execute network with test data|TBP|
 |train.py|Build and train neual network|Active|
 |anayze-labels|Find images  that have only one label|Inactive|
 |CellSegmenterTest.py|Demo for HPA cellsegmentator|Inactive|
