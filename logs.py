@@ -17,16 +17,26 @@
 
 from argparse import   ArgumentParser
 from csv               import reader
-from matplotlib.pyplot import figure,plot,show
+from matplotlib.pyplot import figure,plot,show,title,legend,ylabel
+
+def extract(row):
+    return row[1]
 
 if __name__ == '__main__':
     parser = ArgumentParser('Analyze log files from training/testing')
-    parser.add_argument('--logfile', default = 'log.csv')
+    parser.add_argument('--logfiles', nargs='+', default = ['log.csv'])
     args = parser.parse_args()
 
     fig = figure(figsize=(20,20))
-    with open(args.logfile) as logfile:
-        data = reader(logfile)
-        errors = [float(error) for _,_,error in data]
-        plot (errors)
+    for logfile_name in args.logfiles:
+        with open(logfile_name) as logfile:
+            data      = reader(logfile)
+            image_set = extract(next(data))
+            lr        = float(extract(next(data)))
+            momentum  = float(extract(next(data)))
+            errors    = [float(error) for _,_,error in data]
+            plot (errors,label=f'lr={lr}, momentum={momentum}')
+        ylabel('Training Error')
+        title(f'{image_set}')
+        legend()
     show()
