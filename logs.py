@@ -28,33 +28,54 @@ def is_logfile(filename,prefix='log',suffix='.csv'):
     return filename.startswith(prefix) and splitext(filename)[-1]==suffix
 
 def get_logfile_names(notall,logfiles,prefix='log',suffix='.csv',logdir='logs'):
-    return logfiles if notall else [join(logdir,filename) for _,_,filenames in walk(logdir) for filename in filenames if is_logfile(filename,
-                                                                                                                    prefix=prefix,
-                                                                                                                    suffix=suffix)]
+    if notall:
+        return logfiles
+    else:
+        return [join(logdir,filename) for _,_,filenames in walk(logdir) for filename in filenames if is_logfile(filename,
+                                                                                                                prefix=prefix,
+                                                                                                                suffix=suffix)]
 
 if __name__ == '__main__':
     parser = ArgumentParser('Analyze log files from training/testing')
-    parser.add_argument('--logfiles', default = ['log.csv'], nargs='+')
-    parser.add_argument('--prefix',   default = 'log')
-    parser.add_argument('--suffix',   default = '.csv')
-    parser.add_argument('--notall',   default = False,       action = 'store_true')
-    parser.add_argument('--savefile', default = 'logs')
+    parser.add_argument('--logfiles',
+                        default = ['log.csv'],
+                        nargs   = '+',
+                        help    = 'List of files to be plotted (if --notall)')
+    parser.add_argument('--prefix',
+                        default = 'log',
+                        help    = 'Specifes pattern for logfiles (with suffix)')
+    parser.add_argument('--suffix',
+                        default = '.csv',
+                        help    = 'Specifes pattern for logfiles (with prefix)')
+    parser.add_argument('--notall',
+                        default = False,
+                        action  = 'store_true',
+                        help    = 'Controls whther we plot all log files, or merely those specifed by --logfiles')
+    parser.add_argument('--savefile',
+                        default = 'logs',
+                        help    = 'File name for saving plot')
     parser.add_argument('--logdir',
                         default = './logs',
-                        help = 'directory for storing logfiles')
+                        help    = 'directory for storing logfiles')
+    parser.add_argument('--skip',
+                        default = 10,
+                        type    = int,
+                        help    = 'Number of burn-in entries to be skipped at beginning')
     args     = parser.parse_args()
     fig      = figure(figsize=(20,20))
     for logfile_name in get_logfile_names(args.notall,args.logfiles,
                                           prefix = args.prefix,
                                           suffix = args.suffix,
                                           logdir = args.logdir):
+
         with open(logfile_name) as logfile:
             data      = reader(logfile)
             image_set = extract(next(data))
             lr        = float(extract(next(data)))
             momentum  = float(extract(next(data)))
             errors    = [float(error) for _,_,error in data]
-            plot (errors,label=f'lr={lr}, momentum={momentum}')
+            plot (errors[args.skip:],
+                  label=f'lr={lr}, momentum={momentum}')
 
     ylabel('Training Error')
     title(f'Image set: {image_set}')
