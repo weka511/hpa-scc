@@ -11,7 +11,6 @@
 |logs.py|Analyze log files from training/testing|
 |segment.py|Segment images using HPA cellsegmentator|
 |split.py|Partition data into training and validation|
-|test.py|Execute network with test data|
 |train.py|Build and train neual network|
 ||Spikes||
 |anayze-labels|Find images  that have only one label|
