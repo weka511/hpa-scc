@@ -3,30 +3,30 @@
 
 ## Python Scripts
 
-|File|Description|Active|
+|File|Description|
 |---------------------|-------------------------------------------------------------------------------------------------|--------|
 ||Production||
-|descriptions.csv|Text labels for classes|Active|
-|hpa-scc.wpr|Python project|Active|
-|logs.py|Analyze log files from training/testing|WIP|
-|segment.py|Segment images using HPA cellsegmentator|Active|
-|split.py|Partition datainto training and validation|TBP|
-|test.py|Execute network with test data|TBP|
-|train.py|Build and train neual network|Active|
+|descriptions.csv|Text labels for classes|
+|hpa-scc.wpr|Python project|
+|logs.py|Analyze log files from training/testing|
+|segment.py|Segment images using HPA cellsegmentator|
+|split.py|Partition data into training and validation|
+|test.py|Execute network with test data|
+|train.py|Build and train neual network|
 ||Spikes||
-|anayze-labels|Find images  that have only one label|Inactive|
-|CellSegmenterTest.py|Demo for HPA cellsegmentator|Inactive|
-|encoding.py|Example of encoding|Inactive|
-|otsu.py|Segment images using Otsu's method|Inactive|
-|watershed.py|Naive Watershed segmentation|Inactive|
-|download.py|Download training images from kaggle|Inactive|
-|summarize.py|Organize image names by description|Inactive|
-|unzip.py|Unzip downloaded files|Inactive|
-|visualize.py|Visualize image files|Inactive|
+|anayze-labels|Find images  that have only one label|
+|CellSegmenterTest.py|Demo for HPA cellsegmentator|
+|encoding.py|Example of encoding|
+|otsu.py|Segment images using Otsu's method|
+|watershed.py|Naive Watershed segmentation|
+|download.py|Download training images from kaggle|
+|summarize.py|Organize image names by description|
+|unzip.py|Unzip downloaded files|
+|visualize.py|Visualize image files|
 
 ## Documentation
 
-|File|Description|Active|
+|File|Description|
 |-----------------|-------------------------------------------------------------------------------------------------|--------|
-|hpa-scc.bib|Bibliography|Active|
-|Notes.tex|My notes|Active|
+|hpa-scc.bib|Bibliography|
+|Notes.tex|My notes|
