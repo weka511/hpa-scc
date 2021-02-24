@@ -23,9 +23,10 @@ from logs                       import get_logfile_names
 from numpy                      import asarray, stack
 from os.path                    import join, exists
 from os                         import walk
+from shutil                     import copy
 from skimage                    import io, transform
 from time                       import time
-from torch                      import from_numpy,unsqueeze,FloatTensor
+from torch                      import from_numpy,unsqueeze,FloatTensor,save
 from torch.nn                   import Module, Conv3d, MaxPool3d, Linear,MSELoss
 from torch.nn.functional        import relu
 from torch.optim                import SGD
@@ -143,7 +144,8 @@ if __name__=='__main__':
                         default = 'log')
     parser.add_argument('--suffix',
                         default = '.csv')
-
+    parser.add_argument('--saveweights',
+                        default = 'weights')
     args          = parser.parse_args()
 
     logs          = get_logfile_names(False,None,args.prefix,args.suffix)
@@ -183,6 +185,10 @@ if __name__=='__main__':
                     print(f'{epoch}, {i}, {running_loss / args.freq}')
                     logfile.write(f'{epoch}, {i}, {running_loss / args.freq}\n')
                     logfile.flush()
+                    save_weights_path = f'{args.saveweights}.pth'
+                    if exists(save_weights_path):
+                        copy(save_weights_path,f'{args.saveweights}.pth.bak')
+                    save(model.state_dict(),save_weights_path )
                 running_loss = 0.0
 
 
