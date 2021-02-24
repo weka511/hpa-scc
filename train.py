@@ -100,13 +100,9 @@ class Net(Module):
                             out_features = 18)
 
     def forward(self, x):
-        # print (x.shape)
         x = self.pool(relu(self.conv1(x.float())))
-        # print (x.shape)
         x = self.pool(relu(self.conv2(x)))
-        # print (x.shape)
         x = x.view(-1, 16 * 126 * 126)
-        # print (x.shape)
         x = relu(self.fc1(x))
         x = relu(self.fc2(x))
         x = self.fc3(x)
@@ -172,7 +168,7 @@ def validate(args):
     for i, data in enumerate(validation_loader, 0):
         inputs, labels = data
         outputs        = model(inputs)
-        predictions    = softmax(outputs, dim=1, dtype=float)
+        predictions    = outputs#softmax(outputs, dim=1, dtype=float)
         j              = argmax(predictions[0].detach().numpy())
         print (j,predictions[0].detach().numpy())
 
