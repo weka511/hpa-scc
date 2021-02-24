@@ -110,7 +110,7 @@ class Net(Module):
         x = relu(self.fc1(x))
         x = relu(self.fc2(x))
         x = self.fc3(x)
-        return x
+        return softmax(x,dim=1)
 
 def imshow1(inp, title=None):
     """Imshow for Tensor."""
