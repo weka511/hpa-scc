@@ -161,7 +161,7 @@ def train(args):
                     if exists(save_weights_path):
                         copy(save_weights_path,f'{args.weights}.pth.bak')
                     save(model.state_dict(),save_weights_path )
-                running_loss = 0.0
+                    running_loss = 0.0
 
 def validate(args):
     model = Net()
