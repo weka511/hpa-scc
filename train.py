@@ -122,10 +122,10 @@ def imshow1(inp, title=None):
 def train(args):
     logs          = get_logfile_names(False,None,args.prefix,args.suffix)
     i             = len(logs)
-    logfile_name = f'{args.prefix}{i+1}{args.suffix}'
-    while exists(logfile_name):
+    logfile_path = join(args.logdir, f'{args.prefix}{i+1}{args.suffix}')
+    while exists(logfile_path):
         i += 1
-        logfile_name = f'{args.prefix}{i+1}{args.suffix}'
+        logfile_name = logfile_path = join(args.logdir, f'{args.prefix}{i+1}{args.suffix}')
 
     training_data   = CellDataset()
     training_loader = DataLoader(training_data,batch_size=7)
@@ -135,7 +135,7 @@ def train(args):
     optimizer = SGD(model.parameters(), lr = args.lr, momentum = args.momentum)
 
     print (model)
-    with open(logfile_name,'w') as logfile:
+    with open(logfile_path,'w') as logfile:
         logfile.write(f'image_set,{args.image_set}\n')
         logfile.write(f'lr,{args.lr}\n')
         logfile.write(f'momentum,{args.momentum}\n')
@@ -215,6 +215,9 @@ if __name__=='__main__':
     parser.add_argument('--suffix',
                         default = '.csv',
                         help    = 'Suffix for log file names')
+    parser.add_argument('--logdir',
+                        default = './logs',
+                        help = 'directory for storing logfiles')
     parser.add_argument('--weights',
                         default = 'weights',
                         help    = 'Filename for saving and loading weights')
