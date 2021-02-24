@@ -167,8 +167,7 @@ def validate(args):
     validation_loader = DataLoader(validation_data,batch_size=1)
     for i, data in enumerate(validation_loader, 0):
         inputs, labels = data
-        outputs        = model(inputs)
-        predictions    = outputs#softmax(outputs, dim=1, dtype=float)
+        predictions    = model(inputs)
         j              = argmax(predictions[0].detach().numpy())
         print (j,predictions[0].detach().numpy())
 
