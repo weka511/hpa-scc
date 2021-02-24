@@ -17,7 +17,7 @@
 
 from argparse import   ArgumentParser
 from csv               import reader
-from matplotlib.pyplot import figure,plot,show,title,legend,ylabel,savefig
+from matplotlib.pyplot import figure,plot,show,title,legend,ylabel,savefig,ylim
 from os                import walk
 from os.path           import splitext, join
 
@@ -34,6 +34,7 @@ def get_logfile_names(notall,logfiles,prefix='log',suffix='.csv',logdir='logs'):
         return [join(logdir,filename) for _,_,filenames in walk(logdir) for filename in filenames if is_logfile(filename,
                                                                                                                 prefix=prefix,
                                                                                                                 suffix=suffix)]
+Colours = ['r','g','b','y','c','m','k']
 
 if __name__ == '__main__':
     parser = ArgumentParser('Analyze log files from training/testing')
@@ -61,8 +62,13 @@ if __name__ == '__main__':
                         default = 10,
                         type    = int,
                         help    = 'Number of burn-in entries to be skipped at beginning')
+    parser.add_argument('--average',
+                        default = 10,
+                        type    = int,
+                        help    = 'Plot moving average')
     args     = parser.parse_args()
     fig      = figure(figsize=(20,20))
+    i        = 0
     for logfile_name in get_logfile_names(args.notall,args.logfiles,
                                           prefix = args.prefix,
                                           suffix = args.suffix,
@@ -74,11 +80,21 @@ if __name__ == '__main__':
             lr        = float(extract(next(data)))
             momentum  = float(extract(next(data)))
             errors    = [float(error) for _,_,error in data]
-            plot (errors[args.skip:],
-                  label=f'lr={lr}, momentum={momentum}')
 
+            plot (errors[args.skip+args.average//2:],
+                  c     = Colours[i],
+                  label = f'lr={lr}, momentum={momentum}')
+
+            plot([sum([errors[i] for i in range(j,j+args.average)])/args.average for j in range(args.skip,len(errors)-args.average)],
+                 c     = Colours[i],
+                 linestyle = 'dashed')
+            i += 1
+            if i==len(Colours):
+                i = 0
     ylabel('Training Error')
     title(f'Image set: {image_set}')
+    # _, y0 = ylim()
+    # ylim(0,y0)
     legend()
     savefig (f'{args.savefile}.png' if len(splitext(args.savefile))==0 else args.savefile)
     show()
