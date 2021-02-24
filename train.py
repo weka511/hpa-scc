@@ -25,8 +25,9 @@ from os.path                    import join, exists
 from os                         import walk
 from shutil                     import copy
 from skimage                    import io, transform
+from sys                        import exit
 from time                       import time
-from torch                      import from_numpy,unsqueeze,FloatTensor,save
+from torch                      import from_numpy,unsqueeze,FloatTensor,save,load
 from torch.nn                   import Module, Conv3d, MaxPool3d, Linear,MSELoss
 from torch.nn.functional        import relu
 from torch.optim                import SGD
@@ -118,36 +119,7 @@ def imshow1(inp, title=None):
     if title is not None:
         title(title)
 
-
-if __name__=='__main__':
-    start  = time()
-    parser = ArgumentParser('Train with HPA data')
-    parser.add_argument('--path',
-                        default = r'd:\data\hpa-scc',
-                        help    = 'Path to data')
-    parser.add_argument('--image_set',
-                        default = 'train512x512',
-                        help    = 'Identified subset of data-- e.g. train512x512')
-    parser.add_argument('--freq',
-                        default = 10,
-                        type    = int)
-    parser.add_argument('--momentum',
-                        default = 0.9,
-                        type    = float)
-    parser.add_argument('--lr',
-                        default = 0.001,
-                        type    = float)
-    parser.add_argument('--n',
-                        default = 10,
-                        type    = int)
-    parser.add_argument('--prefix',
-                        default = 'log')
-    parser.add_argument('--suffix',
-                        default = '.csv')
-    parser.add_argument('--saveweights',
-                        default = 'weights')
-    args          = parser.parse_args()
-
+def train(args):
     logs          = get_logfile_names(False,None,args.prefix,args.suffix)
     i             = len(logs)
     logfile_name = f'{args.prefix}{i+1}{args.suffix}'
@@ -185,11 +157,65 @@ if __name__=='__main__':
                     print(f'{epoch}, {i}, {running_loss / args.freq}')
                     logfile.write(f'{epoch}, {i}, {running_loss / args.freq}\n')
                     logfile.flush()
-                    save_weights_path = f'{args.saveweights}.pth'
+                    save_weights_path = f'{args.weights}.pth'
                     if exists(save_weights_path):
-                        copy(save_weights_path,f'{args.saveweights}.pth.bak')
+                        copy(save_weights_path,f'{args.weights}.pth.bak')
                     save(model.state_dict(),save_weights_path )
                 running_loss = 0.0
+
+def validate(args):
+    model = Net()
+    model.load_state_dict(load(f'{args.weights}.pth'))
+    model.eval()
+    print ('Not implemented')
+    exit(1)
+
+if __name__=='__main__':
+    start  = time()
+    parser = ArgumentParser('Train with HPA data')
+    parser.add_argument('action',
+                        choices = ['train','test','validate'],
+                        help    = 'Action: train network, validate angainst held out data, or predict from test dataset')
+    parser.add_argument('--path',
+                        default = r'd:\data\hpa-scc',
+                        help    = 'Path to data')
+    parser.add_argument('--image_set',
+                        default = 'train512x512',
+                        help    = 'Identified subset of data-- e.g. train512x512')
+    parser.add_argument('--freq',
+                        default = 10,
+                        type    = int,
+                        help    = 'Controls frequency with which data logged/saved')
+    parser.add_argument('--momentum',
+                        default = 0.9,
+                        type    = float,
+                        help    = 'Momentum')
+    parser.add_argument('--lr',
+                        default = 0.001,
+                        type    = float,
+                        help    = 'Learning Rate')
+    parser.add_argument('--n',
+                        default = 10,
+                        type    = int,
+                        help    = 'Number of epochs for training')
+    parser.add_argument('--prefix',
+                        default = 'log',
+                        help    = 'Prefix for log file names')
+    parser.add_argument('--suffix',
+                        default = '.csv',
+                        help    = 'Suffix for log file names')
+    parser.add_argument('--weights',
+                        default = 'weights',
+                        help    = 'Filename for saving and loading weights')
+    args          = parser.parse_args()
+
+    if args.action == 'train':
+        train(args)
+    elif args.action == 'validate':
+        validate(args)
+    else:
+        print ('Not implemented')
+        exit(1)
 
 
     elapsed = time() - start
