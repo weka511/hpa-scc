@@ -20,7 +20,7 @@
 from argparse                   import ArgumentParser
 from csv                        import reader
 from logs                       import get_logfile_names
-from numpy                      import asarray, stack
+from numpy                      import asarray, stack, argmax
 from os.path                    import join, exists
 from os                         import walk
 from shutil                     import copy
@@ -28,8 +28,8 @@ from skimage                    import io, transform
 from sys                        import exit
 from time                       import time
 from torch                      import from_numpy,unsqueeze,FloatTensor,save,load
-from torch.nn                   import Module, Conv3d, MaxPool3d, Linear,MSELoss
-from torch.nn.functional        import relu
+from torch.nn                   import Module, Conv3d, MaxPool3d, Linear, MSELoss
+from torch.nn.functional        import relu, softmax
 from torch.optim                import SGD
 from torch.utils.data           import Dataset, DataLoader
 from torchvision                import transforms, utils
@@ -167,6 +167,17 @@ def validate(args):
     model = Net()
     model.load_state_dict(load(f'{args.weights}.pth'))
     model.eval()
+    validation_data  = CellDataset()
+    validation_loader = DataLoader(validation_data,batch_size=1)
+    for i, data in enumerate(validation_loader, 0):
+        inputs, labels = data
+        outputs        = model(inputs)
+        predictions    = softmax(outputs, dim=1, dtype=float)
+        j              = argmax(predictions[0].detach().numpy())
+        print (j,predictions[0].detach().numpy())
+
+
+def test(args):
     print ('Not implemented')
     exit(1)
 
@@ -209,14 +220,10 @@ if __name__=='__main__':
                         help    = 'Filename for saving and loading weights')
     args          = parser.parse_args()
 
-    if args.action == 'train':
-        train(args)
-    elif args.action == 'validate':
-        validate(args)
-    else:
-        print ('Not implemented')
-        exit(1)
-
+    {   'train'    : train,
+        'validate' : validate,
+        'test'     : test
+     }[args.action](args)
 
     elapsed = time() - start
     minutes = int(elapsed/60)
