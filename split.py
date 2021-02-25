@@ -42,14 +42,14 @@ if __name__ == '__main__':
     args   = parser.parse_args()
 
     seed(args.seed)
-    training_output_name = args.train if len(splitext(args.train)[1])>0 else f'{args.train}.csv'
+    training_output_name   = args.train if len(splitext(args.train)[1])>0 else f'{args.train}.csv'
     validation_output_name = args.validation if len(splitext(args.validation)[1])>0 else f'{args.validation}.csv'
-    i = 0
-    j = 0
-    k = 0
-    with open(join(args.path,args.file_name)) as train,            \
-         open(training_output_name,'w')       as training_output,        \
-         open( validation_output_name ,'w')   as validation_output:
+    i                      = 0
+    j                      = 0
+    k                      = 0
+    with open(join(args.path,args.file_name)) as train,             \
+         open(training_output_name,'w')       as training_output,   \
+         open(validation_output_name ,'w')    as validation_output:
         for row in train:
             i += 1
             if i==1:   #Heading
@@ -61,5 +61,5 @@ if __name__ == '__main__':
             else:
                 validation_output.write(row)
                 k += 1
-    print (f'Read {i-1} records (excludinging heading).')
+    print (f'Read {i-1} records (excluding heading).')
     print (f'Partitioned into {j} training records and {k} for validation')
