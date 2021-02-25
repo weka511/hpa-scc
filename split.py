@@ -52,11 +52,14 @@ if __name__ == '__main__':
          open( validation_output_name ,'w')   as validation_output:
         for row in train:
             i += 1
-            if random()<args.split:
+            if i==1:   #Heading
+                training_output.write(row)
+                validation_output.write(row)
+            elif random()<args.split:
                 training_output.write(row)
                 j += 1
             else:
                 validation_output.write(row)
                 k += 1
-    print (f'Read {i} records.')
+    print (f'Read {i-1} records (excludinging heading).')
     print (f'Partitioned into {j} training records and {k} for validation')
