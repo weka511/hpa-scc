@@ -43,8 +43,8 @@ class CellDataset(Dataset):
                  allow_multiplets =  False,
                  allow_negatives  =  False):
         self.expectations = {}
-        with open(join(path,file_name)) as train:
-            rows = reader(train)
+        with open(file_name) as index:
+            rows = reader(index)
             next(rows)
             for row in rows:
                 class_ids = list(set([int(label) for label in row[1].split('|')]))
@@ -109,13 +109,6 @@ class Net(Module):
         x = softmax(x,dim=1)
         return x
 
-def imshow1(inp, title=None):
-    """Imshow for Tensor."""
-    inp = inp.numpy().transpose((1, 2, 0))
-    imshow(inp)
-    if title is not None:
-        title(title)
-
 def train(args):
     logs          = get_logfile_names(False,None,args.prefix,args.suffix)
     i             = len(logs)
@@ -124,7 +117,7 @@ def train(args):
         i += 1
         logfile_name = logfile_path = join(args.logdir, f'{args.prefix}{i+1}{args.suffix}')
 
-    training_data   = CellDataset()
+    training_data   = CellDataset(file_name = 'training.csv' if args.index == None else args.index)
     training_loader = DataLoader(training_data,batch_size=4)
 
     model     = Net()
@@ -164,7 +157,7 @@ def validate(args):
     model = Net()
     model.load_state_dict(load(f'{args.weights}.pth'))
     model.eval()
-    validation_data   = CellDataset()
+    validation_data   = CellDataset(file_name = 'validation.csv'  if args.index == None else args.index)
     validation_loader = DataLoader(validation_data,batch_size=1) # FIX ME
     matches           = 0
     mismatches        = 0
@@ -226,6 +219,9 @@ if __name__=='__main__':
     parser.add_argument('--weights',
                         default = 'weights',
                         help    = 'Filename for saving and loading weights')
+    parser.add_argument('--index',
+                        default = None,
+                        help    = 'Name for index file for training/validation')
     args          = parser.parse_args()
 
     {   'train'    : train,
