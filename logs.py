@@ -81,20 +81,21 @@ if __name__ == '__main__':
             momentum  = float(extract(next(data)))
             errors    = [float(error) for _,_,error in data]
 
-            plot (errors[args.skip+args.average//2:],
+            plot (errors[args.skip+args.average:],
                   c     = Colours[i],
                   label = f'lr={lr}, momentum={momentum}')
 
             plot([sum([errors[i] for i in range(j,j+args.average)])/args.average for j in range(args.skip,len(errors)-args.average)],
                  c     = Colours[i],
-                 linestyle = 'dashed')
+                 linestyle = 'dashed',
+                 label     = f'{args.average}-point moving average')
+
             i += 1
             if i==len(Colours):
                 i = 0
     ylabel('Training Error')
     title(f'Image set: {image_set}')
-    # _, y0 = ylim()
-    # ylim(0,y0)
+
     legend()
     savefig (f'{args.savefile}.png' if len(splitext(args.savefile))==0 else args.savefile)
     show()

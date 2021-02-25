@@ -106,7 +106,8 @@ class Net(Module):
         x = relu(self.fc1(x))
         x = relu(self.fc2(x))
         x = self.fc3(x)
-        return softmax(x,dim=1)
+        x = softmax(x,dim=1)
+        return x
 
 def imshow1(inp, title=None):
     """Imshow for Tensor."""
@@ -124,7 +125,7 @@ def train(args):
         logfile_name = logfile_path = join(args.logdir, f'{args.prefix}{i+1}{args.suffix}')
 
     training_data   = CellDataset()
-    training_loader = DataLoader(training_data,batch_size=7)
+    training_loader = DataLoader(training_data,batch_size=4)
 
     model     = Net()
     criterion = MSELoss()
@@ -154,7 +155,7 @@ def train(args):
                     logfile.write(f'{epoch}, {i}, {running_loss / args.freq}\n')
                     logfile.flush()
                     save_weights_path = f'{args.weights}.pth'
-                    if exists(save_weights_path):
+                    if exists(save_weights_path):     # backup old weights in case save fails
                         copy(save_weights_path,f'{args.weights}.pth.bak')
                     save(model.state_dict(),save_weights_path )
                     running_loss = 0.0
@@ -163,13 +164,22 @@ def validate(args):
     model = Net()
     model.load_state_dict(load(f'{args.weights}.pth'))
     model.eval()
-    validation_data  = CellDataset()
-    validation_loader = DataLoader(validation_data,batch_size=1)
+    validation_data   = CellDataset()
+    validation_loader = DataLoader(validation_data,batch_size=1) # FIX ME
+    matches           = 0
+    mismatches        = 0
     for i, data in enumerate(validation_loader, 0):
         inputs, labels = data
         predictions    = model(inputs)
         j              = argmax(predictions[0].detach().numpy())
-        print (j,predictions[0].detach().numpy())
+        k              = argmax(labels.detach().numpy())
+        # print (j,k,predictions[0].detach().numpy())
+        if j==k:
+            matches+=1
+        else:
+            mismatches+=1
+        if (matches+mismatches)%args.freq==0:
+            print (f'{100*matches/(matches+mismatches):.1f}%')
 
 
 def test(args):
