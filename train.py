@@ -200,7 +200,7 @@ if __name__=='__main__':
                         type    = float,
                         help    = 'Momentum')
     parser.add_argument('--lr',
-                        default = 0.001,
+                        default = 0.01,
                         type    = float,
                         help    = 'Learning Rate')
     parser.add_argument('--n',
