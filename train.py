@@ -20,7 +20,8 @@
 from argparse                   import ArgumentParser
 from csv                        import reader
 from logs                       import get_logfile_names
-from numpy                      import asarray, stack, argmax
+from multiprocessing            import cpu_count
+from numpy                      import asarray, stack, argmax, mean
 from os.path                    import join, exists
 from os                         import walk
 from shutil                     import copy
@@ -75,7 +76,6 @@ class CellDataset(Dataset):
 
         classes = [1 if i in self.expectations[image_id] else 0 for i in range(18)]
 
-        # return img,FloatTensor(classes)
         return unsqueeze(img,1),FloatTensor(classes)
 
 class Net(Module):
@@ -117,8 +117,8 @@ def train(args):
         i += 1
         logfile_name = logfile_path = join(args.logdir, f'{args.prefix}{i+1}{args.suffix}')
 
-    training_data   = CellDataset(file_name = 'training.csv' if args.index == None else args.index)
-    training_loader = DataLoader(training_data,batch_size=4)
+    training_loader = DataLoader(CellDataset(file_name = 'training.csv' if args.index == None else args.index),
+                                 batch_size = cpu_count())
 
     model     = Net()
     criterion = MSELoss()
@@ -153,26 +153,38 @@ def train(args):
                     save(model.state_dict(),save_weights_path )
                     running_loss = 0.0
 
+# get_predictions
+#
+# Use model to predict class of input
+def get_predictions(model,inputs):
+    def get_prediction(probabilities):
+        prediction = argmax(probabilities)
+        return prediction, probabilities[prediction]
+
+    output      = model(inputs)
+    predictions = [get_prediction(output[i].detach().numpy()) for i in range(len(output))]
+    return [a for a,_ in predictions],[b for _,b in predictions]
+
 def validate(args):
     model = Net()
     model.load_state_dict(load(f'{args.weights}.pth'))
     model.eval()
-    validation_data   = CellDataset(file_name = 'validation.csv'  if args.index == None else args.index)
-    validation_loader = DataLoader(validation_data,batch_size=1) # FIX ME
+    validation_loader = DataLoader(CellDataset(file_name = 'validation.csv'  if args.index == None else args.index),
+                                   batch_size = cpu_count())
     matches           = 0
     mismatches        = 0
+    confidence        = 0.0
     for i, data in enumerate(validation_loader, 0):
         inputs, labels = data
-        predictions    = model(inputs)
-        j              = argmax(predictions[0].detach().numpy())
-        k              = argmax(labels.detach().numpy())
-        # print (j,k,predictions[0].detach().numpy())
-        if j==k:
-            matches+=1
-        else:
-            mismatches+=1
+        predictions,confidences = get_predictions(model,inputs)
+        confidence             += sum(confidences)
+        for predicted,expected in zip(predictions,[argmax(labels[i].detach().numpy()) for i in range(len(labels))]):
+            if predicted==expected:
+                matches+=1
+            else:
+                mismatches+=1
         if (matches+mismatches)%args.freq==0:
-            print (f'{100*matches/(matches+mismatches):.1f}%')
+            print (f'Confidence = {confidence/(matches+mismatches):.3f}, accuracy={100*matches/(matches+mismatches):.1f}%')
 
 
 def test(args):
