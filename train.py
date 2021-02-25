@@ -109,23 +109,27 @@ class Net(Module):
         x = softmax(x,dim=1)
         return x
 
-def train(args):
+def get_logfile_name(args):
     logs          = get_logfile_names(False,None,args.prefix,args.suffix)
     i             = len(logs)
     logfile_path = join(args.logdir, f'{args.prefix}{i+1}{args.suffix}')
     while exists(logfile_path):
         i += 1
-        logfile_name = logfile_path = join(args.logdir, f'{args.prefix}{i+1}{args.suffix}')
+        logfile_path = join(args.logdir, f'{args.prefix}{i+1}{args.suffix}')
+    return logfile_path
 
+def train(args):
     training_loader = DataLoader(CellDataset(file_name = 'training.csv' if args.index == None else args.index),
                                  batch_size = cpu_count())
 
     model     = Net()
     criterion = MSELoss()
-    optimizer = SGD(model.parameters(), lr = args.lr, momentum = args.momentum)
+    optimizer = SGD(model.parameters(),
+                    lr = args.lr,
+                    momentum = args.momentum)
 
     print (model)
-    with open(logfile_path,'w') as logfile:
+    with open(get_logfile_name(args),'w') as logfile:
         logfile.write(f'image_set,{args.image_set}\n')
         logfile.write(f'lr,{args.lr}\n')
         logfile.write(f'momentum,{args.momentum}\n')
@@ -135,13 +139,11 @@ def train(args):
                 inputs, labels = data # get the inputs; data is a list of [inputs, labels]
                 optimizer.zero_grad()  # zero the parameter gradients
 
-                # forward + backward + optimize
                 outputs = model(inputs)
                 loss    = criterion(outputs, labels)
                 loss.backward()
                 optimizer.step()
 
-                # print statistics
                 running_loss += loss.item()
                 if i % args.freq == 0:
                     print(f'{epoch}, {i}, {running_loss / args.freq}')
@@ -184,8 +186,7 @@ def validate(args):
             else:
                 mismatches+=1
         if (matches+mismatches)%args.freq==0:
-            print (f'Confidence = {confidence/(matches+mismatches):.3f}, accuracy={100*matches/(matches+mismatches):.1f}%')
-
+            print (f'Confidence = {100*confidence/(matches+mismatches):.1f}%, accuracy={100*matches/(matches+mismatches):.1f}%')
 
 def test(args):
     print ('Not implemented')
@@ -236,7 +237,8 @@ if __name__=='__main__':
                         help    = 'Name for index file for training/validation')
     args          = parser.parse_args()
 
-    {   'train'    : train,
+    {
+        'train'    : train,
         'validate' : validate,
         'test'     : test
      }[args.action](args)
