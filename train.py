@@ -20,8 +20,7 @@
 from argparse                   import ArgumentParser
 from csv                        import reader
 from logs                       import get_logfile_names
-from multiprocessing            import cpu_count
-from numpy                      import asarray, stack, argmax, mean
+from numpy                      import asarray, stack, argmax
 from os.path                    import join, exists
 from os                         import walk
 from shutil                     import copy
@@ -44,8 +43,8 @@ class CellDataset(Dataset):
                  allow_multiplets =  False,
                  allow_negatives  =  False):
         self.expectations = {}
-        with open(file_name) as index:
-            rows = reader(index)
+        with open(file_name) as train:
+            rows = reader(train)
             next(rows)
             for row in rows:
                 class_ids = list(set([int(label) for label in row[1].split('|')]))
@@ -76,6 +75,7 @@ class CellDataset(Dataset):
 
         classes = [1 if i in self.expectations[image_id] else 0 for i in range(18)]
 
+        # return img,FloatTensor(classes)
         return unsqueeze(img,1),FloatTensor(classes)
 
 class Net(Module):
@@ -106,30 +106,32 @@ class Net(Module):
         x = relu(self.fc1(x))
         x = relu(self.fc2(x))
         x = self.fc3(x)
-        x = softmax(x,dim=1)
-        return x
+        return softmax(x,dim=1)
 
-def get_logfile_name(args):
+def imshow1(inp, title=None):
+    """Imshow for Tensor."""
+    inp = inp.numpy().transpose((1, 2, 0))
+    imshow(inp)
+    if title is not None:
+        title(title)
+
+def train(args):
     logs          = get_logfile_names(False,None,args.prefix,args.suffix)
     i             = len(logs)
     logfile_path = join(args.logdir, f'{args.prefix}{i+1}{args.suffix}')
     while exists(logfile_path):
         i += 1
-        logfile_path = join(args.logdir, f'{args.prefix}{i+1}{args.suffix}')
-    return logfile_path
+        logfile_name = logfile_path = join(args.logdir, f'{args.prefix}{i+1}{args.suffix}')
 
-def train(args):
-    training_loader = DataLoader(CellDataset(file_name = 'training.csv' if args.index == None else args.index),
-                                 batch_size = cpu_count())
+    training_data   = CellDataset(file_name='training.csv')
+    training_loader = DataLoader(training_data,batch_size=7)
 
     model     = Net()
     criterion = MSELoss()
-    optimizer = SGD(model.parameters(),
-                    lr = args.lr,
-                    momentum = args.momentum)
+    optimizer = SGD(model.parameters(), lr = args.lr, momentum = args.momentum)
 
     print (model)
-    with open(get_logfile_name(args),'w') as logfile:
+    with open(logfile_path,'w') as logfile:
         logfile.write(f'image_set,{args.image_set}\n')
         logfile.write(f'lr,{args.lr}\n')
         logfile.write(f'momentum,{args.momentum}\n')
@@ -139,54 +141,36 @@ def train(args):
                 inputs, labels = data # get the inputs; data is a list of [inputs, labels]
                 optimizer.zero_grad()  # zero the parameter gradients
 
+                # forward + backward + optimize
                 outputs = model(inputs)
                 loss    = criterion(outputs, labels)
                 loss.backward()
                 optimizer.step()
 
+                # print statistics
                 running_loss += loss.item()
                 if i % args.freq == 0:
                     print(f'{epoch}, {i}, {running_loss / args.freq}')
                     logfile.write(f'{epoch}, {i}, {running_loss / args.freq}\n')
                     logfile.flush()
                     save_weights_path = f'{args.weights}.pth'
-                    if exists(save_weights_path):     # backup old weights in case save fails
+                    if exists(save_weights_path):
                         copy(save_weights_path,f'{args.weights}.pth.bak')
                     save(model.state_dict(),save_weights_path )
                     running_loss = 0.0
-
-# get_predictions
-#
-# Use model to predict class of input
-def get_predictions(model,inputs):
-    def get_prediction(probabilities):
-        prediction = argmax(probabilities)
-        return prediction, probabilities[prediction]
-
-    output      = model(inputs)
-    predictions = [get_prediction(output[i].detach().numpy()) for i in range(len(output))]
-    return [a for a,_ in predictions],[b for _,b in predictions]
 
 def validate(args):
     model = Net()
     model.load_state_dict(load(f'{args.weights}.pth'))
     model.eval()
-    validation_loader = DataLoader(CellDataset(file_name = 'validation.csv'  if args.index == None else args.index),
-                                   batch_size = cpu_count())
-    matches           = 0
-    mismatches        = 0
-    confidence        = 0.0
+    validation_data  = CellDataset(file_name = 'validation.csv')
+    validation_loader = DataLoader(validation_data,batch_size=1)
     for i, data in enumerate(validation_loader, 0):
         inputs, labels = data
-        predictions,confidences = get_predictions(model,inputs)
-        confidence             += sum(confidences)
-        for predicted,expected in zip(predictions,[argmax(labels[i].detach().numpy()) for i in range(len(labels))]):
-            if predicted==expected:
-                matches+=1
-            else:
-                mismatches+=1
-        if (matches+mismatches)%args.freq==0:
-            print (f'Confidence = {100*confidence/(matches+mismatches):.1f}%, accuracy={100*matches/(matches+mismatches):.1f}%')
+        predictions    = model(inputs)
+        j              = argmax(predictions[0].detach().numpy())
+        print (j,predictions[0].detach().numpy())
+
 
 def test(args):
     print ('Not implemented')
@@ -232,13 +216,9 @@ if __name__=='__main__':
     parser.add_argument('--weights',
                         default = 'weights',
                         help    = 'Filename for saving and loading weights')
-    parser.add_argument('--index',
-                        default = None,
-                        help    = 'Name for index file for training/validation')
     args          = parser.parse_args()
 
-    {
-        'train'    : train,
+    {   'train'    : train,
         'validate' : validate,
         'test'     : test
      }[args.action](args)
