@@ -123,10 +123,14 @@ def save_weights(model,args):
         copy(save_weights_path,f'{args.weights}.pth.bak')
     save(model.state_dict(),save_weights_path )
 
+def get_index_file_name(index=None, default = 'validation.csv'):
+    return default  if index == None else index
+
 def train(args):
 
-    training_data   = CellDataset(file_name='training.csv')
-    training_loader = DataLoader(training_data,batch_size=7)
+    training_loader   = DataLoader(CellDataset(file_name =  get_index_file_name(index   = args.index,
+                                                                                default = 'training.csv')),
+                                   batch_size=args.batch)
 
     model     = Net()
     criterion = MSELoss()
@@ -166,8 +170,6 @@ def train(args):
                 running_losses.clear()
             save_weights(model,args)
 
-def get_index_file_name(index=None, default = 'validation.csv'):
-    return default  if index == None else index
 
 # get_predictions
 #
@@ -226,11 +228,11 @@ if __name__=='__main__':
     parser.add_argument('--momentum',
                         default = 0.9,
                         type    = float,
-                        help    = 'Momentum')
+                        help    = 'Momentum for optimization')
     parser.add_argument('--lr',
                         default = 0.01,
                         type    = float,
-                        help    = 'Learning Rate')
+                        help    = 'Learning Rate for optimization')
     parser.add_argument('--n',
                         default = 10,
                         type    = int,
