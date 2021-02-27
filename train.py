@@ -108,7 +108,7 @@ class Net(Module):
         x = self.fc3(x)
         return softmax(x,dim=1)
 
-def get_logfile_name(args):
+def get_logfile_path(args):
     logs          = get_logfile_names(False,None,args.prefix,args.suffix)
     i             = len(logs)
     logfile_path = join(args.logdir, f'{args.prefix}{i+1}{args.suffix}')
@@ -117,8 +117,13 @@ def get_logfile_name(args):
         logfile_path = join(args.logdir, f'{args.prefix}{i+1}{args.suffix}')
     return logfile_path
 
+def save_weights(model,args):
+    save_weights_path = f'{args.weights}.pth'
+    if exists(save_weights_path):
+        copy(save_weights_path,f'{args.weights}.pth.bak')
+    save(model.state_dict(),save_weights_path )
+
 def train(args):
-    logs          = get_logfile_names(False,None,args.prefix,args.suffix)
 
     training_data   = CellDataset(file_name='training.csv')
     training_loader = DataLoader(training_data,batch_size=7)
@@ -128,12 +133,12 @@ def train(args):
     optimizer = SGD(model.parameters(), lr = args.lr, momentum = args.momentum)
 
     print (model)
-    with open(logfile_path,'w') as logfile:
+    with open(get_logfile_path(args),'w') as logfile:
         logfile.write(f'image_set,{args.image_set}\n')
         logfile.write(f'lr,{args.lr}\n')
         logfile.write(f'momentum,{args.momentum}\n')
+        running_losses = []
         for epoch in range(1,args.n+1):  # loop over the dataset multiple times
-            running_loss = 0.0
             for i, data in enumerate(training_loader, 0):
                 inputs, labels = data # get the inputs; data is a list of [inputs, labels]
                 optimizer.zero_grad()  # zero the parameter gradients
@@ -145,16 +150,21 @@ def train(args):
                 optimizer.step()
 
                 # print statistics
-                running_loss += loss.item()
+                running_losses.append(loss.item())
                 if i % args.freq == 0:
-                    print(f'{epoch}, {i}, {running_loss / args.freq}')
-                    logfile.write(f'{epoch}, {i}, {running_loss / args.freq}\n')
+                    mean_loss = mean(running_losses)
+                    print(f'{epoch}, {i}, {mean_loss}')
+                    logfile.write(f'{epoch}, {i}, {mean_loss}\n')
                     logfile.flush()
-                    save_weights_path = f'{args.weights}.pth'
-                    if exists(save_weights_path):
-                        copy(save_weights_path,f'{args.weights}.pth.bak')
-                    save(model.state_dict(),save_weights_path )
-                    running_loss = 0.0
+                    running_losses.clear()
+                    save_weights(model,args)
+            if len(running_losses)>0:
+                mean_loss = mean(running_losses)
+                print(f'{epoch}, {i}, {mean_loss}')
+                logfile.write(f'{epoch}, {i}, {mean_loss}\n')
+                logfile.flush()
+                running_losses.clear()
+            save_weights(model,args)
 
 def get_index_file_name(index=None, default = 'validation.csv'):
     return default  if index == None else index
