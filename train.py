@@ -108,23 +108,32 @@ class Net(Module):
         x = self.fc3(x)
         return softmax(x,dim=1)
 
-def get_logfile_path(args):
-    logs          = get_logfile_names(False,None,args.prefix,args.suffix)
+# get_logfile_path
+
+def get_logfile_path(prefix='log',suffix='csv',logdir='./logs'):
+    logs          = get_logfile_names(False,None,prefix,suffix)
     i             = len(logs)
-    logfile_path = join(args.logdir, f'{args.prefix}{i+1}{args.suffix}')
+    logfile_path = join(logdir, f'{prefix}{i+1}{suffix}')
     while exists(logfile_path):
         i += 1
-        logfile_path = join(args.logdir, f'{args.prefix}{i+1}{args.suffix}')
+        logfile_path = join(logdir, f'{prefix}{i+1}{suffix}')
     return logfile_path
 
-def save_weights(model,args):
-    save_weights_path = f'{args.weights}.pth'
+# save_weights
+def save_weights(model,weights='weights'):
+    save_weights_path = f'{weights}.pth'
     if exists(save_weights_path):
-        copy(save_weights_path,f'{args.weights}.pth.bak')
+        copy(save_weights_path,f'{weights}.pth.bak')
     save(model.state_dict(),save_weights_path )
+
+# get_index_file_name
 
 def get_index_file_name(index=None, default = 'validation.csv'):
     return default  if index == None else index
+
+#  train
+
+# Train network
 
 def train(args):
 
@@ -136,13 +145,26 @@ def train(args):
     criterion = MSELoss()
     optimizer = SGD(model.parameters(), lr = args.lr, momentum = args.momentum)
 
+    model = Net()
+    optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
+
+    epoch0 = 1
+    if args.restart!=None:
+        checkpoint = torch.load(args.restart)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        epoch0 = checkpoint['epoch'] + 1
+        loss = checkpoint['loss']
+
+        model.train()
+
     print (model)
-    with open(get_logfile_path(args),'w') as logfile:
+    with open(get_logfile_path(prefix=args.prefix,suffix=args.suffix,logdir=logdir),'w') as logfile:
         logfile.write(f'image_set,{args.image_set}\n')
         logfile.write(f'lr,{args.lr}\n')
         logfile.write(f'momentum,{args.momentum}\n')
         running_losses = []
-        for epoch in range(1,args.n+1):  # loop over the dataset multiple times
+        for epoch in range(epoch0,args.n+epoch0):  # loop over the dataset multiple times
             for i, data in enumerate(training_loader, 0):
                 inputs, labels = data # get the inputs; data is a list of [inputs, labels]
                 optimizer.zero_grad()  # zero the parameter gradients
@@ -161,14 +183,20 @@ def train(args):
                     logfile.write(f'{epoch}, {i}, {mean_loss}\n')
                     logfile.flush()
                     running_losses.clear()
-                    save_weights(model,args)
+
             if len(running_losses)>0:
                 mean_loss = mean(running_losses)
                 print(f'{epoch}, {i}, {mean_loss}')
                 logfile.write(f'{epoch}, {i}, {mean_loss}\n')
                 logfile.flush()
                 running_losses.clear()
-            save_weights(model,args)
+            save({
+                    'epoch'                : epoch,
+                    'model_state_dict'     : model.state_dict(),
+                    'optimizer_state_dict' : optimizer.state_dict(),
+                    'loss'                 : loss,
+                },
+                f'{args.checkpoint}{epoch}.pth')
 
 
 # get_predictions
@@ -183,9 +211,14 @@ def get_predictions(model,inputs):
     predictions = [get_prediction(output[i].detach().numpy()) for i in range(len(output))]
     return [a for a,_ in predictions],[b for _,b in predictions]
 
+# validate
+
 def validate(args):
-    model = Net()
-    model.load_state_dict(load(f'{args.weights}.pth'))
+    model       = Net()
+    Checkpoints = sorted([join(path,name) for path,_,names in walk('./') for name in names if name.startswith(args.checkpoint)])
+    checkpoint  = load(Checkpoints[-1])
+    model.load_state_dict(checkpoint['model_state_dict'])
+
     model.eval()
     validation_loader = DataLoader(CellDataset(file_name =  get_index_file_name(index=args.index)),
                                    batch_size=args.batch)
@@ -224,7 +257,7 @@ if __name__=='__main__':
     parser.add_argument('--freq',
                         default = 10,
                         type    = int,
-                        help    = 'Controls frequency with which data logged/saved')
+                        help    = 'Controls frequency with which data logged')
     parser.add_argument('--momentum',
                         default = 0.9,
                         type    = float,
@@ -256,12 +289,18 @@ if __name__=='__main__':
                         default = 7,
                         type    = int,
                         help    = 'Batch size for training/validating')
+    parser.add_argument('--checkpoint',
+                        default = 'chk')
+    parser.add_argument('--restart',
+                        default = None)
     args          = parser.parse_args()
 
-    {   'train'    : train,
-        'validate' : validate,
-        'test'     : test
-     }[args.action](args)
+    Actions = {   'train'    : train,
+                  'validate' : validate,
+                  'test'     : test
+     }
+
+    Actions[args.action](args)
 
     elapsed = time() - start
     minutes = int(elapsed/60)
