@@ -146,11 +146,12 @@ def train(args):
     optimizer = SGD(model.parameters(), lr = args.lr, momentum = args.momentum)
 
     model = Net()
-    optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
 
     epoch0 = 1
     if args.restart!=None:
-        checkpoint = torch.load(args.restart)
+        print (f'Loading checkpoint: {args.restart}')
+        checkpoint = load(args.restart)
+        print (f'Loaded checkpoint: {args.restart}')
         model.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         epoch0 = checkpoint['epoch'] + 1
@@ -159,7 +160,10 @@ def train(args):
         model.train()
 
     print (model)
-    with open(get_logfile_path(prefix=args.prefix,suffix=args.suffix,logdir=logdir),'w') as logfile:
+    with open(get_logfile_path(prefix = args.prefix,
+                               suffix = args.suffix,
+                               logdir = args.logdir),
+              'w') as logfile:
         logfile.write(f'image_set,{args.image_set}\n')
         logfile.write(f'lr,{args.lr}\n')
         logfile.write(f'momentum,{args.momentum}\n')
