@@ -12,6 +12,7 @@
 |segment.py|Segment images using HPA cellsegmentator|
 |split.py|Partition data into training and validation|
 |train.py|Build and train neual network|
+|visualize.py|Visualize image files|
 ||Spikes||
 |anayze-labels|Find images  that have only one label|
 |CellSegmenterTest.py|Demo for HPA cellsegmentator|
@@ -21,7 +22,7 @@
 |download.py|Download training images from kaggle|
 |summarize.py|Organize image names by description|
 |unzip.py|Unzip downloaded files|
-|visualize.py|Visualize image files|
+
 
 ## Documentation
 
