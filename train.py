@@ -23,6 +23,7 @@ from logs                       import get_logfile_names
 from numpy                      import asarray, stack, argmax, mean
 from os.path                    import join, exists
 from os                         import walk
+from random                     import seed, shuffle
 from shutil                     import copy
 from skimage                    import io, transform
 from sys                        import exit
@@ -77,6 +78,9 @@ class CellDataset(Dataset):
 
         # return img,FloatTensor(classes)
         return unsqueeze(img,1),FloatTensor(classes)
+
+    def shuffle(self):
+        shuffle(self.image_ids)
 
 class Net(Module):
     def __init__(self):
@@ -137,9 +141,9 @@ def get_index_file_name(index=None, default = 'validation.csv'):
 
 def train(args):
 
-    training_loader   = DataLoader(CellDataset(file_name =  get_index_file_name(index   = args.index,
-                                                                                default = 'training.csv')),
-                                   batch_size=args.batch)
+    dataset = CellDataset(file_name =  get_index_file_name(index   = args.index,
+                                                           default = 'training.csv'))
+    loader   = DataLoader(dataset, batch_size=args.batch)
 
     model     = Net()
     criterion = MSELoss()
@@ -155,7 +159,7 @@ def train(args):
         model.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         epoch0 = checkpoint['epoch'] + 1
-        loss = checkpoint['loss']
+        loss   = checkpoint['loss']
 
         model.train()
 
@@ -169,7 +173,8 @@ def train(args):
         logfile.write(f'momentum,{args.momentum}\n')
         running_losses = []
         for epoch in range(epoch0,args.n+epoch0):  # loop over the dataset multiple times
-            for i, data in enumerate(training_loader, 0):
+            dataset.shuffle()
+            for i, data in enumerate(loader, 0):
                 inputs, labels = data # get the inputs; data is a list of [inputs, labels]
                 optimizer.zero_grad()  # zero the parameter gradients
 
@@ -297,7 +302,11 @@ if __name__=='__main__':
                         default = 'chk')
     parser.add_argument('--restart',
                         default = None)
+    parser.add_argument('--seed',
+                        default = None)
     args          = parser.parse_args()
+
+    seed(args.seed)
 
     Actions = {   'train'    : train,
                   'validate' : validate,
