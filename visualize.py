@@ -15,23 +15,33 @@
 #
 #  To contact me, Simon Crase, email simon@greenweaves.nz
 
-from argparse         import ArgumentParser
-from csv              import reader
-from matplotlib.pyplot import figure, show
-from matplotlib.image import imread
-from matplotlib       import cm
-from numpy            import zeros,array
-from os.path          import join
-
+from argparse          import ArgumentParser
+from csv               import reader
+from matplotlib.pyplot import figure, show, savefig, close
+from matplotlib.image  import imread
+from matplotlib        import cm
+from numpy             import zeros,array
+from os.path           import join
+from random            import sample
 
 
 RED         = 0
 GREEN       = 1
 BLUE        = 2
 YELLOW      = 3
-colours     = ['red',  'green', 'blue', 'yellow']
-meanings    = ['Microtubules', 'Nuclei channels', 'Protein/antibody', 'Endoplasmic reticulum channels']
-image_id    = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0'
+NCOLOURS    = 3
+
+colours     = ['red',
+               'green',
+               'blue',
+               'yellow'
+              ]
+
+meanings    = ['Microtubules',
+               'Protein/antibody',
+               'Nuclei channels',
+               'Endoplasmic reticulum channels'
+              ]
 
 # read_descriptions
 
@@ -48,75 +58,67 @@ def read_training_expectations(path=r'd:\data\hpa-scc',file_name='train.csv'):
         next(rows)
         return {row[0] : list(set([int(label) for label in row[1].split('|')])) for row in rows}
 
+def visualize(image_id     = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
+              path         = r'd:\data\hpa-scc',
+              image_set    = 'train512x512',
+              figs         = './figs',
+              Descriptions = []):
+    fig          = figure(figsize=(20,20))
+    axs          = fig.subplots(2, 4)
 
-def read_image(path        = r'd:\data\hpa-scc',
-               image_set   = 'train512x512',
-               image_id    = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0'):
-    Image = None
-    for i in range(2):
-        for j in range(2):
-            index      = 2*i+j
-            file_name  = f'{image_id}_{colours[index]}.png'
-            path_name  = join(path,image_set,file_name)
-            image_mono = imread(path_name)
-            if index==0:
-                nx,ny   = image_mono.shape
-                Image   = zeros((nx,ny,4))
-            Image[:,:,index] = image_mono
-    return Image
+    for column,colour in enumerate([BLUE,RED,YELLOW,GREEN]):
+        file_name        = f'{image_id}_{colours[colour]}.png'
+        path_name        = join(path,image_set,file_name)
+        grey_scale_image = imread(path_name)
+        nx,ny            = grey_scale_image.shape
+        Image            = zeros((nx,ny,NCOLOURS))
+        if colour==YELLOW:
+            Image[:,:,RED] = grey_scale_image[:,:]
+            Image[:,:,GREEN] = grey_scale_image[:,:]
+        else:
+            Image[:,:,colour] = grey_scale_image[:,:]
 
-def create_selection(Image,
-                 Selector = [
-                     [1,0,0,1],
-                     [0,1,0,1],
-                     [0,0,1,0]]):
-    nx,ny,_ = Image.shape
-    Product = zeros((nx,ny,3))
-    Matrix  = array(Selector)
-    for i in range(nx):
-        for j in range(ny):
-            for k in range(3):
-                Product[i,j,k] = sum([Matrix[k,l] * Image[i,j,l] for l in range(4)])
+        axs[0,column].imshow(Image)
+        axs[0,column].axes.xaxis.set_ticks([])
+        axs[0,column].axes.yaxis.set_ticks([])
+        axs[0,column].set_title(meanings[colour])
 
-    return Product
+        axs[1,column].hist([grey_scale_image[i,j] for i in range(nx) for j in range(ny) if grey_scale_image[i,j]>0],
+                           color = colours[colour])
+
+    fig.suptitle(f'{image_id}: {"+".join([Descriptions[label] for label in Training[image_id]])}')
+    savefig(join(figs,image_id))
+    return fig
 
 if __name__=='__main__':
     parser = ArgumentParser('Visualize HPA data')
-    parser.add_argument('--path',      default=r'd:\data\hpa-scc')
+    parser.add_argument('--path',      default = r'd:\data\hpa-scc')
     parser.add_argument('--image_set', default = 'train512x512')
     parser.add_argument('--image_id',  default = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0')
+    parser.add_argument('--figs',      default = './figs',  help    = 'Identifies where to store plots')
+    parser.add_argument('--sample',    default=None, type=int)
+    parser.add_argument('--show',      default=False, action='store_true')
+
     args         = parser.parse_args()
 
     Descriptions = read_descriptions('descriptions.csv')
     Training     = read_training_expectations(path=args.path)
-    Image        = read_image(path=args.path,image_id=args.image_id,image_set=args.image_set)
 
-    fig          = figure(figsize=(20,20))
-    axs          = fig.subplots(2, 4)
+    if args.sample == None:
+        visualize(image_id     = args.image_id,
+                  path         = args.path,
+                  image_set    = args.image_set,
+                  figs         = args.figs,
+                  Descriptions = Descriptions)
+    else:
+        for image_id in sample(list(Training.keys()),args.sample):
+            fig = visualize(image_id     = image_id,
+                            path         = args.path,
+                            image_set    = args.image_set,
+                            figs         = args.figs,
+                            Descriptions = Descriptions)
+            if not args.show:
+                close(fig)
 
-    axs[0,0].imshow(create_selection(Image))
-    axs[0,0].axes.xaxis.set_ticks([])
-    axs[0,0].axes.yaxis.set_ticks([])
-    nx,ny,_  = Image.shape
-    for i in range(3):
-        ImageR   = zeros((nx,ny,3))
-        ImageR[:,:,i] = Image[:,:,i]
-        axs[0,i+1].imshow(ImageR)
-        axs[0,i+1].axes.xaxis.set_ticks([])
-        axs[0,i+1].axes.yaxis.set_ticks([])
-
-    ImageY   = zeros((nx,ny,3))
-    ImageY[:,:,0] = Image[:,:,3]
-    ImageY[:,:,1] = Image[:,:,3]
-    axs[1,0].imshow(ImageY)
-    axs[1,0].axes.xaxis.set_ticks([])
-    axs[1,0].axes.yaxis.set_ticks([])
-
-    jet = cm.get_cmap('jet')
-    im = axs[1,1].imshow(Image[:,:,BLUE],cmap=jet)
-    axs[1,1].axes.xaxis.set_ticks([])
-    axs[1,1].axes.yaxis.set_ticks([])
-    fig.colorbar(im, ax=axs[1,1], orientation='vertical')
-    mylabels =  '+'.join([Descriptions[label] for label in Training[image_id]])
-    fig.suptitle(f'{args.image_id}: {mylabels}')
-    show()
+    if args.show:
+        show()
