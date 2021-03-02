@@ -20,7 +20,9 @@ from csv               import reader
 from matplotlib.pyplot import figure, show, savefig, close
 from matplotlib.image  import imread
 from matplotlib        import cm
-from numpy             import zeros,array
+from numpy             import zeros, array, mean
+from numpy.fft         import fft2
+import numpy           as np
 from os.path           import join
 from random            import sample
 
@@ -71,20 +73,23 @@ def visualize(image_id     = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
         path_name        = join(path,image_set,file_name)
         grey_scale_image = imread(path_name)
         nx,ny            = grey_scale_image.shape
+
         Image            = zeros((nx,ny,NCOLOURS))
         if colour==YELLOW:
-            Image[:,:,RED] = grey_scale_image[:,:]
-            Image[:,:,GREEN] = grey_scale_image[:,:]
+            Image[:,:,RED]    = grey_scale_image[:,:]
+            Image[:,:,GREEN]  = grey_scale_image[:,:]
         else:
             Image[:,:,colour] = grey_scale_image[:,:]
 
+        ratios = []
+        threshold = 0.5
         axs[0,column].imshow(Image)
         axs[0,column].axes.xaxis.set_ticks([])
         axs[0,column].axes.yaxis.set_ticks([])
         axs[0,column].set_title(meanings[colour])
 
-        axs[1,column].hist([grey_scale_image[i,j] for i in range(nx) for j in range(ny) if grey_scale_image[i,j]>0],
-                           color = colours[colour])
+        freqs = fft2(grey_scale_image)
+        axs[1,column].imshow(np.log(abs(freqs)),cmap='gray')
 
     fig.suptitle(f'{image_id}: {"+".join([Descriptions[label] for label in Training[image_id]])}')
     savefig(join(figs,image_id))
@@ -96,9 +101,9 @@ if __name__=='__main__':
     parser.add_argument('--image_set', default = 'train512x512')
     parser.add_argument('--image_id',  default = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0')
     parser.add_argument('--figs',      default = './figs',  help    = 'Identifies where to store plots')
-    parser.add_argument('--sample',    default=None, type=int)
-    parser.add_argument('--show',      default=False, action='store_true')
-
+    parser.add_argument('--sample',    default = None, type=int)
+    parser.add_argument('--show',      default = False, action='store_true')
+    parser.add_argument('--multiple',  default = False, action='store_true')
     args         = parser.parse_args()
 
     Descriptions = read_descriptions('descriptions.csv')
@@ -112,13 +117,14 @@ if __name__=='__main__':
                   Descriptions = Descriptions)
     else:
         for image_id in sample(list(Training.keys()),args.sample):
-            fig = visualize(image_id     = image_id,
-                            path         = args.path,
-                            image_set    = args.image_set,
-                            figs         = args.figs,
-                            Descriptions = Descriptions)
-            if not args.show:
-                close(fig)
+            if len(Training[image_id]) == 1:
+                fig = visualize(image_id     = image_id,
+                                path         = args.path,
+                                image_set    = args.image_set,
+                                figs         = args.figs,
+                                Descriptions = Descriptions)
+                if not args.show:
+                    close(fig)
 
     if args.show:
         show()
