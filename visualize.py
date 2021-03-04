@@ -60,6 +60,10 @@ def read_training_expectations(path=r'd:\data\hpa-scc',file_name='train.csv'):
         next(rows)
         return {row[0] : list(set([int(label) for label in row[1].split('|')])) for row in rows}
 
+# visualize
+#
+# Display images for one slide.
+
 def visualize(image_id     = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
               path         = r'd:\data\hpa-scc',
               image_set    = 'train512x512',
@@ -81,8 +85,6 @@ def visualize(image_id     = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
         else:
             Image[:,:,colour] = grey_scale_image[:,:]
 
-        ratios = []
-        threshold = 0.5
         axs[0,column].imshow(Image)
         axs[0,column].axes.xaxis.set_ticks([])
         axs[0,column].axes.yaxis.set_ticks([])
@@ -104,12 +106,23 @@ if __name__=='__main__':
     parser.add_argument('--sample',    default = None, type=int)
     parser.add_argument('--show',      default = False, action='store_true')
     parser.add_argument('--multiple',  default = False, action='store_true')
+    parser.add_argument('--all' ,      default = False, action='store_true')
     args         = parser.parse_args()
 
     Descriptions = read_descriptions('descriptions.csv')
     Training     = read_training_expectations(path=args.path)
 
-    if args.sample == None:
+    if args.all:
+        for image_id, cell_types in Training.items():
+            if args.multiple or len(cell_types)==1:
+                fig = visualize(image_id     = image_id,
+                                path         = args.path,
+                                image_set    = args.image_set,
+                                figs         = args.figs,
+                                Descriptions = Descriptions)
+                if not args.show:
+                    close(fig)
+    elif args.sample == None:
         visualize(image_id     = args.image_id,
                   path         = args.path,
                   image_set    = args.image_set,
@@ -117,7 +130,7 @@ if __name__=='__main__':
                   Descriptions = Descriptions)
     else:
         for image_id in sample(list(Training.keys()),args.sample):
-            if len(Training[image_id]) == 1:
+            if args.multiple or len(Training[image_id]) == 1:
                 fig = visualize(image_id     = image_id,
                                 path         = args.path,
                                 image_set    = args.image_set,
