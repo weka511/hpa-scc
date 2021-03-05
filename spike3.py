@@ -1,4 +1,5 @@
-from numpy                      import load
+from numpy                      import load, mean
+from time                       import time
 from torch                      import unsqueeze, from_numpy, FloatTensor
 from torch.nn                   import Module, Conv3d, MaxPool3d, Linear, MSELoss
 from torch.nn.functional        import relu, softmax
@@ -6,13 +7,13 @@ from torch.optim                import SGD
 from torch.utils.data           import Dataset, DataLoader
 
 class CellDataset(Dataset):
-    def __init__(self, file_name        = 'test1.npz'):
+    def __init__(self, file_name = 'test1.npz'):
         npzfile = load(file_name)
         self.Images  = npzfile['Images']
         self.Targets = npzfile['Targets']
         print (self.Images.shape)
     def __len__(self):
-        return self.Images.shape[3]
+        return self.Images.shape[0]
 
     def __getitem__(self, idx):
         return unsqueeze(from_numpy(self.Images[idx]),1), FloatTensor([1 if i in self.Targets[idx] else 0 for i in range(18)])
@@ -48,18 +49,28 @@ class Net(Module):
         return softmax(x,dim=1)
 
 if __name__=='__main__':
+    start    = time()
     dataset = CellDataset()
-    loader   = DataLoader(dataset, batch_size=7)
+    loader   = DataLoader(dataset, batch_size=8)
 
     model     = Net()
     criterion = MSELoss()
     optimizer = SGD(model.parameters(), lr = 0.01, momentum = 0.9)
 
-    for epoch in range(2):
+    losses = []
+    for epoch in range(24):
         for i, data in enumerate(loader, 0):
             inputs, labels = data
             optimizer.zero_grad()
             outputs = model(inputs)
             loss    = criterion(outputs, labels)
+            losses.append(loss.item())
             loss.backward()
             optimizer.step()
+            if i%10==0:
+                print (epoch,i, mean(losses))
+                losses.clear()
+    elapsed = time() - start
+    minutes = int(elapsed/60)
+    seconds = elapsed - 60*minutes
+    print (f'Elapsed Time (training network) {minutes} m {seconds:.2f} s')
