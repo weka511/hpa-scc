@@ -54,10 +54,9 @@ class MemoryReporter:
 if __name__=='__main__':
     start    = time()
     reporter = MemoryReporter()
-    parser   = ArgumentParser('Visualize HPA data')
+    parser   = ArgumentParser('Estimate memory usage for down-sampled data, and loading and saving times')
     parser.add_argument('--path',      default = r'd:\data\hpa-scc')
     parser.add_argument('--image_set', default = 'train512x512')
-    parser.add_argument('--image_id',  default = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0')
 
     args         = parser.parse_args()
 
