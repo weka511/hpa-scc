@@ -12,7 +12,8 @@
 |segment.py|Segment images using HPA cellsegmentator|
 |slice.py|Slice and downsample dataset|
 |split.py|Partition data into training and validation|
-|train.py|Build and train neual network|
+|train.py|Build and train neural network|
+|train2.py|Build and train neural network using sliced data|
 |visualize.py|Visualize image files|
 ||Spikes||
 |anayze-labels|Find images  that have only one label|
