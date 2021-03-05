@@ -55,6 +55,8 @@ if __name__=='__main__':
     print (Images.shape, Images.shape[0]*Images.shape[1]*Images.shape[2]*Images.shape[3])
     Targets = []
     for k in range(N):
+        if k%32==0:
+            print (k)
         image_id,classes = Singletons[k]
         for column,colour in enumerate([BLUE,RED,YELLOW,GREEN]):
             file_name        = f'{image_id}_{colours[colour]}.png'
@@ -65,7 +67,8 @@ if __name__=='__main__':
 
             for i in range(mx):
                 for j in range(my):
-                    Images[i,j,colour,k] = int8(128*grey_scale_image[2*i,2*j]/mm)
+                    if grey_scale_image[2*i,2*j]>0:
+                        Images[i,j,colour,k] = int8(128*grey_scale_image[2*i,2*j]/mm)
         Targets.append(classes)
 
     reporter.check()
