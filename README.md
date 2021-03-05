@@ -10,6 +10,7 @@
 |hpa-scc.wpr|Python project|
 |logs.py|Analyze log files from training/testing|
 |segment.py|Segment images using HPA cellsegmentator|
+|slice.py|Slice and downsample dataset|
 |split.py|Partition data into training and validation|
 |train.py|Build and train neual network|
 |visualize.py|Visualize image files|
