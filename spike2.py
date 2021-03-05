@@ -47,11 +47,11 @@ if __name__=='__main__':
     Descriptions = read_descriptions('descriptions.csv')
     Training     = read_training_expectations(path=args.path)
     Singletons   = [(image_id, classes) for image_id,classes in Training.items() if len(classes)==1]
-    stride       = 2
+
     N            = 4096
     mx           = 256
     my           = 256
-    Images       = zeros((mx,my,4,N),dtype=int8)
+    Images       = zeros((N,4,mx,my), dtype=int8)
     print (Images.shape, Images.shape[0]*Images.shape[1]*Images.shape[2]*Images.shape[3])
     Targets = []
     for k in range(N):
@@ -68,7 +68,7 @@ if __name__=='__main__':
             for i in range(mx):
                 for j in range(my):
                     if grey_scale_image[2*i,2*j]>0:
-                        Images[i,j,colour,k] = int8(128*grey_scale_image[2*i,2*j]/mm)
+                        Images[k,colour,i,j] = int8(128*grey_scale_image[2*i,2*j]/mm)
         Targets.append(classes)
 
     reporter.check()
@@ -77,21 +77,21 @@ if __name__=='__main__':
     elapsed = time() - start
     minutes = int(elapsed/60)
     seconds = elapsed - 60*minutes
-    print (f'Elapsed Time {minutes} m {seconds:.2f} s')
+    print (f'Elapsed Time (building image_set) {minutes} m {seconds:.2f} s')
 
     start = time()
-    savez('test.npz',Images=Images,Targets=Targets)
+    savez('test1.npz',Images=Images,Targets=Targets)
     elapsed = time() - start
     minutes = int(elapsed/60)
     seconds = elapsed - 60*minutes
-    print (f'Elapsed Time {minutes} m {seconds:.2f} s')
+    print (f'Elapsed Time (saving images) {minutes} m {seconds:.2f} s')
 
     start = time()
-    npzfile = load('test.npz')
+    npzfile = load('test1.npz')
 
     print(npzfile.files)
     print (npzfile['Images'].shape)
     elapsed = time() - start
     minutes = int(elapsed/60)
     seconds = elapsed - 60*minutes
-    print (f'Elapsed Time {minutes} m {seconds:.2f} s')
+    print (f'Elapsed Time (reloading images){minutes} m {seconds:.2f} s')
