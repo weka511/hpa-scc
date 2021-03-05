@@ -18,7 +18,8 @@
 |CellSegmenterTest.py|Demo for HPA cellsegmentator|
 |encoding.py|Example of encoding|
 |otsu.py|Segment images using Otsu's method|
-|spike2.py|Estimate memory usage for down-samples data, and loading and saving times|
+|spike2.py|Estimate memory usage for down-sampled data, and loading and saving times|
+|spike3.py|Train network using data daved by spike2.py|
 |watershed.py|Naive Watershed segmentation|
 |download.py|Download training images from kaggle|
 |summarize.py|Organize image names by description|
