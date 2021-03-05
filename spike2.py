@@ -63,12 +63,12 @@ if __name__=='__main__':
             path_name        = join(args.path,args.image_set,file_name)
             grey_scale_image = imread(path_name)
             nx,ny            = grey_scale_image.shape
-            mm = amax(grey_scale_image)
+            max_intensity    = amax(grey_scale_image)
 
             for i in range(mx):
                 for j in range(my):
                     if grey_scale_image[2*i,2*j]>0:
-                        Images[k,colour,i,j] = int8(128*grey_scale_image[2*i,2*j]/mm)
+                        Images[k,colour,i,j] = int8(128*grey_scale_image[2*i,2*j]/max_intensity)
         Targets.append(classes)
 
     reporter.check()
