@@ -15,15 +15,16 @@
 #
 #  To contact me, Simon Crase, email simon@greenweaves.nz
 
-from argparse                   import ArgumentParser
-from numpy                      import load, mean
-from os.path                    import exists
-from time                       import time
-from torch                      import unsqueeze, from_numpy, FloatTensor
-from torch.nn                   import Module, Conv3d, MaxPool3d, Linear, MSELoss
-from torch.nn.functional        import relu, softmax
-from torch.optim                import SGD
-from torch.utils.data           import Dataset, DataLoader
+from argparse            import ArgumentParser
+from logs                import get_logfile_names
+from numpy               import load, mean
+from os.path             import exists, join
+from time                import time
+from torch               import unsqueeze, from_numpy, FloatTensor
+from torch.nn            import Module, Conv3d, MaxPool3d, Linear, MSELoss
+from torch.nn.functional import relu, softmax
+from torch.optim         import SGD
+from torch.utils.data    import Dataset, DataLoader
 
 class CellDataset(Dataset):
     def __init__(self, file_name = 'dataset1.npz'):
@@ -67,6 +68,17 @@ class Net(Module):
         x = self.fc3(x)
         return softmax(x,dim=1)
 
+    # get_logfile_path
+
+def get_logfile_path(prefix='log',suffix='csv',logdir='./logs'):
+    logs          = get_logfile_names(False,None,prefix,suffix)
+    i             = len(logs)
+    logfile_path = join(logdir, f'{prefix}{i+1}{suffix}')
+    while exists(logfile_path):
+        i += 1
+        logfile_path = join(logdir, f'{prefix}{i+1}{suffix}')
+    return logfile_path
+
 if __name__=='__main__':
     start    = time()
     parser = ArgumentParser('Train with HPA data')
@@ -91,7 +103,7 @@ if __name__=='__main__':
                         type    = int,
                         help    = 'Number of epochs for training')
     parser.add_argument('--prefix',
-                        default = 'log',
+                        default = 'train',
                         help    = 'Prefix for log file names')
     parser.add_argument('--suffix',
                         default = '.csv',
@@ -120,23 +132,33 @@ if __name__=='__main__':
     criterion     = MSELoss()
     optimizer     = SGD(model.parameters(), lr = args.lr, momentum = args.momentum)
     m             = 1
-    while exists(f'{args.data}{m}.npz'):
-        dataset   = CellDataset(file_name = f'{args.data}{m}.npz')
-        loader   = DataLoader(dataset, batch_size=args.batch)
-        losses = []
-        for epoch in range(args.n):
-            for i, data in enumerate(loader, 0):
-                inputs, labels = data
-                optimizer.zero_grad()
-                outputs = model(inputs)
-                loss    = criterion(outputs, labels)
-                losses.append(loss.item())
-                loss.backward()
-                optimizer.step()
-                if i%args.frequency==0:
-                    print (epoch,i, mean(losses))
-                    losses.clear()
-        m+= 1
+    with open(get_logfile_path(prefix = args.prefix,
+                               suffix = args.suffix,
+                               logdir = args.logdir),
+              'w') as logfile:
+        logfile.write(f'lr,{args.lr}\n')
+        logfile.write(f'momentum,{args.momentum}\n')
+        while exists(file_name:=f'{args.data}{m}.npz'):
+            print (f'Processing {file_name}')
+            dataset   = CellDataset(file_name = file_name)
+            loader   = DataLoader(dataset, batch_size=args.batch)
+            losses = []
+            for epoch in range(args.n):
+                for i, data in enumerate(loader, 0):
+                    inputs, labels = data
+                    optimizer.zero_grad()
+                    outputs = model(inputs)
+                    loss    = criterion(outputs, labels)
+                    losses.append(loss.item())
+                    loss.backward()
+                    optimizer.step()
+                    if i%args.frequency==0:
+                        mean_loss = mean(losses)
+                        print (epoch,i, mean_loss)
+                        losses.clear()
+                        logfile.write(f'{epoch}, {i}, {mean_loss}\n')
+                        logfile.flush()
+            m+= 1
 
     elapsed = time() - start
     minutes = int(elapsed/60)
