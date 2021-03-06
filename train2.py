@@ -138,12 +138,13 @@ if __name__=='__main__':
               'w') as logfile:
         logfile.write(f'lr,{args.lr}\n')
         logfile.write(f'momentum,{args.momentum}\n')
-        while exists(file_name:=f'{args.data}{m}.npz'):
-            print (f'Processing {file_name}')
-            dataset   = CellDataset(file_name = file_name)
-            loader   = DataLoader(dataset, batch_size=args.batch)
-            losses = []
-            for epoch in range(args.n):
+        for epoch in range(args.n):
+            while exists(file_name:=f'{args.data}{m}.npz'):
+                print (f'Processing {file_name}')
+                dataset   = CellDataset(file_name = file_name)
+                loader   = DataLoader(dataset, batch_size=args.batch)
+                losses = []
+
                 for i, data in enumerate(loader, 0):
                     inputs, labels = data
                     optimizer.zero_grad()
@@ -154,9 +155,9 @@ if __name__=='__main__':
                     optimizer.step()
                     if i%args.frequency==0:
                         mean_loss = mean(losses)
-                        print (epoch,i, mean_loss)
+                        print (f'{m}, {epoch}, {i}, {mean_loss}\n')
                         losses.clear()
-                        logfile.write(f'{epoch}, {i}, {mean_loss}\n')
+                        logfile.write(f'{m}, {epoch}, {i}, {mean_loss}\n')
                         logfile.flush()
             m+= 1
 
