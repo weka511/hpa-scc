@@ -42,19 +42,19 @@ meanings    = ['Microtubules',
                'Endoplasmic reticulum channels'
               ]
 
-def create(data,
+def create_image_target(data,
            N         = 1,
            mx        = 256,
            my        = 256,
            start     = 0,
            path      = r'd:\data\hpa-scc',
            image_set = 'train512x512'):
-    Images = zeros((N,4,mx,my), dtype=int8)
-
+    print (f'Creating data: N={N}, start={start}')
+    Images  = zeros((N,4,mx,my), dtype=int8)
     Targets = []
     for k in range(N):
         if k%args.frequency==0:
-            print (f'{k}')
+            print (f'{k} of {N} -> {k+start}')
         image_id,classes = data[k+start]
         for column,colour in enumerate([BLUE,RED,YELLOW,GREEN]):
             file_name        = f'{image_id}_{colours[colour]}.png'
@@ -70,6 +70,9 @@ def create(data,
         Targets.append(classes)
     return Images, Targets
 
+def save_images(output,Images,Targets):
+    print (f'Saving {output} {Images.shape}')
+    savez(output,Images=Images,Targets=Targets)
 
 if __name__=='__main__':
     start    = time()
@@ -92,18 +95,25 @@ if __name__=='__main__':
     seed(args.seed)
     shuffle(Singletons)
     N_validation = int(args.split*len(Singletons))
-    Images, Targets = create(Singletons,N=N_validation,mx=args.pixels,my=args.pixels,path=args.path,image_set=args.image_set)
-    output = f'{args.validation}.npz'
-    print (f'Saving {output} {Images.shape}')
-    savez(output,Images=Images,Targets=Targets)
+    Images, Targets = create_image_target(Singletons,
+                                          N         =N_validation,
+                                          mx        = args.pixels,
+                                          my        = args.pixels,
+                                          path      = args.path,
+                                          image_set = args.image_set)
+    save_images(f'{args.validation}.npz',Images,Targets)
     start = N_validation
 
     for m in range(M):
         N_train = min(len(Singletons)-start,args.N)
-        Images, Targets = create(Singletons,N=N_train,mx=args.pixels,my=args.pixels,start=start,path=args.path,image_set=args.image_set)
-        output = f'{args.output}{m+1}.npz'
-        print (f'Saving {output} {Images.shape}')
-        savez(output,Images=Images,Targets=Targets)
+        Images, Targets = create_image_target(Singletons,
+                                              N         = N_train,
+                                              mx        = args.pixels,
+                                              my        = args.pixels,
+                                              start     = start,
+                                              path      = args.path,
+                                              image_set = args.image_set)
+        save_images(f'{args.output}{m+1}.npz',Images,Targets)
         start += N_train
 
     elapsed = time() - start
