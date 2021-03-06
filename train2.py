@@ -26,6 +26,24 @@ from torch.nn.functional import relu, softmax
 from torch.optim         import SGD
 from torch.utils.data    import Dataset, DataLoader
 
+# Timer
+#
+# This class is used as a wrapper when I want to know the execution time of some code.
+
+class Timer:
+    def __init__(self, message = ''):
+        self.start   = None
+        self.message = message
+
+    def __enter__(self):
+        self.start = time()
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        elapsed = time() - self.start
+        minutes = int(elapsed/60)
+        seconds = elapsed - 60*minutes
+        print (f'Elapsed Time {self.message} {minutes} m {seconds:.2f} s')
+
 class CellDataset(Dataset):
     def __init__(self, file_name = 'dataset1.npz'):
         npzfile = load(file_name)
@@ -80,7 +98,6 @@ def get_logfile_path(prefix='log',suffix='csv',logdir='./logs'):
     return logfile_path
 
 if __name__=='__main__':
-    start    = time()
     parser = ArgumentParser('Train with HPA data')
     parser.add_argument('action',
                         choices = ['train','test','validate'],
@@ -131,37 +148,33 @@ if __name__=='__main__':
     model         = Net()
     criterion     = MSELoss()
     optimizer     = SGD(model.parameters(), lr = args.lr, momentum = args.momentum)
-    m             = 1
-    with open(get_logfile_path(prefix = args.prefix,
-                               suffix = args.suffix,
-                               logdir = args.logdir),
-              'w') as logfile:
+
+    with Timer('(training network)'),  open(get_logfile_path(prefix = args.prefix,
+                                                             suffix = args.suffix,
+                                                             logdir = args.logdir),
+                                            'w') as logfile:
         logfile.write(f'lr,{args.lr}\n')
         logfile.write(f'momentum,{args.momentum}\n')
         for epoch in range(args.n):
+            m             = 1
             while exists(file_name:=f'{args.data}{m}.npz'):
                 print (f'Processing {file_name}')
                 dataset   = CellDataset(file_name = file_name)
-                loader   = DataLoader(dataset, batch_size=args.batch)
-                losses = []
+                loader    = DataLoader(dataset, batch_size=args.batch)
+                losses    = []
 
                 for i, data in enumerate(loader, 0):
-                    inputs, labels = data
                     optimizer.zero_grad()
-                    outputs = model(inputs)
-                    loss    = criterion(outputs, labels)
+                    inputs, labels = data
+                    outputs        = model(inputs)
+                    loss           = criterion(outputs, labels)
                     losses.append(loss.item())
                     loss.backward()
                     optimizer.step()
                     if i%args.frequency==0:
                         mean_loss = mean(losses)
-                        print (f'{m}, {epoch}, {i}, {mean_loss}\n')
                         losses.clear()
+                        print (f'{m}, {epoch}, {i}, {mean_loss}')
                         logfile.write(f'{m}, {epoch}, {i}, {mean_loss}\n')
                         logfile.flush()
-            m+= 1
-
-    elapsed = time() - start
-    minutes = int(elapsed/60)
-    seconds = elapsed - 60*minutes
-    print (f'Elapsed Time (training network) {minutes} m {seconds:.2f} s')
+                m+= 1
