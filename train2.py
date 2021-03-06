@@ -158,7 +158,7 @@ if __name__=='__main__':
         for epoch in range(args.n):
             m             = 1
             while exists(file_name:=f'{args.data}{m}.npz'):
-                print (f'Processing {file_name}')
+                print (f'Epoch {epoch}, file {file_name}')
                 dataset   = CellDataset(file_name = file_name)
                 loader    = DataLoader(dataset, batch_size=args.batch)
                 losses    = []
@@ -174,7 +174,7 @@ if __name__=='__main__':
                     if i%args.frequency==0:
                         mean_loss = mean(losses)
                         losses.clear()
-                        print (f'{m}, {epoch}, {i}, {mean_loss}')
-                        logfile.write(f'{m}, {epoch}, {i}, {mean_loss}\n')
+                        print (f'{epoch}, {m},  {i}, {mean_loss}')
+                        logfile.write(f'{epoch}, {m}, {i}, {mean_loss}\n')
                         logfile.flush()
                 m+= 1

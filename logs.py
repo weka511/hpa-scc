@@ -43,13 +43,15 @@ def get_logfile_names(notall,logfiles,prefix='log',suffix='.csv',logdir='logs'):
         return [join(logdir,filename) for _,_,filenames in walk(logdir) for filename in filenames if is_logfile(filename,
                                                                                                                 prefix=prefix,
                                                                                                                 suffix=suffix)]
-def set_background(breaks,facecolor='olive'):
+def set_background(breaks,epochs,facecolor='xkcd:olive'):
     it =iter(breaks)
     try:
         for x in it:
             axvspan(x,next(it),facecolor=facecolor)
     except:
         pass
+    for epoch in epochs:
+        axvspan(epoch,epoch+1,facecolor='xkcd:teal')
 
 if __name__ == '__main__':
     parser = ArgumentParser('Analyze log files from training/testing')
@@ -96,15 +98,20 @@ if __name__ == '__main__':
             momentum  = float(extract(next(data)))
             losses    = []
             breaks    = []
+            epochs    = []
             seq0      = -1
+            epoch0    = -1
             for j,[epoch,seq,step,loss] in enumerate(data):
                 losses.append(float(loss))
                 seq = int(seq)
                 if seq != seq0:
                     breaks.append(j)
                     seq0 = seq
+                if epoch != epoch0:
+                    epochs.append(j)
+                    epoch0 = epoch
             breaks.append(j)
-            set_background(breaks)
+            set_background(breaks,epochs)
 
 
             plot (losses[args.skip+args.average:],
