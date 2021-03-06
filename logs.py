@@ -17,9 +17,18 @@
 
 from argparse import   ArgumentParser
 from csv               import reader
-from matplotlib.pyplot import figure,plot,show,title,legend,ylabel,savefig,ylim
+from matplotlib.pyplot import figure,plot,show,title,legend,ylabel,savefig,ylim,axvspan
 from os                import walk
 from os.path           import splitext, join
+
+Colours = ['xkcd:red',
+           'xkcd:lime green',
+           'xkcd:sky blue',
+           'xkcd:magenta',
+           'xkcd:yellow',
+           'xkcd:aqua',
+           'xkcd:terracotta'
+           ]
 
 def extract(row):
     return row[1]
@@ -34,7 +43,13 @@ def get_logfile_names(notall,logfiles,prefix='log',suffix='.csv',logdir='logs'):
         return [join(logdir,filename) for _,_,filenames in walk(logdir) for filename in filenames if is_logfile(filename,
                                                                                                                 prefix=prefix,
                                                                                                                 suffix=suffix)]
-Colours = ['r','g','b','y','c','m','k']
+def set_background(breaks,facecolor='olive'):
+    it =iter(breaks)
+    try:
+        for x in it:
+            axvspan(x,next(it),facecolor=facecolor)
+    except:
+        pass
 
 if __name__ == '__main__':
     parser = ArgumentParser('Analyze log files from training/testing')
@@ -79,13 +94,24 @@ if __name__ == '__main__':
             # image_set = extract(next(data))
             lr        = float(extract(next(data)))
             momentum  = float(extract(next(data)))
-            errors    = [float(error) for _,_,_,error in data]
+            losses    = []
+            breaks    = []
+            seq0      = -1
+            for j,[epoch,seq,step,loss] in enumerate(data):
+                losses.append(float(loss))
+                seq = int(seq)
+                if seq != seq0:
+                    breaks.append(j)
+                    seq0 = seq
+            breaks.append(j)
+            set_background(breaks)
 
-            plot (errors[args.skip+args.average:],
+
+            plot (losses[args.skip+args.average:],
                   c     = Colours[i],
                   label = f'lr={lr}, momentum={momentum}')
 
-            plot([sum([errors[i] for i in range(j,j+args.average)])/args.average for j in range(args.skip,len(errors)-args.average)],
+            plot([sum([losses[i] for i in range(j,j+args.average)])/args.average for j in range(args.skip,len(losses)-args.average)],
                  c     = Colours[i],
                  linestyle = 'dashed',
                  label     = f'{args.average}-point moving average')
