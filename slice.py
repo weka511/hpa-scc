@@ -26,6 +26,24 @@ from random           import seed, shuffle
 from time             import time
 from visualize        import read_descriptions, read_training_expectations
 
+# Timer
+#
+# This class is used as a wrapper when I want to know the execution time of some code.
+
+class Timer:
+    def __init__(self, message = ''):
+        self.start   = None
+        self.message = message
+
+    def __enter__(self):
+        self.start = time()
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        elapsed = time() - self.start
+        minutes = int(elapsed/60)
+        seconds = elapsed - 60*minutes
+        print (f'Elapsed Time {self.message} {minutes} m {seconds:.2f} s')
+
 RED         = 0
 GREEN       = 1
 BLUE        = 2
@@ -119,7 +137,7 @@ def save_images(output,Images,Targets):
 
 
 if __name__=='__main__':
-    start    = time()
+
     parser   = ArgumentParser('Slice and downsample dataset')
     parser.add_argument('--output',     default = 'train',                               help = 'Base name for output datasets')
     parser.add_argument('--path',       default = r'd:\data\hpa-scc',                    help = 'Path where raw data is located')
@@ -142,28 +160,26 @@ if __name__=='__main__':
     seed(args.seed)
     shuffle(Data)
     N_validation = int(args.split*len(Data))
-    Images, Targets = create_image_target(Data,
-                                          N         =N_validation,
-                                          mx        = args.pixels,
-                                          my        = args.pixels,
-                                          path      = args.path,
-                                          image_set = args.image_set)
-    save_images(f'{args.validation}.npz',Images,Targets)
+    with Timer(f'{args.validation}.npz'):
+        Images, Targets = create_image_target(Data,
+                                              N         = N_validation,
+                                              mx        = args.pixels,
+                                              my        = args.pixels,
+                                              path      = args.path,
+                                              image_set = args.image_set)
+        save_images(f'{args.validation}.npz',Images,Targets)
+
     start = N_validation
 
     for m in range(M):
-        N_train = min(len(Data)-start,args.N)
-        Images, Targets = create_image_target(Data,
-                                              N         = N_train,
-                                              mx        = args.pixels,
-                                              my        = args.pixels,
-                                              start     = start,
-                                              path      = args.path,
-                                              image_set = args.image_set)
-        save_images(f'{args.output}{m+1}.npz',Images,Targets)
-        start += N_train
-
-    elapsed = time() - start
-    minutes = int(elapsed/60)
-    seconds = elapsed - 60*minutes
-    print (f'Elapsed Time (reloading images){minutes} m {seconds:.2f} s')
+        with Timer(f'{args.output}{m+1}.npz'):
+            N_train = min(len(Data)-start,args.N)
+            Images, Targets = create_image_target(Data,
+                                                  N         = N_train,
+                                                  mx        = args.pixels,
+                                                  my        = args.pixels,
+                                                  start     = start,
+                                                  path      = args.path,
+                                                  image_set = args.image_set)
+            save_images(f'{args.output}{m+1}.npz',Images,Targets)
+            start += N_train
