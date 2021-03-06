@@ -29,7 +29,7 @@ def is_logfile(filename,prefix='log',suffix='.csv'):
 
 def get_logfile_names(notall,logfiles,prefix='log',suffix='.csv',logdir='logs'):
     if notall:
-        return logfiles
+        return [join(logdir,filename) for filename in logfiles]
     else:
         return [join(logdir,filename) for _,_,filenames in walk(logdir) for filename in filenames if is_logfile(filename,
                                                                                                                 prefix=prefix,
@@ -76,10 +76,10 @@ if __name__ == '__main__':
 
         with open(logfile_name) as logfile:
             data      = reader(logfile)
-            image_set = extract(next(data))
+            # image_set = extract(next(data))
             lr        = float(extract(next(data)))
             momentum  = float(extract(next(data)))
-            errors    = [float(error) for _,_,error in data]
+            errors    = [float(error) for _,_,_,error in data]
 
             plot (errors[args.skip+args.average:],
                   c     = Colours[i],
@@ -94,7 +94,7 @@ if __name__ == '__main__':
             if i==len(Colours):
                 i = 0
     ylabel('Training Error')
-    title(f'Image set: {image_set}')
+    # title(f'Image set: {image_set}')
 
     legend()
     savefig (f'{args.savefile}.png' if len(splitext(args.savefile))==0 else args.savefile)
