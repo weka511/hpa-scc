@@ -11,17 +11,18 @@
 |logs.py|Analyze log files from training/testing|
 |segment.py|Segment images using HPA cellsegmentator|
 |slice.py|Slice and downsample dataset|
-|split.py|Partition data into training and validation|
-|train.py|Build and train neural network|
 |train2.py|Build and train neural network using sliced data|
+|utils.py|Utility classes: Timer and Log|
 |visualize.py|Visualize image files|
 ||Spikes||
 |anayze-labels|Find images  that have only one label|
 |CellSegmenterTest.py|Demo for HPA cellsegmentator|
 |encoding.py|Example of encoding|
 |otsu.py|Segment images using Otsu's method|
+|split.py|Partition data into training and validation|
 |spike2.py|Estimate memory usage for down-sampled data, and loading and saving times|
 |spike3.py|Train network using data daved by spike2.py|
+|train.py|Build and train neural network|
 |watershed.py|Naive Watershed segmentation|
 |download.py|Download training images from kaggle|
 |summarize.py|Organize image names by description|
