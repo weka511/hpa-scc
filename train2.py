@@ -20,7 +20,7 @@ from logs                import get_logfile_names
 from numpy               import load, mean
 from os.path             import exists, join
 from time                import time
-from torch               import unsqueeze, from_numpy, FloatTensor
+from torch               import unsqueeze, from_numpy, FloatTensor, save, load as reload
 from torch.nn            import Module, Conv3d, MaxPool3d, Linear, MSELoss
 from torch.nn.functional import relu, softmax
 from torch.optim         import SGD
@@ -97,6 +97,41 @@ def get_logfile_path(prefix='log',suffix='csv',logdir='./logs'):
         logfile_path = join(logdir, f'{prefix}{i+1}{suffix}')
     return logfile_path
 
+def train_epoch(epoch,args,model,criterion,optimizer):
+    m             = 1
+    while exists(file_name:=f'{args.data}{m}.npz'):
+        print (f'Epoch {epoch}, file {file_name}')
+        dataset   = CellDataset(file_name = file_name)
+        loader    = DataLoader(dataset, batch_size=args.batch)
+        losses    = []
+
+        for i, data in enumerate(loader, 0):
+            optimizer.zero_grad()
+            inputs, labels = data
+            outputs        = model(inputs)
+            loss           = criterion(outputs, labels)
+            losses.append(loss.item())
+            loss.backward()
+            optimizer.step()
+            if i%args.frequency==0:
+                mean_loss = mean(losses)
+                losses.clear()
+                print (f'{epoch}, {m},  {i}, {mean_loss}')
+                logfile.write(f'{epoch}, {m}, {i}, {mean_loss}\n')
+                logfile.flush()
+        m+= 1
+
+def restart(args,model,criterion,optimizer):
+    print (f'Loading checkpoint: {args.restart}')
+    checkpoint = reload(args.restart)
+    print (f'Loaded checkpoint: {args.restart}')
+    model.load_state_dict(checkpoint['model_state_dict'])
+    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+    epoch = checkpoint['epoch'] + 1
+    # loss  = checkpoint['loss']
+    model.train()
+    return epoch
+
 if __name__=='__main__':
     parser = ArgumentParser('Train with HPA data')
     parser.add_argument('action',
@@ -139,15 +174,18 @@ if __name__=='__main__':
                         type    = int,
                         help    = 'Batch size for training/validating')
     parser.add_argument('--checkpoint',
-                        default = 'chk')
+                        default = 'chk',
+                        help    = 'Base of name for checkpoint files')
     parser.add_argument('--restart',
-                        default = None)
-    parser.add_argument('--seed',
-                        default = None)
+                        default = None,
+                        help   = 'Restart from specified checkpoint')
+
     args          = parser.parse_args()
     model         = Net()
     criterion     = MSELoss()
-    optimizer     = SGD(model.parameters(), lr = args.lr, momentum = args.momentum)
+    optimizer     = SGD(model.parameters(),
+                        lr       = args.lr,
+                        momentum = args.momentum)
 
     with Timer('(training network)'),  open(get_logfile_path(prefix = args.prefix,
                                                              suffix = args.suffix,
@@ -155,26 +193,13 @@ if __name__=='__main__':
                                             'w') as logfile:
         logfile.write(f'lr,{args.lr}\n')
         logfile.write(f'momentum,{args.momentum}\n')
-        for epoch in range(args.n):
-            m             = 1
-            while exists(file_name:=f'{args.data}{m}.npz'):
-                print (f'Epoch {epoch}, file {file_name}')
-                dataset   = CellDataset(file_name = file_name)
-                loader    = DataLoader(dataset, batch_size=args.batch)
-                losses    = []
-
-                for i, data in enumerate(loader, 0):
-                    optimizer.zero_grad()
-                    inputs, labels = data
-                    outputs        = model(inputs)
-                    loss           = criterion(outputs, labels)
-                    losses.append(loss.item())
-                    loss.backward()
-                    optimizer.step()
-                    if i%args.frequency==0:
-                        mean_loss = mean(losses)
-                        losses.clear()
-                        print (f'{epoch}, {m},  {i}, {mean_loss}')
-                        logfile.write(f'{epoch}, {m}, {i}, {mean_loss}\n')
-                        logfile.flush()
-                m+= 1
+        epoch0 = restart(args,model,criterion,optimizer) if args.restart!=None else 1
+        for epoch in range(epoch0,epoch0+args.n):
+            train_epoch(epoch,args,model,criterion,optimizer)
+            save({
+                    'epoch'                : epoch,
+                    'model_state_dict'     : model.state_dict(),
+                    'optimizer_state_dict' : optimizer.state_dict(),
+                    'loss'                 : loss
+                },
+                f'{args.checkpoint}{epoch}.pth')
