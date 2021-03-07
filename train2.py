@@ -105,20 +105,21 @@ def train_epoch(epoch,args,model,criterion,optimizer):
         loader    = DataLoader(dataset, batch_size=args.batch)
         losses    = []
 
-        for i, data in enumerate(loader, 0):
-            optimizer.zero_grad()
-            inputs, labels = data
-            outputs        = model(inputs)
-            loss           = criterion(outputs, labels)
-            losses.append(loss.item())
-            loss.backward()
-            optimizer.step()
-            if i%args.frequency==0:
-                mean_loss = mean(losses)
-                losses.clear()
-                print (f'{epoch}, {m},  {i}, {mean_loss}')
-                logfile.write(f'{epoch}, {m}, {i}, {mean_loss}\n')
-                logfile.flush()
+        for k in range(args.K):
+            for i, data in enumerate(loader, 0):
+                optimizer.zero_grad()
+                inputs, labels = data
+                outputs        = model(inputs)
+                loss           = criterion(outputs, labels)
+                losses.append(loss.item())
+                loss.backward()
+                optimizer.step()
+                if i%args.frequency==0:
+                    mean_loss = mean(losses)
+                    losses.clear()
+                    print (f'{epoch}, {m},  {i}, {mean_loss}')
+                    logfile.write(f'{epoch}, {m}, {i}, {mean_loss}\n')
+                    logfile.flush()
         m+= 1
 
 def restart(args,model,criterion,optimizer):
@@ -154,6 +155,10 @@ if __name__=='__main__':
                         default = 10,
                         type    = int,
                         help    = 'Number of epochs for training')
+    parser.add_argument('--K',
+                        default = 1,
+                        type    = int,
+                        help    = 'Number of pasees through one dataset before loading next one')
     parser.add_argument('--prefix',
                         default = 'train',
                         help    = 'Prefix for log file names')
@@ -199,7 +204,7 @@ if __name__=='__main__':
             save({
                     'epoch'                : epoch,
                     'model_state_dict'     : model.state_dict(),
-                    'optimizer_state_dict' : optimizer.state_dict(),
-                    'loss'                 : loss
+                    'optimizer_state_dict' : optimizer.state_dict()#,
+                    # 'loss'                 : loss
                 },
                 f'{args.checkpoint}{epoch}.pth')
