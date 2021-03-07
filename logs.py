@@ -51,7 +51,7 @@ def set_background(breaks,epochs,facecolor='xkcd:olive'):
     except:
         pass
     for epoch in epochs:
-        axvspan(epoch,epoch+1,facecolor='xkcd:teal')
+        axvspan(epoch,epoch+5,facecolor='xkcd:black')
 
 if __name__ == '__main__':
     parser = ArgumentParser('Analyze log files from training/testing')
