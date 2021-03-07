@@ -44,9 +44,14 @@ class Timer:
         seconds = elapsed - 60*minutes
         print (f'Elapsed Time {self.message} {minutes} m {seconds:.2f} s')
 
+# CellDataset
+#
+# Read a slice of data that was packed up by slice.py, and allow
+# a neural network to train on it.
+
 class CellDataset(Dataset):
     def __init__(self, file_name = 'dataset1.npz'):
-        npzfile = load(file_name)
+        npzfile = load(file_name,allow_pickle=True)
         self.Images  = npzfile['Images']
         self.Targets = npzfile['Targets']
 
@@ -55,6 +60,10 @@ class CellDataset(Dataset):
 
     def __getitem__(self, idx):
         return unsqueeze(from_numpy(self.Images[idx]),1), FloatTensor([1 if i in self.Targets[idx] else 0 for i in range(18)])
+
+# Net
+#
+# Simple connulutional neural network
 
 class Net(Module):
     def __init__(self):
@@ -86,7 +95,7 @@ class Net(Module):
         x = self.fc3(x)
         return softmax(x,dim=1)
 
-    # get_logfile_path
+# get_logfile_path
 
 def get_logfile_path(prefix='log',suffix='csv',logdir='./logs'):
     logs          = get_logfile_names(False,None,prefix,suffix)
@@ -97,6 +106,9 @@ def get_logfile_path(prefix='log',suffix='csv',logdir='./logs'):
         logfile_path = join(logdir, f'{prefix}{i+1}{suffix}')
     return logfile_path
 
+# train_epoch
+#
+# Train for one epoch. Labels through all slices of data
 def train_epoch(epoch,args,model,criterion,optimizer):
     m             = 1
     while exists(file_name:=f'{args.data}{m}.npz'):
@@ -121,6 +133,10 @@ def train_epoch(epoch,args,model,criterion,optimizer):
                     logfile.write(f'{epoch}, {m}, {i}, {mean_loss}\n')
                     logfile.flush()
         m+= 1
+
+# restart
+#
+# Restart from saved data
 
 def restart(args,model,criterion,optimizer):
     print (f'Loading checkpoint: {args.restart}')
