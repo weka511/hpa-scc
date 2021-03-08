@@ -16,7 +16,8 @@
 #  To contact me, Simon Crase, email simon@greenweaves.nz
 
 from argparse            import ArgumentParser
-from numpy               import load, mean
+from numpy               import load, mean, argmax
+from os                  import walk
 from os.path             import exists, join
 from torch               import unsqueeze, from_numpy, FloatTensor, save, load as reload
 from torch.nn            import Module, Conv3d, MaxPool3d, Linear, MSELoss
@@ -125,6 +126,41 @@ def restart(args,model,criterion,optimizer):
     model.train()
     return epoch
 
+# get_predictions
+#
+# Use model to predict class of input
+def get_predictions(model,inputs):             #FIXME - need to handle multiplets
+    def get_prediction(probabilities):
+        prediction = argmax(probabilities)
+        return prediction, probabilities[prediction]
+
+    output      = model(inputs)
+    predictions = [get_prediction(output[i].detach().numpy()) for i in range(len(output))]
+    return [a for a,_ in predictions],[b for _,b in predictions]
+
+def validate(args):
+    model  = Net()
+    Checkpoints = sorted([join(path,name) for path,_,names in walk('./') for name in names if name.startswith(args.checkpoint)])
+    checkpoint  = reload(Checkpoints[-1])
+    model.load_state_dict(checkpoint['model_state_dict'])
+
+    model.eval()
+    loader = DataLoader(CellDataset(file_name =  args.data),
+                                   batch_size=args.batch)
+    matches           = 0
+    mismatches        = 0
+    confidence        = 0.0
+    for i, data in enumerate(loader, 0):
+        inputs, labels = data
+        predictions,confidences = get_predictions(model,inputs)
+        confidence             += sum(confidences)
+        for predicted,expected in zip(predictions,[argmax(labels[i].detach().numpy()) for i in range(len(labels))]):
+            if predicted==expected:
+                matches+=1
+            else:
+                mismatches+=1
+        if (matches+mismatches)%args.frequency==0:
+            print (f'Confidence = {100*confidence/(matches+mismatches):.1f}%, accuracy={100*matches/(matches+mismatches):.1f}%')
 
 if __name__=='__main__':
     parser = ArgumentParser('Train with HPA data')
@@ -203,6 +239,6 @@ if __name__=='__main__':
                     },
                     f'{args.checkpoint}{epoch}.pth')
     elif args.action == VALIDATE:
-        print ('Not implemeneted')
+        validate(args)
     else:
         print ('Not implemeneted')
