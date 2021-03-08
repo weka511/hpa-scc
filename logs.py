@@ -22,7 +22,7 @@ from os                import walk
 from os.path           import splitext, join
 
 Colours = ['xkcd:red',
-           'xkcd:lime green',
+           'xkcd:forest green',
            'xkcd:sky blue',
            'xkcd:magenta',
            'xkcd:yellow',
@@ -83,6 +83,10 @@ if __name__ == '__main__':
                         default = 10,
                         type    = int,
                         help    = 'Plot moving average')
+    parser.add_argument('--suppress',
+                        default = False,
+                        action  = 'store_true',
+                        help    = 'Show averages, but suppress details')
     args     = parser.parse_args()
     fig      = figure(figsize=(20,20))
     i        = 0
@@ -114,14 +118,15 @@ if __name__ == '__main__':
             set_background(breaks,epochs)
 
 
-            plot (losses[args.skip+args.average:],
-                  c     = Colours[i],
-                  label = f'lr={lr}, momentum={momentum}')
+            if not args.suppress:
+                plot (losses[args.skip+args.average:],
+                      c     = Colours[i],
+                      label = f'lr={lr}, momentum={momentum}')
 
             plot([sum([losses[i] for i in range(j,j+args.average)])/args.average for j in range(args.skip,len(losses)-args.average)],
                  c     = Colours[i],
                  linestyle = 'dashed',
-                 label     = f'{args.average}-point moving average')
+                 label     = f'lr={lr}, momentum={momentum}' if args.suppress else f'{args.average}-point moving average')
 
             i += 1
             if i==len(Colours):
