@@ -16,33 +16,20 @@
 #  To contact me, Simon Crase, email simon@greenweaves.nz
 
 from argparse            import ArgumentParser
-from logs                import get_logfile_names
 from numpy               import load, mean
 from os.path             import exists, join
-from time                import time
 from torch               import unsqueeze, from_numpy, FloatTensor, save, load as reload
 from torch.nn            import Module, Conv3d, MaxPool3d, Linear, MSELoss
 from torch.nn.functional import relu, softmax
 from torch.optim         import SGD
 from torch.utils.data    import Dataset, DataLoader
+from utils               import Logger, Timer
 
-# Timer
-#
-# This class is used as a wrapper when I want to know the execution time of some code.
+# Allowable actions for program
 
-class Timer:
-    def __init__(self, message = ''):
-        self.start   = None
-        self.message = message
-
-    def __enter__(self):
-        self.start = time()
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        elapsed = time() - self.start
-        minutes = int(elapsed/60)
-        seconds = elapsed - 60*minutes
-        print (f'Elapsed Time {self.message} {minutes} m {seconds:.2f} s')
+TRAIN    = 'train'
+TEST     = 'test'
+VALIDATE = 'validate'
 
 # CellDataset
 #
@@ -95,22 +82,13 @@ class Net(Module):
         x = self.fc3(x)
         return softmax(x,dim=1)
 
-# get_logfile_path
-
-def get_logfile_path(prefix='log',suffix='csv',logdir='./logs'):
-    logs          = get_logfile_names(False,None,prefix,suffix)
-    i             = len(logs)
-    logfile_path = join(logdir, f'{prefix}{i+1}{suffix}')
-    while exists(logfile_path):
-        i += 1
-        logfile_path = join(logdir, f'{prefix}{i+1}{suffix}')
-    return logfile_path
 
 # train_epoch
 #
-# Train for one epoch. Labels through all slices of data
-def train_epoch(epoch,args,model,criterion,optimizer):
-    m             = 1
+# Train for one epoch. Iterates through all slices of data
+
+def train_epoch(epoch,args,model,criterion,optimizer,logger=None):
+    m  = 1
     while exists(file_name:=f'{args.data}{m}.npz'):
         print (f'Epoch {epoch}, file {file_name}')
         dataset   = CellDataset(file_name = file_name)
@@ -129,9 +107,7 @@ def train_epoch(epoch,args,model,criterion,optimizer):
                 if i%args.frequency==0:
                     mean_loss = mean(losses)
                     losses.clear()
-                    print (f'{epoch}, {m},  {i}, {mean_loss}')
-                    logfile.write(f'{epoch}, {m}, {i}, {mean_loss}\n')
-                    logfile.flush()
+                    logger.log(f'{epoch}, {m},  {i}, {mean_loss}')
         m+= 1
 
 # restart
@@ -149,10 +125,11 @@ def restart(args,model,criterion,optimizer):
     model.train()
     return epoch
 
+
 if __name__=='__main__':
     parser = ArgumentParser('Train with HPA data')
     parser.add_argument('action',
-                        choices = ['train','test','validate'],
+                        choices = [TRAIN, TEST, VALIDATE],
                         help    = 'Action: train network, validate angainst held out data, or predict from test dataset')
     parser.add_argument('data')
     parser.add_argument('--frequency',
@@ -208,19 +185,24 @@ if __name__=='__main__':
                         lr       = args.lr,
                         momentum = args.momentum)
 
-    with Timer('(training network)'),  open(get_logfile_path(prefix = args.prefix,
-                                                             suffix = args.suffix,
-                                                             logdir = args.logdir),
-                                            'w') as logfile:
-        logfile.write(f'lr,{args.lr}\n')
-        logfile.write(f'momentum,{args.momentum}\n')
-        epoch0 = restart(args,model,criterion,optimizer) if args.restart!=None else 1
-        for epoch in range(epoch0,epoch0+args.n):
-            train_epoch(epoch,args,model,criterion,optimizer)
-            save({
-                    'epoch'                : epoch,
-                    'model_state_dict'     : model.state_dict(),
-                    'optimizer_state_dict' : optimizer.state_dict()#,
-                    # 'loss'                 : loss
-                },
-                f'{args.checkpoint}{epoch}.pth')
+    if args.action == TRAIN:
+        with Timer('training network'), \
+                    Logger(prefix = args.prefix,
+                           suffix = args.suffix,
+                           logdir = args.logdir) as logger:
+            logger.log(f'lr,{args.lr}')
+            logger.log(f'momentum,{args.momentum}')
+            epoch0 = restart(args,model,criterion,optimizer) if args.restart!=None else 1
+            for epoch in range(epoch0,epoch0+args.n):
+                train_epoch(epoch,args,model,criterion,optimizer,logger=logger)
+                save({
+                        'epoch'                : epoch,
+                        'model_state_dict'     : model.state_dict(),
+                        'optimizer_state_dict' : optimizer.state_dict()#,
+                        # 'loss'                 : loss
+                    },
+                    f'{args.checkpoint}{epoch}.pth')
+    elif args.action == VALIDATE:
+        print ('Not implemeneted')
+    else:
+        print ('Not implemeneted')

@@ -25,7 +25,7 @@ from time    import time
 class Timer:
     def __init__(self, message = None):
         self.start   = None
-        self.message = '' if message is None else '({message}) '
+        self.message = '' if message is None else f'({message}) '
 
     def __enter__(self):
         self.start = time()
@@ -37,13 +37,13 @@ class Timer:
         seconds = elapsed - 60*minutes
         print (f'Elapsed Time {self.message}{minutes} m {seconds:.2f} s')
 
-class Log:
-    def __init__(self,prefix='log',suffix='csv',logdir='./logs'):
+class Logger:
+    def __init__(self,prefix='log',suffix='.csv',logdir='./logs'):
         logs = [join(logdir,filename) for _,_,filenames in walk(logdir) \
                 for filename in filenames                               \
                 if filename.startswith(prefix) and splitext(filename)[-1]==suffix]
         i    = len(logs)
-        self.logfile_path = join(logdir, f'{prefix}{i+1}.{suffix}')
+        self.logfile_path = join(logdir, f'{prefix}{i+1}{suffix}')
         while exists(self.logfile_path):
             i += 1
             self.logfile_path = join(logdir, f'{prefix}{i+1}{suffix}')
@@ -65,7 +65,6 @@ class Log:
         self.logfile.close()
 
 if __name__=='__main__':
-    with Timer('Test') as timer:
-        with Log(prefix='foo') as log:
-            x=1
+    with Timer('Test') as timer, Logger(prefix='foo') as log:
+        x=1
 
