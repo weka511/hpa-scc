@@ -21,7 +21,7 @@
 |hpa-scc.bib|Bibliography|
 |Notes.tex|My notes|
 
-## Spike solutions
+## Spike solutions and obsolete code
 
 |File|Description|
 |---------------------|-------------------------------------------------------------------------------------------------|
