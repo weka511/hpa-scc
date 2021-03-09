@@ -16,9 +16,10 @@
 #  To contact me, Simon Crase, email simon@greenweaves.nz
 
 from argparse            import ArgumentParser
-from numpy               import load, mean, argmax
+from numpy               import load, mean, argmax,argmin
 from os                  import walk
 from os.path             import exists, join
+from random              import sample, seed
 from torch               import unsqueeze, from_numpy, FloatTensor, save, load as reload
 from torch.nn            import Module, Conv3d, MaxPool3d, Linear, MSELoss
 from torch.nn.functional import relu, softmax
@@ -138,29 +139,86 @@ def get_predictions(model,inputs):             #FIXME - need to handle multiplet
     predictions = [get_prediction(output[i].detach().numpy()) for i in range(len(output))]
     return [a for a,_ in predictions],[b for _,b in predictions]
 
-def validate(args):
-    model  = Net()
-    Checkpoints = sorted([join(path,name) for path,_,names in walk('./') for name in names if name.startswith(args.checkpoint)])
+def get_threshold(Probabilities,Labels,nsteps=25):
+    def match(call,label):
+        return 0 if call==label else 1
+    Scores = []
+    for i in range(nsteps+1):
+        threshold =i/nsteps
+        score = 0
+        for probabilities,labels in zip(Probabilities,Labels):
+            calls = [1 if p>threshold else 0 for p in probabilities]
+            score += sum([match(call,label) for call,label in zip(calls,labels)])
+        Scores.append(score)
+    index = argmin(Scores)
+    j     = index
+    while Scores[j+1]==Scores[index]:
+        j+=1
+    return 0.5* (index+j)/nsteps
+
+def get_test_score(threshold,Probabilities,Labels):
+    def match(call,label):
+        return 0 if call==label else 1
+
+    score = 0
+    for probabilities,labels in zip(Probabilities,Labels):
+        calls = [1 if p>threshold else 0 for p in probabilities]
+        score += sum([match(call,label) for call,label in zip(calls,labels)])
+    return score
+
+
+def validate(data, checkpoint='chk', batch=8,frequency=10,n1=3,n2=3):
+    model       = Net()
+    Checkpoints = sorted([join(path,name) for path,_,names in walk('./') for name in names if name.startswith(checkpoint)])
     checkpoint  = reload(Checkpoints[-1])
     model.load_state_dict(checkpoint['model_state_dict'])
 
     model.eval()
-    loader = DataLoader(CellDataset(file_name =  args.data),
-                                   batch_size=args.batch)
-    matches           = 0
-    mismatches        = 0
-    confidence        = 0.0
+    dataset                  = CellDataset(file_name =  data)               #FIXME shuffle
+    loader                   = DataLoader(dataset, batch_size = batch)
+    Validation_Probabilities = []
+    Validation_Labels        = []
+    threshold                = None
+    Test_Probabilities       = []
+    Test_Labels              = []
+
     for i, data in enumerate(loader, 0):
+        if i>=n1+n2: break
         inputs, labels = data
-        predictions,confidences = get_predictions(model,inputs)
-        confidence             += sum(confidences)
-        for predicted,expected in zip(predictions,[argmax(labels[i].detach().numpy()) for i in range(len(labels))]):
-            if predicted==expected:
-                matches+=1
-            else:
-                mismatches+=1
-        if (matches+mismatches)%args.frequency==0:
-            print (f'Confidence = {100*confidence/(matches+mismatches):.1f}%, accuracy={100*matches/(matches+mismatches):.1f}%')
+        outputs        = model(inputs)
+        if i<n1:
+            for output in outputs:
+                Validation_Probabilities.append(output.detach().numpy())
+            for label in labels:
+                Validation_Labels.append(label.detach().numpy())
+        else:
+            for output in outputs:
+                Test_Probabilities.append(output.detach().numpy())
+            for label in labels:
+                Test_Labels.append(label.detach().numpy())
+
+    threshold = get_threshold(Validation_Probabilities,Validation_Labels)
+    get_test_score(threshold,Test_Probabilities,Test_Labels)
+    # assert(len(Probabilities)==n1*batch),f'{len(Probabilities)},{n1*batch}'
+    # assert(len(Labels)==n1*batch),f'{len(Labels)},{n1*batch}'
+
+
+        # predictions,confidences = get_predictions(model,inputs)
+
+    # matches           = 0
+    # mismatches        = 0
+    # confidence        = 0.0
+    # for i, data in enumerate(loader, 0):
+        # inputs, labels = data
+        # predictions,confidences = get_predictions(model,inputs)
+        # confidence             += sum(confidences)
+        # for predicted,expected in zip(predictions,[argmax(labels[i].detach().numpy()) for i in range(len(labels))]):
+            # if predicted==expected:
+                # matches+=1
+            # else:
+                # mismatches+=1
+        # if (matches+mismatches)%frequency==0:
+            # print (f'Confidence = {100*confidence/(matches+mismatches):.1f}%, accuracy={100*matches/(matches+mismatches):.1f}%')
 
 if __name__=='__main__':
     parser = ArgumentParser('Train with HPA data')
@@ -215,6 +273,7 @@ if __name__=='__main__':
                         help   = 'Restart from specified checkpoint')
 
     args          = parser.parse_args()
+    seed(42)                                 #FIXME
     model         = Net()
     criterion     = MSELoss()
     optimizer     = SGD(model.parameters(),
@@ -239,6 +298,9 @@ if __name__=='__main__':
                     },
                     f'{args.checkpoint}{epoch}.pth')
     elif args.action == VALIDATE:
-        validate(args)
+        validate(args.data,
+                 checkpoint = args.checkpoint,
+                 batch      = args.batch,
+                 frequency  = args.frequency)
     else:
         print ('Not implemeneted')
