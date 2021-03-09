@@ -14,8 +14,8 @@
 |train2.py|Build and train neural network using sliced data|
 |utils.py|Utility classes: Timer and Log|
 |visualize.py|Visualize image files|
-||Spikes||
-|anayze-labels|Find images  that have only one label|
+||Spike solutions||
+|analyze-labels|Find images  that have only one label|
 |CellSegmenterTest.py|Demo for HPA cellsegmentator|
 |encoding.py|Example of encoding|
 |otsu.py|Segment images using Otsu's method|
