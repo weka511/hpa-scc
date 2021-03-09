@@ -5,7 +5,6 @@
 
 |File|Description|
 |---------------------|-------------------------------------------------------------------------------------------------|
-||Production||
 |descriptions.csv|Text labels for classes|
 |hpa-scc.wpr|Python project|
 |logs.py|Analyze log files from training/testing|
@@ -14,7 +13,18 @@
 |train2.py|Build and train neural network using sliced data|
 |utils.py|Utility classes: Timer and Log|
 |visualize.py|Visualize image files|
-||Spike solutions||
+
+## Documentation
+
+|File|Description|
+|-----------------|-------------------------------------------------------------------------------------------------|
+|hpa-scc.bib|Bibliography|
+|Notes.tex|My notes|
+
+## Spike solutions
+
+|File|Description|
+|---------------------|-------------------------------------------------------------------------------------------------|
 |analyze-labels|Find images  that have only one label|
 |CellSegmenterTest.py|Demo for HPA cellsegmentator|
 |encoding.py|Example of encoding|
@@ -28,10 +38,3 @@
 |summarize.py|Organize image names by description|
 |unzip.py|Unzip downloaded files|
 
-
-## Documentation
-
-|File|Description|
-|-----------------|-------------------------------------------------------------------------------------------------|
-|hpa-scc.bib|Bibliography|
-|Notes.tex|My notes|
