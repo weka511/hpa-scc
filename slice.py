@@ -23,26 +23,10 @@ from matplotlib.image import imread
 from numpy            import zeros, int8, amax, load, savez
 from os.path          import join
 from random           import seed, shuffle
-from time             import time
+from utils            import Timer
 from visualize        import read_descriptions, read_training_expectations
 
-# Timer
-#
-# This class is used as a wrapper when I want to know the execution time of some code.
 
-class Timer:
-    def __init__(self, message = ''):
-        self.start   = None
-        self.message = message
-
-    def __enter__(self):
-        self.start = time()
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        elapsed = time() - self.start
-        minutes = int(elapsed/60)
-        seconds = elapsed - 60*minutes
-        print (f'Elapsed Time {self.message} {minutes} m {seconds:.2f} s')
 
 RED         = 0
 GREEN       = 1
@@ -126,9 +110,9 @@ def create_image_target(Data,
 # Save image/target pair
 #
 # Parameters:
-#     output
-#     Images
-#     Targets
+#     output      Name of file where data is to be saved
+#     Images      Numpy array of images
+#     Targets     List of values that are expected
 
 def save_images(output,Images,Targets):
     print (f'Saving {output} {Images.shape}')
