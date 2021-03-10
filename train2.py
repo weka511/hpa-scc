@@ -307,8 +307,12 @@ if __name__=='__main__':
                         type    = float,
                         nargs   = '+',
                         help    = 'Parameters for dropout layers')
+    parser.add_argument('--seed',
+                        default = 42,
+                        type    = int,
+                        help    = 'Used to seed random number generator')
     args          = parser.parse_args()
-    seed(42)                                 #FIXME
+    seed(args.seed)
     model         = Net(args.dropout)
     criterion     = MSELoss()
     optimizer     = SGD(model.parameters(),
