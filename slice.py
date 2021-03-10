@@ -21,6 +21,7 @@ from argparse         import ArgumentParser
 from math             import ceil
 from matplotlib.image import imread
 from numpy            import zeros, int8, amax, load, savez
+from os               import environ
 from os.path          import join
 from random           import seed, shuffle
 from utils            import Timer
@@ -82,7 +83,7 @@ def create_image_target(Data,
                         mx        = 256,
                         my        = 256,
                         start     = 0,
-                        path      = r'd:\data\hpa-scc',
+                        path      = join(environ['DATA'],'hpa-scc'),
                         image_set = 'train512x512'):
     print (f'Creating data: N={N}, start={start}')
     Images  = zeros((N,4,mx,my), dtype=int8)
@@ -124,16 +125,16 @@ if __name__=='__main__':
 
     parser   = ArgumentParser('Slice and downsample dataset')
     parser.add_argument('--output',     default = 'train',                               help = 'Base name for output datasets')
-    parser.add_argument('--path',       default = r'd:\data\hpa-scc',                    help = 'Path where raw data is located')
+    parser.add_argument('--path',       default = join(environ['DATA'],'hpa-scc'),                    help = 'Path where raw data is located')
     parser.add_argument('--image_set',  default = 'train512x512',                        help = 'Location of images')
     parser.add_argument('--N',          default = 4096,           type = int,            help = 'Number of images in each output dataset')
     parser.add_argument('--pixels',     default = 256,            type = int,            help = 'Number of pixels after downsampling')
     parser.add_argument('--seed',                                 type = int,            help = 'Seed for random number generator')
-    parser.add_argument('--frequency',  default=32,               type = int,            help = 'Frequency for progress reports')
+    parser.add_argument('--frequency',  default = 32,             type = int,            help = 'Frequency for progress reports')
     parser.add_argument('--split',      default = 0.05,           type = float,          help = 'Proportion of data for validation')
     parser.add_argument('--validation', default = 'validation',                          help = 'Validation dataset')
     parser.add_argument('--multiplets', default = False,          action = 'store_true', help = 'Include slides with multiple classes')
-    parser.add_argument('--negative', default = False,            action = 'store_true', help = 'Include slides with no classes assigned')
+    parser.add_argument('--negative',   default = False,          action = 'store_true', help = 'Include slides with no classes assigned')
     args         = parser.parse_args()
     Descriptions = read_descriptions('descriptions.csv')
     Data         = create_data(read_training_expectations(path=args.path),

@@ -27,6 +27,7 @@ from imageio                    import imwrite
 from math                       import isqrt
 from matplotlib.pyplot          import figure, imread, imshow, axis, savefig, close, show, title,suptitle
 from numpy                      import dstack,uint8, where, bool, squeeze, asfortranarray, save
+from os                         import environ
 from os.path                    import join,basename
 from pycocotools                import _mask as coco_mask
 from random                     import sample
@@ -53,7 +54,7 @@ def create_descriptions(file_name='descriptions.csv'):
 #      https://www.kaggle.com/c/hpa-single-cell-image-classification/discussion/221025
 #      so we need to do a list(set(...)) below
 
-def read_training_expectations(path=r'd:\data\hpa-scc',file_name='train.csv'):
+def read_training_expectations(path=join(environ['DATA'],'hpa-scc'),file_name='train.csv'):
 
     def unique(items):
         return list(set(items))
@@ -104,7 +105,7 @@ if __name__=='__main__':
     start  = time()
     parser = ArgumentParser('Segment HPA data using HPA Cell segmenter')
     parser.add_argument('--path',
-                        default = r'd:\data\hpa-scc',
+                        default = join(environ['DATA'],'hpa-scc'),
                         help    = 'Path to data')
     parser.add_argument('--image_set',
                         default = 'train512x512',

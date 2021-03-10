@@ -20,9 +20,9 @@ from csv               import reader
 from matplotlib.pyplot import figure, show, savefig, close
 from matplotlib.image  import imread
 from matplotlib        import cm
-from numpy             import zeros, array, mean
+from numpy             import zeros, array, mean, log
 from numpy.fft         import fft2
-import numpy           as np
+from os                import environ
 from os.path           import join
 from random            import sample
 
@@ -54,7 +54,7 @@ def read_descriptions(name):
 
 # read_training_expectations
 
-def read_training_expectations(path=r'd:\data\hpa-scc',file_name='train.csv'):
+def read_training_expectations(path=join(environ['DATA'],'hpa-scc'),file_name='train.csv'):
     with open(join(path,file_name)) as train:
         rows = reader(train)
         next(rows)
@@ -65,7 +65,7 @@ def read_training_expectations(path=r'd:\data\hpa-scc',file_name='train.csv'):
 # Display images for one slide.
 
 def visualize(image_id     = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
-              path         = r'd:\data\hpa-scc',
+              path         = join(environ['DATA'],'hpa-scc'),
               image_set    = 'train512x512',
               figs         = './figs',
               Descriptions = []):
@@ -91,7 +91,7 @@ def visualize(image_id     = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
         axs[0,column].set_title(meanings[colour])
 
         freqs = fft2(grey_scale_image)
-        axs[1,column].imshow(np.log(abs(freqs)),cmap='gray')
+        axs[1,column].imshow(log(abs(freqs)),cmap='gray')
 
     fig.suptitle(f'{image_id}: {"+".join([Descriptions[label] for label in Training[image_id]])}')
     savefig(join(figs,image_id))
@@ -99,7 +99,7 @@ def visualize(image_id     = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
 
 if __name__=='__main__':
     parser = ArgumentParser('Visualize HPA data')
-    parser.add_argument('--path',      default = r'd:\data\hpa-scc')
+    parser.add_argument('--path',      default = join(environ['DATA'],'hpa-scc'))
     parser.add_argument('--image_set', default = 'train512x512')
     parser.add_argument('--image_id',  default = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0')
     parser.add_argument('--figs',      default = './figs',  help    = 'Identifies where to store plots')
