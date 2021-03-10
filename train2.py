@@ -21,7 +21,8 @@ from os                  import walk
 from os.path             import exists, join
 from random              import sample, seed
 from torch               import unsqueeze, from_numpy, FloatTensor, save, load as reload
-from torch.nn            import Module, Conv3d, MaxPool3d, Linear, MSELoss
+from torch.nn            import Module, Conv3d, MaxPool3d, Linear, MSELoss, Dropout
+
 from torch.nn.functional import relu, softmax
 from torch.optim         import SGD
 from torch.utils.data    import Dataset, DataLoader
@@ -55,32 +56,36 @@ class CellDataset(Dataset):
 # Simple connulutional neural network
 
 class Net(Module):
-    def __init__(self):
+    def __init__(self, dropouts):
         super(Net, self).__init__()
-        self.conv1 = Conv3d(in_channels  = 4,
-                            out_channels = 6,
-                            kernel_size  = (1,5,5),
-                            stride       = 1,
-                            padding      = 1)
-        self.pool  = MaxPool3d(2)
-        self.conv2 = Conv3d(in_channels  = 6,
-                            out_channels = 16,
-                            kernel_size  = (1,5,5),
-                            stride       = 1,
-                            padding      = 1)
-        self.fc1   = Linear(in_features  = 16 * 62 * 62,
-                            out_features = 120)
-        self.fc2   = Linear(in_features  = 120,
-                            out_features = 84)
-        self.fc3   = Linear(in_features  = 84,
-                            out_features = 18)
+        self.conv1    = Conv3d(in_channels  = 4,
+                               out_channels = 6,
+                               kernel_size  = (1,5,5),
+                               stride       = 1,
+                               padding      = 1)
+        self.pool     = MaxPool3d(2)
+        self.conv2    = Conv3d(in_channels  = 6,
+                               out_channels = 16,
+                               kernel_size  = (1,5,5),
+                               stride       = 1,
+                               padding      = 1)
+        self.fc1      = Linear(in_features  = 16 * 62 * 62,
+                               out_features = 120)
+        self.dropout1 = Dropout(p           = dropouts[0],
+                                inplace     = False)
+        self.fc2      = Linear(in_features  = 120,
+                               out_features = 84)
+        self.dropout2 = Dropout(p           = dropouts[-1],
+                                inplace     = False)
+        self.fc3      = Linear(in_features  = 84,
+                               out_features = 18)
 
     def forward(self, x):
         x = self.pool(relu(self.conv1(x.float())))
         x = self.pool(relu(self.conv2(x)))
         x = x.view(-1, 16 * 62 * 62)
-        x = relu(self.fc1(x))
-        x = relu(self.fc2(x))
+        x = relu(self.dropout1(self.fc1(x)))
+        x = relu(self.dropout2(self.fc2(x)))
         x = self.fc3(x)
         return softmax(x,dim=1)
 
@@ -287,12 +292,6 @@ if __name__=='__main__':
     parser.add_argument('--logdir',
                         default = './logs',
                         help = 'directory for storing logfiles')
-    parser.add_argument('--weights',
-                        default = 'weights',
-                        help    = 'Filename for saving and loading weights')
-    parser.add_argument('--index',
-                        default = None,
-                        help    = 'Name for index file for training/validation')
     parser.add_argument('--batch',
                         default = 8,
                         type    = int,
@@ -303,10 +302,14 @@ if __name__=='__main__':
     parser.add_argument('--restart',
                         default = None,
                         help   = 'Restart from specified checkpoint')
-
+    parser.add_argument('--dropout',
+                        default = [0.5],
+                        type    = float,
+                        nargs   = '+',
+                        help    = 'Parameters for dropout layers')
     args          = parser.parse_args()
     seed(42)                                 #FIXME
-    model         = Net()
+    model         = Net(args.dropout)
     criterion     = MSELoss()
     optimizer     = SGD(model.parameters(),
                         lr       = args.lr,
