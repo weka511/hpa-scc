@@ -30,19 +30,28 @@ Colours = ['xkcd:red',
            'xkcd:terracotta'
            ]
 
-def extract(row):
-    return row[1]
+
+# is_logfile
+#
+# Verify whether file name is a valid logfile
 
 def is_logfile(filename,prefix='log',suffix='.csv'):
     return filename.startswith(prefix) and splitext(filename)[-1]==suffix
 
+# get_logfile_names
+#
+# Used to determine which files are to be processed
+
 def get_logfile_names(notall,logfiles,prefix='log',suffix='.csv',logdir='logs'):
-    if notall:
-        return [join(logdir,filename) for filename in logfiles]
-    else:
-        return [join(logdir,filename) for _,_,filenames in walk(logdir) for filename in filenames if is_logfile(filename,
-                                                                                                                prefix=prefix,
-                                                                                                                suffix=suffix)]
+    return                                                                     \
+           [join(logdir,filename) for filename in logfiles] if notall  else    \
+           [join(logdir,filename) for _,_,filenames in walk(logdir)            \
+            for filename in filenames if is_logfile(filename,
+                                                    prefix=prefix,
+                                                    suffix=suffix)]
+# set_background
+#
+# show epoch and file boundaries
 def set_background(breaks,epochs,facecolor='xkcd:olive'):
     it =iter(breaks)
     try:
@@ -52,6 +61,28 @@ def set_background(breaks,epochs,facecolor='xkcd:olive'):
         pass
     for epoch in epochs:
         axvspan(epoch,epoch+5,facecolor='xkcd:black')
+
+# create_parameters
+#
+# Extract parametrs from log file (variable number)
+
+def create_parameters(data):
+    product    = []
+
+    while True:
+        row = next(data)
+        key = row[0]
+        if key.isnumeric(): break
+        product.append((key,row[1]))
+
+    return product
+
+# display_parameters
+#
+# Display paramters from logfile - used in legend
+
+def display_parameters(params):
+    return ', '.join([f'{key}={value}' for key,value in params])
 
 if __name__ == '__main__':
     parser = ArgumentParser('Analyze log files from training/testing')
@@ -97,9 +128,7 @@ if __name__ == '__main__':
 
         with open(logfile_name) as logfile:
             data      = reader(logfile)
-            # image_set = extract(next(data))
-            lr        = float(extract(next(data)))
-            momentum  = float(extract(next(data)))
+            params    = create_parameters(data)
             losses    = []
             breaks    = []
             epochs    = []
@@ -125,18 +154,17 @@ if __name__ == '__main__':
             if not args.suppress:
                 plot (losses[args.skip+args.average:],
                       c     = Colours[i],
-                      label = f'lr={lr}, momentum={momentum}')
+                      label = display_parameters(params))
 
             plot([sum([losses[i] for i in range(j,j+args.average)])/args.average for j in range(args.skip,len(losses)-args.average)],
-                 c     = Colours[i],
+                 c         = Colours[i],
                  linestyle = 'dashed',
-                 label     = f'lr={lr}, momentum={momentum}' if args.suppress else f'{args.average}-point moving average')
+                 label     = display_parameters(params) if args.suppress else f'{args.average}-point moving average')
 
             i += 1
             if i==len(Colours):
                 i = 0
     ylabel('Training Error')
-    # title(f'Image set: {image_set}')
 
     legend()
     savefig (f'{args.savefile}.png' if len(splitext(args.savefile))==0 else args.savefile)
