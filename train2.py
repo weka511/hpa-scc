@@ -16,7 +16,7 @@
 #  To contact me, Simon Crase, email simon@greenweaves.nz
 
 from argparse            import ArgumentParser
-from numpy               import load, mean, argmax,argmin
+from numpy               import load, mean, argmax,argmin,argsort
 from os                  import walk
 from os.path             import exists, join
 from random              import sample, seed
@@ -139,7 +139,7 @@ def get_predictions(model,inputs):             #FIXME - need to handle multiplet
     predictions = [get_prediction(output[i].detach().numpy()) for i in range(len(output))]
     return [a for a,_ in predictions],[b for _,b in predictions]
 
-def get_threshold(Probabilities,Labels,nsteps=25):
+def get_threshold(Probabilities,Labels,nsteps=100):
     def match(call,label):
         return 0 if call==label else 1
     Scores = []
@@ -156,13 +156,45 @@ def get_threshold(Probabilities,Labels,nsteps=25):
         j+=1
     return 0.5* (index+j)/nsteps
 
+def get_score(probabilities=[],labels=[],threshold=0.5):
+    def match(call,label):
+        return 0 if call==label else 1
+    print (probabilities)
+    print (labels)
+    score = 0
+    cumulative_probability = 0
+    for i in range(len(probabilities)):
+        if cumulative_probability < threshold:
+            cumulative_probability+=probabilities[i]
+            if labels[i]==0:
+                score+=1
+        else:
+            if labels[i]==1:
+                score+=1
+    return score
+
+def get_threshold_mult(Probabilities,Labels,nsteps=100):
+    Scores = []
+    for i in range(1,nsteps):
+        threshold =i/nsteps
+        score     = 0
+        for probabilities,labels in zip(Probabilities,Labels):
+            indices = argsort(probabilities)[::-1]
+            score  += get_score(probabilities = [probabilities[i] for i in indices],
+                                labels        = [labels[i]        for i in indices],
+                                threshold     = threshold)
+        Scores.append(score)
+        return 0.2                # FIXME
+
 def get_test_score(threshold,Probabilities,Labels):
     def match(call,label):
         return 0 if call==label else 1
-
+    print (f'Threshold={threshold}')
     score = 0
     for probabilities,labels in zip(Probabilities,Labels):
         calls = [1 if p>threshold else 0 for p in probabilities]
+        # print (f'C: {calls}')
+        # print (f'L: {labels}')
         score += sum([match(call,label) for call,label in zip(calls,labels)])
     return score
 
@@ -197,7 +229,7 @@ def validate(data, checkpoint='chk', batch=8,frequency=10,n1=3,n2=3):
             for label in labels:
                 Test_Labels.append(label.detach().numpy())
 
-    threshold = get_threshold(Validation_Probabilities,Validation_Labels)
+    threshold = get_threshold_mult(Validation_Probabilities,Validation_Labels)
     get_test_score(threshold,Test_Probabilities,Test_Labels)
     # assert(len(Probabilities)==n1*batch),f'{len(Probabilities)},{n1*batch}'
     # assert(len(Labels)==n1*batch),f'{len(Labels)},{n1*batch}'
