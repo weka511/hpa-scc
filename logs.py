@@ -105,17 +105,21 @@ if __name__ == '__main__':
             epochs    = []
             seq0      = -1
             epoch0    = -1
-            for j,[epoch,seq,step,loss] in enumerate(data):
-                losses.append(float(loss))
-                seq = int(seq)
-                if seq != seq0:
-                    breaks.append(j)
-                    seq0 = seq
-                if epoch != epoch0:
-                    epochs.append(j)
-                    epoch0 = epoch
-            breaks.append(j)
-            set_background(breaks,epochs)
+            try:
+                for j,[epoch,seq,step,loss] in enumerate(data):
+                    losses.append(float(loss))
+                    seq = int(seq)
+                    if seq != seq0:
+                        breaks.append(j)
+                        seq0 = seq
+                    if epoch != epoch0:
+                        epochs.append(j)
+                        epoch0 = epoch
+            except ValueError:  # This can happen if training interrupted
+                pass
+            finally:
+                breaks.append(j)
+                set_background(breaks,epochs)
 
 
             if not args.suppress:
