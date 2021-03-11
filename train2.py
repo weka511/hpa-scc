@@ -22,10 +22,10 @@ from os.path             import exists, join
 from random              import sample, seed
 from torch               import unsqueeze, from_numpy, FloatTensor, save, load as reload
 from torch.nn            import Module, Conv3d, MaxPool3d, Linear, MSELoss, Dropout
-
 from torch.nn.functional import relu, softmax
 from torch.optim         import SGD
 from torch.utils.data    import Dataset, DataLoader
+from torchvision.models  import resnet18
 from utils               import Logger, Timer
 
 # Allowable actions for program
@@ -41,7 +41,7 @@ VALIDATE = 'validate'
 
 class CellDataset(Dataset):
     def __init__(self, file_name = 'dataset1.npz'):
-        npzfile = load(file_name,allow_pickle=True)
+        npzfile      = load(file_name,allow_pickle=True)
         self.Images  = npzfile['Images']
         self.Targets = npzfile['Targets']
 
@@ -53,7 +53,7 @@ class CellDataset(Dataset):
 
 # Net
 #
-# Simple connulutional neural network
+# Simple convolutional neural network
 
 class Net(Module):
     def __init__(self, dropouts):
@@ -89,6 +89,9 @@ class Net(Module):
         x = self.fc3(x)
         return softmax(x,dim=1)
 
+def create_model(name,dropouts=[0.5]):
+    if name == 'simple': return Net(dropouts=dropouts)
+    if name == 'resnet18': return resnet18()
 
 # train_epoch
 #
@@ -96,7 +99,7 @@ class Net(Module):
 
 def train_epoch(epoch,args,model,criterion,optimizer,logger=None):
     m  = 1
-    while exists(file_name:=f'{args.data}{m}.npz'):
+    while exists(file_name:=join(args.path,f'{args.data}{m}.npz')):
         print (f'Epoch {epoch}, file {file_name}')
         dataset   = CellDataset(file_name = file_name)
         loader    = DataLoader(dataset, batch_size=args.batch)
@@ -122,9 +125,10 @@ def train_epoch(epoch,args,model,criterion,optimizer,logger=None):
 # Restart from saved data
 
 def restart(args,model,criterion,optimizer):
-    print (f'Loading checkpoint: {args.restart}')
-    checkpoint = reload(args.restart)
-    print (f'Loaded checkpoint: {args.restart}')
+    ckeckpoint = join(args.chks,args.restart)
+    print (f'Loading checkpoint: {ckeckpoint}')
+    checkpoint = reload(ckeckpoint)
+    print (f'Loaded checkpoint: {ckeckpoint}')
     model.load_state_dict(checkpoint['model_state_dict'])
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
     epoch = checkpoint['epoch'] + 1
@@ -204,14 +208,22 @@ def get_test_score(threshold,Probabilities,Labels):
     return score
 
 
-def validate(data, checkpoint='chk', batch=8,frequency=10,n1=3,n2=3):
-    model       = Net()
-    Checkpoints = sorted([join(path,name) for path,_,names in walk('./') for name in names if name.startswith(checkpoint)])
+def validate(data,
+             path       = 'data',
+             model      = None,
+             checkpoint = 'chk',
+             chks       = 'chks',
+             batch      = 8,
+             frequency  = 10,
+             n1         = 3,
+             n2         = 3):
+
+    Checkpoints = sorted([join(path,name) for path,_,names in walk(chks) for name in names if name.startswith(checkpoint)])
     checkpoint  = reload(Checkpoints[-1])
     model.load_state_dict(checkpoint['model_state_dict'])
 
     model.eval()
-    dataset                  = CellDataset(file_name =  data)               #FIXME shuffle
+    dataset                  = CellDataset(file_name =  join(path,data))               #FIXME shuffle
     loader                   = DataLoader(dataset, batch_size = batch)
     Validation_Probabilities = []
     Validation_Labels        = []
@@ -263,6 +275,9 @@ if __name__=='__main__':
                         choices = [TRAIN, TEST, VALIDATE],
                         help    = 'Action: train network, validate angainst held out data, or predict from test dataset')
     parser.add_argument('data')
+    parser.add_argument('--path',
+                        default = 'data',
+                        help    = 'Folder for data files')
     parser.add_argument('--frequency',
                         default = 10,
                         type    = int,
@@ -296,6 +311,9 @@ if __name__=='__main__':
                         default = 8,
                         type    = int,
                         help    = 'Batch size for training/validating')
+    parser.add_argument('--chks',
+                        default = 'chks',
+                        help    = 'Folder for checkpoint files')
     parser.add_argument('--checkpoint',
                         default = 'chk',
                         help    = 'Base of name for checkpoint files')
@@ -311,9 +329,12 @@ if __name__=='__main__':
                         default = 42,
                         type    = int,
                         help    = 'Used to seed random number generator')
+    parser.add_argument('--model',
+                        default = 'simple',
+                        help    = 'The model to be trained')
     args          = parser.parse_args()
     seed(args.seed)
-    model         = Net(args.dropout)
+    model         = create_model(args.model,dropouts=args.dropout)
     criterion     = MSELoss()
     optimizer     = SGD(model.parameters(),
                         lr       = args.lr,
@@ -339,11 +360,14 @@ if __name__=='__main__':
                         'optimizer_state_dict' : optimizer.state_dict()#,
                         # 'loss'                 : loss
                     },
-                    f'{args.checkpoint}{epoch}.pth')
+                    f'{join(args.chks,args.restart)}{epoch}.pth')
     elif args.action == VALIDATE:
         validate(args.data,
+                 model      = model,
                  checkpoint = args.checkpoint,
                  batch      = args.batch,
-                 frequency  = args.frequency)
+                 frequency  = args.frequency,
+                 chks       = args.chks,
+                 path       = args.path)
     else:
         print ('Not implemeneted')
