@@ -114,10 +114,10 @@ if __name__ == '__main__':
                         default = 10,
                         type    = int,
                         help    = 'Plot moving average')
-    parser.add_argument('--suppress',
+    parser.add_argument('--detail',
                         default = False,
                         action  = 'store_true',
-                        help    = 'Show averages, but suppress details')
+                        help    = 'Show details, not just averages')
     args     = parser.parse_args()
     fig      = figure(figsize=(20,20))
     i        = 0
@@ -151,7 +151,7 @@ if __name__ == '__main__':
                 set_background(breaks,epochs)
 
 
-            if not args.suppress:
+            if args.detail:
                 plot (losses[args.skip+args.average:],
                       c     = Colours[i],
                       label = display_parameters(params))
@@ -159,7 +159,7 @@ if __name__ == '__main__':
             plot([sum([losses[i] for i in range(j,j+args.average)])/args.average for j in range(args.skip,len(losses)-args.average)],
                  c         = Colours[i],
                  linestyle = 'dashed',
-                 label     = display_parameters(params) if args.suppress else f'{args.average}-point moving average')
+                 label     = display_parameters(params) if not args.detail else f'{args.average}-point moving average')
 
             i += 1
             if i==len(Colours):
