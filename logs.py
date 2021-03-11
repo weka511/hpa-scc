@@ -121,11 +121,11 @@ if __name__ == '__main__':
                         help     = 'Colours for plots')
     args     = parser.parse_args()
     fig      = figure(figsize=(20,20))
-    i        = 0
-    for logfile_name in get_logfile_names(args.notall,args.logfiles,
+
+    for k,logfile_name in enumerate(get_logfile_names(args.notall,args.logfiles,
                                           prefix = args.prefix,
                                           suffix = args.suffix,
-                                          logdir = args.logdir):
+                                          logdir = args.logdir)):
 
         with open(logfile_name) as logfile:
             data      = reader(logfile)
@@ -153,17 +153,14 @@ if __name__ == '__main__':
 
             if args.detail:
                 plot (losses[args.skip+args.average:],
-                      c     = args.colours[i],
+                      c     = args.colours[k%len(args.colours)],
                       label = display_parameters(params))
 
             plot([sum([losses[i] for i in range(j,j+args.average)])/args.average for j in range(args.skip,len(losses)-args.average)],
-                 c         = Colours[i],
+                 c         = args.colours[k%len(args.colours)],
                  linestyle = 'dashed',
                  label     = display_parameters(params) if not args.detail else f'{args.average}-point moving average')
 
-            i += 1
-            if i==len(Colours):
-                i = 0
     ylabel('Training Error')
 
     legend()
