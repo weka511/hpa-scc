@@ -324,8 +324,12 @@ if __name__=='__main__':
                     Logger(prefix = args.prefix,
                            suffix = args.suffix,
                            logdir = args.logdir) as logger:
-            logger.log(f'lr,{args.lr}')
-            logger.log(f'momentum,{args.momentum}')
+            # Log any non-default arguments
+            for key,value in vars(args).items():
+                if key in ['action', 'prefix', 'suffix']: continue    #...except for these
+                if value != parser.get_default(key):
+                    logger.log (f'{key}, {value}')
+
             epoch0 = restart(args,model,criterion,optimizer) if args.restart!=None else 1
             for epoch in range(epoch0,epoch0+args.n):
                 train_epoch(epoch,args,model,criterion,optimizer,logger=logger)
