@@ -15,20 +15,11 @@
 #
 # Analyze log files from training/testing
 
-from argparse import   ArgumentParser
+from argparse          import   ArgumentParser
 from csv               import reader
 from matplotlib.pyplot import figure,plot,show,title,legend,ylabel,savefig,ylim,axvspan
 from os                import walk
 from os.path           import splitext, join
-
-Colours = ['xkcd:red',
-           'xkcd:forest green',
-           'xkcd:sky blue',
-           'xkcd:magenta',
-           'xkcd:yellow',
-           'xkcd:aqua',
-           'xkcd:terracotta'
-           ]
 
 
 # is_logfile
@@ -118,6 +109,16 @@ if __name__ == '__main__':
                         default = False,
                         action  = 'store_true',
                         help    = 'Show details, not just averages')
+    parser.add_argument('--colours',
+                        default  = ['xkcd:red',
+                                    'xkcd:forest green',
+                                    'xkcd:sky blue',
+                                    'xkcd:magenta',
+                                    'xkcd:yellow',
+                                    'xkcd:aqua',
+                                    'xkcd:terracotta'
+                                    ],
+                        help     = 'Colours for plots')
     args     = parser.parse_args()
     fig      = figure(figsize=(20,20))
     i        = 0
@@ -150,10 +151,9 @@ if __name__ == '__main__':
                 breaks.append(j)
                 set_background(breaks,epochs)
 
-
             if args.detail:
                 plot (losses[args.skip+args.average:],
-                      c     = Colours[i],
+                      c     = args.colours[i],
                       label = display_parameters(params))
 
             plot([sum([losses[i] for i in range(j,j+args.average)])/args.average for j in range(args.skip,len(losses)-args.average)],
