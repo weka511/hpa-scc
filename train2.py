@@ -25,7 +25,6 @@ from torch.nn            import Module, Conv3d, MaxPool3d, Linear, MSELoss, Drop
 from torch.nn.functional import relu, softmax
 from torch.optim         import SGD
 from torch.utils.data    import Dataset, DataLoader
-from torchvision.models  import resnet18
 from utils               import Logger, Timer
 
 # Allowable actions for program
@@ -89,9 +88,55 @@ class Net(Module):
         x = self.fc3(x)
         return softmax(x,dim=1)
 
+class Net3C(Module):
+    def __init__(self, dropouts):
+        super(Net3C, self).__init__()
+        self.conv1    = Conv3d(in_channels  = 4,
+                               out_channels = 6,
+                               kernel_size  = (1,5,5),
+                               stride       = 1,
+                               padding      = 1)
+        self.pool     = MaxPool3d(2)
+        self.conv2    = Conv3d(in_channels  = 6,
+                               out_channels = 16,
+                               kernel_size  = (1,5,5),
+                               stride       = 1,
+                               padding      = 1)
+        self.conv3    = Conv3d(in_channels  = 16,
+                               out_channels = 16,
+                               kernel_size  = (1,7,7),
+                               stride       = 1,
+                               padding      = 1)
+        self.fc1      = Linear(in_features  = 16 * 29 * 29,
+                               out_features = 1482)
+        self.dropout1 = Dropout(p           = dropouts[0],
+                                inplace     = False)
+        self.fc2      = Linear(in_features  = 1482,
+                               out_features = 164)
+        self.dropout2 = Dropout(p           = dropouts[-1],
+                                inplace     = False)
+        self.fc3      = Linear(in_features  = 164,
+                               out_features = 18)
+
+    def forward(self, x):
+        # print (x.shape)
+        x = self.pool(relu(self.conv1(x.float())))
+        # print (x.shape)
+        x = self.pool(relu(self.conv2(x)))
+        # print (x.shape)
+        x = self.pool(relu(self.conv3(x)))
+        # print (x.shape)
+        x = x.view(-1, 16 * 29 * 29)
+        # print (x.shape)
+        x = relu(self.dropout1(self.fc1(x)))
+        x = relu(self.dropout2(self.fc2(x)))
+        x = self.fc3(x)
+        return softmax(x,dim=1)
+
 def create_model(name,dropouts=[0.5]):
     if name == 'simple': return Net(dropouts=dropouts)
-    if name == 'resnet18': return resnet18()
+    if name == 'simple3': return Net3C(dropouts=dropouts)
+    raise Exception(f'Unknown model: {name}')
 
 # train_epoch
 #
@@ -360,7 +405,7 @@ if __name__=='__main__':
                         'optimizer_state_dict' : optimizer.state_dict()#,
                         # 'loss'                 : loss
                     },
-                    f'{join(args.chks,args.restart)}{epoch}.pth')
+                    f'{join(args.chks,args.checkpoint)}{epoch}.pth')
     elif args.action == VALIDATE:
         validate(args.data,
                  model      = model,
