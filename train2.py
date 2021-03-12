@@ -19,7 +19,7 @@ from argparse            import ArgumentParser
 from numpy               import load, mean, argmax,argmin,argsort
 from os                  import walk
 from os.path             import exists, join
-from random              import sample, seed
+from random              import seed, shuffle
 from torch               import unsqueeze, from_numpy, FloatTensor, save, load as reload
 from torch.nn            import Module, Conv3d, MaxPool3d, Linear, MSELoss, Dropout
 from torch.nn.functional import relu, softmax
@@ -43,12 +43,17 @@ class CellDataset(Dataset):
         npzfile      = load(file_name,allow_pickle=True)
         self.Images  = npzfile['Images']
         self.Targets = npzfile['Targets']
+        self.Indices = list(range(self.Images.shape[0]))
+        shuffle(self.Indices)
 
     def __len__(self):
         return self.Images.shape[0]
 
     def __getitem__(self, idx):
-        return unsqueeze(from_numpy(self.Images[idx]),1), FloatTensor([1 if i in self.Targets[idx] else 0 for i in range(18)])
+        index  = self.Indices[idx]
+        Inputs = unsqueeze(from_numpy(self.Images[index]),1)
+        Labels = FloatTensor([1 if i in self.Targets[index] else 0 for i in range(18)])
+        return Inputs, Labels
 
 # Net
 #
