@@ -154,8 +154,13 @@ def create_model(name,dropouts=None):
 # Train for one epoch. Iterates through all slices of data
 
 def train_epoch(epoch,args,model,criterion,optimizer,logger=None):
-    m  = 1
+    m    = 1
+    seqs = []
     while exists(file_name:=join(args.path,f'{args.data}{m}.npz')):
+        seqs.append(file_name)
+        m+= 1
+    shuffle(seqs)
+    for epoch,file_name in enumerate(seqs):
         print (f'Epoch {epoch}, file {file_name}')
         dataset   = CellDataset(file_name = file_name)
         loader    = DataLoader(dataset, batch_size=args.batch)
@@ -174,7 +179,7 @@ def train_epoch(epoch,args,model,criterion,optimizer,logger=None):
                     mean_loss = mean(losses)
                     losses.clear()
                     logger.log(f'{epoch}, {m},  {i}, {mean_loss}')
-        m+= 1
+
 
 # restart
 #
