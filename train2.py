@@ -57,6 +57,7 @@ class CellDataset(Dataset):
 class Net(Module):
     def __init__(self, dropouts):
         super(Net, self).__init__()
+        self.dropouts = dropouts!=None
         self.conv1    = Conv3d(in_channels  = 4,
                                out_channels = 6,
                                kernel_size  = (1,5,5),
@@ -70,12 +71,14 @@ class Net(Module):
                                padding      = 1)
         self.fc1      = Linear(in_features  = 16 * 62 * 62,
                                out_features = 120)
-        self.dropout1 = Dropout(p           = dropouts[0],
-                                inplace     = False)
+        if self.dropouts:
+            self.dropout1 = Dropout(p           = dropouts[0],
+                                    inplace     = False)
         self.fc2      = Linear(in_features  = 120,
                                out_features = 84)
-        self.dropout2 = Dropout(p           = dropouts[-1],
-                                inplace     = False)
+        if self.dropouts:
+            self.dropout2 = Dropout(p           = dropouts[-1],
+                                    inplace     = False)
         self.fc3      = Linear(in_features  = 84,
                                out_features = 18)
 
@@ -83,14 +86,15 @@ class Net(Module):
         x = self.pool(relu(self.conv1(x.float())))
         x = self.pool(relu(self.conv2(x)))
         x = x.view(-1, 16 * 62 * 62)
-        x = relu(self.dropout1(self.fc1(x)))
-        x = relu(self.dropout2(self.fc2(x)))
+        x = relu(self.dropout1(self.fc1(x)) if self.dropouts else self.fc1(x))
+        x = relu(self.dropout2(self.fc2(x)) if self.dropouts else self.fc2(x))
         x = self.fc3(x)
         return softmax(x,dim=1)
 
 class Net3C(Module):
     def __init__(self, dropouts):
         super(Net3C, self).__init__()
+        self.dropouts = dropouts!=None
         self.conv1    = Conv3d(in_channels  = 4,
                                out_channels = 6,
                                kernel_size  = (1,5,5),
@@ -109,12 +113,14 @@ class Net3C(Module):
                                padding      = 1)
         self.fc1      = Linear(in_features  = 16 * 29 * 29,
                                out_features = 1482)
-        self.dropout1 = Dropout(p           = dropouts[0],
-                                inplace     = False)
+        if self.dropouts:
+            self.dropout1 = Dropout(p           = dropouts[0],
+                                    inplace     = False)
         self.fc2      = Linear(in_features  = 1482,
                                out_features = 164)
-        self.dropout2 = Dropout(p           = dropouts[-1],
-                                inplace     = False)
+        if self.dropouts:
+            self.dropout2 = Dropout(p           = dropouts[-1],
+                                    inplace     = False)
         self.fc3      = Linear(in_features  = 164,
                                out_features = 18)
 
@@ -128,12 +134,12 @@ class Net3C(Module):
         # print (x.shape)
         x = x.view(-1, 16 * 29 * 29)
         # print (x.shape)
-        x = relu(self.dropout1(self.fc1(x)))
-        x = relu(self.dropout2(self.fc2(x)))
+        x = relu(self.dropout1(self.fc1(x)) if self.dropouts else self.fc1(x))
+        x = relu(self.dropout2(self.fc2(x)) if self.dropouts else self.fc2(x))
         x = self.fc3(x)
         return softmax(x,dim=1)
 
-def create_model(name,dropouts=[0.5]):
+def create_model(name,dropouts=None):
     if name == 'simple': return Net(dropouts=dropouts)
     if name == 'simple3': return Net3C(dropouts=dropouts)
     raise Exception(f'Unknown model: {name}')
@@ -366,7 +372,7 @@ if __name__=='__main__':
                         default = None,
                         help   = 'Restart from specified checkpoint')
     parser.add_argument('--dropout',
-                        default = [0.5],
+                        default = None,
                         type    = float,
                         nargs   = '+',
                         help    = 'Parameters for dropout layers')
