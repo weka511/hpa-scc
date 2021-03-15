@@ -17,10 +17,13 @@
 
 # Code snarfed from https://towardsdatascience.com/visualizing-convolution-neural-networks-using-pytorch-3dfa8443e74e
 
-from matplotlib.pyplot import figure, axis, imshow, title, show, tight_layout, savefig
-from numpy             import asarray, multiply, transpose, array, minimum, float32, maximum, mean, std
-from torch.nn          import  Conv2d
-import torchvision.models as models
+from argparse           import ArgumentParser
+from matplotlib.pyplot  import figure, axis, imshow, title, show, tight_layout, savefig
+from numpy              import asarray, multiply, transpose, array, minimum, float32, maximum, mean, std
+from torch.nn           import Module, Conv3d, Conv2d
+from train2             import Net3C
+from torchvision.models import alexnet
+
 def imshow(img, title):
 
     """Custom function to display the image using matplotlib"""
@@ -89,25 +92,14 @@ def plot_filters_single_channel(t):
     plt.show()
 
 def plot_filters_multi_channel(t):
-
-    #get the number of kernals
     num_kernels = t.shape[0]
-
-    #define number of columns for subplots
     num_cols = 12
-    #rows = num of kernels
     num_rows = num_kernels
-
-    #set the figure size
     fig = figure(figsize=(num_cols,num_rows))
 
-    #looping through all the kernels
     for i in range(t.shape[0]):
         ax1 = fig.add_subplot(num_rows,num_cols,i+1)
-
-        #for each kernel, we convert the tensor to numpy
         npimg = array(t[i].numpy(), float32)
-        #standardize the numpy image
         npimg = (npimg - mean(npimg)) / std(npimg)
         npimg = minimum(1, maximum(0, (npimg + 0.5)))
         npimg = npimg.transpose((1, 2, 0))
@@ -119,6 +111,30 @@ def plot_filters_multi_channel(t):
 
     savefig('myimage.png', dpi=100)
     tight_layout()
+    show()
+
+def plot_filters_multi_channel3(t):
+    num_kernels = t.shape[0]
+    num_cols = 12
+    num_rows = num_kernels
+    fig = figure(figsize=(num_cols,num_rows))
+    for i in range(t.shape[0]):
+        ax1 = fig.add_subplot(num_rows,num_cols,i+1)
+        npimg = array(t[i].numpy(), float32)
+        npimg = (npimg - mean(npimg)) / std(npimg)
+        npimg = minimum(1, maximum(0, (npimg + 0.5)))
+        a,b,nx,ny = npimg.shape
+        npimg2 = npimg[0,0,:,:]
+
+        # npimg = npimg.transpose((1, 2, 0))
+        ax1.imshow(npimg2)
+        ax1.axis('off')
+        # ax1.set_title(str(i))
+        ax1.set_xticklabels([])
+        ax1.set_yticklabels([])
+
+    savefig('myimage.png', dpi=100)
+    # tight_layout()
     show()
 
 def plot_weights(model, layer_num, single_channel = True, collated = False):
@@ -140,10 +156,15 @@ def plot_weights(model, layer_num, single_channel = True, collated = False):
             else:
                 print("Can only plot weights with three channels with single channel = False")
 
+    elif isinstance(layer, Conv3d):
+        weight_tensor = model.features[layer_num].weight.data
+        plot_filters_multi_channel3(weight_tensor)
     else:
         print("Can only visualize layers which are convolutional")
 
+parser = ArgumentParser('Visualize Network')
+parser.add_argument('--test', default=False, action='store_true')
+args = parser.parse_args()
 
-alexnet = models.alexnet(pretrained=True)
-
-plot_weights(alexnet, 0, single_channel = False)
+net = Net3C([0,0,0]) if args.test else alexnet(pretrained=True)
+plot_weights(net, 0, single_channel = False)

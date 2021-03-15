@@ -128,6 +128,7 @@ class Net3C(Module):
                                     inplace     = False)
         self.fc3      = Linear(in_features  = 164,
                                out_features = 18)
+        self.features = [self.conv1, self.conv2, self.conv3]
 
     def forward(self, x):
         # print (x.shape)
