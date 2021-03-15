@@ -17,32 +17,12 @@
 
 
 from argparse           import ArgumentParser
-from matplotlib.pyplot  import figure, axis, imshow, title, show, tight_layout, savefig
+from matplotlib.pyplot  import figure, axis, imshow, title, show, tight_layout, savefig,suptitle
 from numpy              import asarray, multiply, transpose, array, minimum, float32, maximum, mean, std
 from os.path            import join
 from torch              import load
 from torch.nn           import Module, Conv3d, Conv2d
 from train2             import Net3C
-
-# imshow
-#
-# Code snarfed from https://towardsdatascience.com/visualizing-convolution-neural-networks-using-pytorch-3dfa8443e74e
-def imshow(img, title):
-
-     #define std correction to be made
-    std_correction = asarray([0.229, 0.224, 0.225]).reshape(3, 1, 1)
-
-    #define mean correction to be made
-    mean_correction = asarray([0.485, 0.456, 0.406]).reshape(3, 1, 1)
-
-    #convert the tensor img to numpy img and de normalize
-    npimg = multiply(img.numpy(), std_correction) + mean_correction
-
-
-    figure(figsize = (batch_size * 4, 4))
-    axis("off")
-    imshow(transpose(npimg, (1, 2, 0)))
-    title(title)
 
 
 # plot_filters_single_channel_big
@@ -115,7 +95,7 @@ def plot_filters_multi_channel(t):
         npimg = npimg.transpose((1, 2, 0))
         ax1.imshow(npimg)
         ax1.axis('off')
-        # ax1.set_title(str(i))
+        ax1.set_title(str(i))
         ax1.set_xticklabels([])
         ax1.set_yticklabels([])
 
@@ -125,32 +105,35 @@ def plot_filters_multi_channel(t):
 # plot_filters_multi_channel3
 
 # Code snarfed from https://towardsdatascience.com/visualizing-convolution-neural-networks-using-pytorch-3dfa8443e74e
-def plot_filters_multi_channel3(t):
-    num_kernels = t.shape[0]
-    num_cols = 12
-    num_rows = num_kernels
-    fig = figure(figsize=(num_cols,num_rows))
-    for i in range(t.shape[0]):
-        ax1 = fig.add_subplot(num_rows,num_cols,i+1)
-        npimg = array(t[i].numpy(), float32)
-        npimg = (npimg - mean(npimg)) / std(npimg)
-        npimg = minimum(1, maximum(0, (npimg + 0.5)))
+def plot_filters_multi_channel3(t,num_cols = 12,heading=''):
+    ts = t.shape # 20,4,1,5,5
+    num_kernels     = t.shape[0]
+    num_in_channels = t.shape[2]
+    num_groups      = num_kernels//num_cols
+    if num_groups * num_cols < num_kernels:
+        num_groups +=1
+    num_rows = num_groups
+    fig      = figure(figsize=(num_cols,num_rows))
+    for i in range(num_kernels):
+        ax1       = fig.add_subplot(num_rows,num_cols,i+1)
+        npimg     = array(t[i].numpy(), float32)
+        npimg     = (npimg - mean(npimg)) / std(npimg)
+        npimg     = minimum(1, maximum(0, (npimg + 0.5)))
         a,b,nx,ny = npimg.shape
-        npimg2 = npimg[0,0,:,:]
+        npimg2    = npimg[0,0,:,:]
 
-        # npimg = npimg.transpose((1, 2, 0))
         ax1.imshow(npimg2)
         ax1.axis('off')
-        # ax1.set_title(str(i))
+        ax1.set_title(str(i))
         ax1.set_xticklabels([])
         ax1.set_yticklabels([])
-
-    # tight_layout()
+    suptitle(heading)
+    tight_layout()
 
 # plot_weights
 # Code snarfed from https://towardsdatascience.com/visualizing-convolution-neural-networks-using-pytorch-3dfa8443e74e
 
-def plot_weights(model, layer_num, single_channel = True, collated = False):
+def plot_weights(model, layer_num, single_channel = True, collated = False, heading=''):
 
     layer = model.features[layer_num]
 
@@ -171,7 +154,7 @@ def plot_weights(model, layer_num, single_channel = True, collated = False):
 
     elif isinstance(layer, Conv3d):
         weight_tensor = model.features[layer_num].weight.data
-        plot_filters_multi_channel3(weight_tensor)
+        plot_filters_multi_channel3(weight_tensor,heading=heading)
     else:
         print("Can only visualize layers which are convolutional")
 
@@ -198,9 +181,12 @@ if __name__=='__main__':
                         help    = 'Layer to plot')
     args = parser.parse_args()
 
-    plot_weights(load_net(join(args.chks,f'{args.checkpoint}.pth')),
+    plot_weights(
+        load_net(
+            join(args.chks,f'{args.checkpoint}.pth')),
                  args.layer,
-                 single_channel = False)
+                 single_channel = False,
+                 heading=f'Filters for {args.checkpoint}, layer={args.layer}')
 
     savefig(f'{args.checkpoint}-{args.layer}.png' if args.save==None else f'{args.save.png}')
     show()
