@@ -187,14 +187,13 @@ def train_epoch(epoch,args,model,criterion,optimizer,logger=None):
 # Restart from saved data
 
 def restart(args,model,criterion,optimizer):
-    ckeckpoint = join(args.chks,args.restart)
-    print (f'Loading checkpoint: {ckeckpoint}')
-    checkpoint = reload(ckeckpoint)
-    print (f'Loaded checkpoint: {ckeckpoint}')
+    checkpoint_file_name = join(args.chks,args.restart)
+    print (f'Loading checkpoint: {checkpoint_file_name}')
+    checkpoint = reload(checkpoint_file_name)
+    print (f'Loaded checkpoint: {checkpoint_file_name}')
     model.load_state_dict(checkpoint['model_state_dict'])
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
     epoch = checkpoint['epoch'] + 1
-    # loss  = checkpoint['loss']
     model.train()
     return epoch
 
