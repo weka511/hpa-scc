@@ -13,6 +13,7 @@
 |train2.py|Build and train neural network using sliced data|
 |utils.py|Utility classes: Timer and Log|
 |visualize.py|Visualize image files|
+|vizcnn.py|Visualize CNN filters|
 
 ## Documentation
 
