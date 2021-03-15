@@ -31,8 +31,12 @@ from os                         import environ
 from os.path                    import join,basename
 from pycocotools                import _mask as coco_mask
 from random                     import sample
-from time                       import time
+from utils                      import Timer
 from zlib                       import compress, Z_BEST_COMPRESSION
+
+# create_descriptions
+#
+# Read descriptions of classes
 
 def create_descriptions(file_name='descriptions.csv'):
     with open(file_name) as description_file:
@@ -102,134 +106,138 @@ def segment_image(img_cell,binary_mask,class_id):
     return img_cell
 
 if __name__=='__main__':
-    start  = time()
-    parser = ArgumentParser('Segment HPA data using HPA Cell segmenter')
-    parser.add_argument('--path',
-                        default = join(environ['DATA'],'hpa-scc'),
-                        help    = 'Path to data')
-    parser.add_argument('--image_set',
-                        default = 'train512x512',
-                        help    = 'Identified subset of data-- e.g. train512x512')
-    parser.add_argument('--figs',
-                        default = './figs',
-                        help    = 'Identifies where to store plots')
-    parser.add_argument('--masks',
-                        default = './masks',
-                        help    = 'Identifies where to store ascii masks')
-    parser.add_argument('--sample',
-                        type    = int,
-                        # default = 3,
-                        help    = 'Specifies number of images to be sampled at random and processed')
-    parser.add_argument('--segments',
-                        default = './segments',
-                        help    = 'Identifies where to store plots')
-    parser.add_argument('--NuclearModel',
-                        default = './nuclei-model.pth',
-                        help    = 'Identifies where to store nuclear models')
-    parser.add_argument('--CellModel',
-                        default = './cell-model.pth',
-                        help    = 'Identifies where to store cell models')
-    parser.add_argument('--show',
-                        default = False,
-                        action  = 'store_true',
-                        help    = 'Display plots')
-    parser.add_argument('--descriptions',
-                        default='descriptions.csv')
-    parser.add_argument('--classes',
-                        default = ['all'],
-                        nargs   = '+',
-                        help    = 'List of classes to be processed')
-    parser.add_argument('--multiplets',
-                        default = False,
-                        action  = 'store_true',
-                        help    = 'Allow multiple assignments')
-    args         = parser.parse_args()
-    Descriptions = create_descriptions(file_name=args.descriptions)
-    Expectations = read_training_expectations() # FIXME - add parameters
+    with Timer():
+        parser = ArgumentParser('Segment HPA data using HPA Cell segmenter')
+        parser.add_argument('--path',
+                            default = join(environ['DATA'],'hpa-scc'),
+                            help    = 'Path to data')
+        parser.add_argument('--image_set',
+                            default = 'train512x512',
+                            help    = 'Identified subset of data-- e.g. train512x512')
+        parser.add_argument('--figs',
+                            default = './figs',
+                            help    = 'Identifies where to store plots')
+        parser.add_argument('--masks',
+                            default = './masks',
+                            help    = 'Identifies where to store ascii masks')
+        parser.add_argument('--sample',
+                            type    = int,
+                            # default = 3,
+                            help    = 'Specifies number of images to be sampled at random and processed')
+        parser.add_argument('--segments',
+                            default = './segments',
+                            help    = 'Identifies where to store plots')
+        parser.add_argument('--NuclearModel',
+                            default = './nuclei-model.pth',
+                            help    = 'Identifies where to store nuclear models')
+        parser.add_argument('--CellModel',
+                            default = './cell-model.pth',
+                            help    = 'Identifies where to store cell models')
+        parser.add_argument('--show',
+                            default = False,
+                            action  = 'store_true',
+                            help    = 'Display plots')
+        parser.add_argument('--descriptions',
+                            default='descriptions.csv')
+        parser.add_argument('--classes',
+                            default = ['all'],
+                            nargs   = '+',
+                            help    = 'List of classes to be processed')
+        parser.add_argument('--multiplets',
+                            default = False,
+                            action  = 'store_true',
+                            help    = 'Allow multiple assignments')
+        args         = parser.parse_args()
+        Descriptions = create_descriptions(file_name=args.descriptions)
+        Expectations = read_training_expectations() # FIXME - add parameters
 
-    if not args.multiplets:
-        Expectations = {file_name:class_names for file_name,class_names in Expectations.items() if len(class_names)==1}
-    if args.classes[0]!='all':   #FIXME
-        classes = [int(c) for c in args.classes]
-        Expectations = {file_name:class_names for file_name,class_names in Expectations.items() if class_names[0] in classes}
+        if not args.multiplets:
+            Expectations = {file_name:class_names for file_name,class_names in Expectations.items() if len(class_names)==1}
+        if args.classes[0]!='all':   #FIXME
+            classes = [int(c) for c in args.classes]
+            Expectations = {file_name:class_names for file_name,class_names in Expectations.items() if class_names[0] in classes}
 
-    file_list   = list(Expectations.keys())
+        file_list   = list(Expectations.keys())
 
-    if args.sample!=None:
-        file_list = sample(file_list,args.sample)
-        print (f'Processing {args.sample} slides')
-    else:
-        print (f'Processing {len(file_list)} slides')
+        if args.sample!=None:
+            file_list = sample(file_list,args.sample)
+            print (f'Processing {args.sample} slides')
+        else:
+            print (f'Processing {len(file_list)} slides')
 
-    image_dir   = join(args.path,args.image_set)
-    mt          = [join(image_dir,f'{name}_red.png') for name in file_list]
-    er          = [f.replace('red', 'yellow') for f in mt]
-    nu          = [f.replace('red', 'blue') for f in mt]
-    images      = [mt, er, nu]
+        image_dir   = join(args.path,args.image_set)
+        mt          = [join(image_dir,f'{name}_red.png') for name in file_list]
+        er          = [f.replace('red', 'yellow') for f in mt]
+        nu          = [f.replace('red', 'blue') for f in mt]
+        images      = [mt, er, nu]
 
-    segmentator = CellSegmentator(
-        nuclei_model        = args.NuclearModel,
-        cell_model          = args.CellModel,
-        scale_factor        = 0.25,
-        device              = "cpu",
-        padding             = False,
-        multi_channel_model = True,
-    )
+        segmentator = CellSegmentator(
+            nuclei_model        = args.NuclearModel,
+            cell_model          = args.CellModel,
+            scale_factor        = 0.25,
+            device              = "cpu",
+            padding             = False,
+            multi_channel_model = True,
+        )
 
-    # For nuclei
-    nuc_segmentations = segmentator.pred_nuclei(nu)
+        # For nuclei
+        nuc_segmentations = segmentator.pred_nuclei(nu)
 
-    # For full cells
-    cell_segmentations = segmentator.pred_cells(images)
+        # For full cells
+        cell_segmentations = segmentator.pred_cells(images)
 
-    # post-processing
-    for i, pred in enumerate(cell_segmentations):
-        nuclei_mask, cell_mask = label_cell(nuc_segmentations[i], cell_segmentations[i])
-        FOVname                = basename(mt[i]).replace('red','predictedmask')
-        print (FOVname)
-        imwrite(join(args.segments,FOVname), cell_mask)
-        fig            = figure(figsize=(19,10))
-        microtubule    = imread(mt[i])
-        endoplasmicrec = imread(er[i])
-        nuclei         = imread(nu[i])
-        img            = dstack((microtubule, endoplasmicrec, nuclei))
-        imshow(img)
-        imshow(cell_mask, alpha=0.5)
-        classes = Expectations[file_list[i]]
-        class_descriptions = [Descriptions[class_id] for class_id in classes]
-        # FIXME - this doesn't handle multiple classes
-        title(f'{file_list[i]} {classes[0]} {class_descriptions[0]}')
-        axis('off')
-        savefig(join(args.figs,basename(mt[i]).replace('red','full')))
-        if not args.show:
-            close(fig)
-        binary_mask        = label_cell(nuc_segmentations[i], cell_segmentations[i])[1].astype(uint8)
-        number_of_segments = binary_mask.max()+1
-        fig                = figure(figsize=(20,20))
-        m1                 = isqrt(number_of_segments)
-        m2                 = number_of_segments // m1 + 1
-        axs                = fig.subplots(m1, m2,squeeze=False)
-        k                  = 0
-        l                  = 0
-        with open(join(args.masks,basename(mt[i]).replace('red','full').replace('png','npy')),'wb') as binary_mask_file:
-            save(binary_mask_file,binary_mask)
-        with open(join(args.masks,basename(mt[i]).replace('red','full').replace('png','txt')),'w') as ascii_mask_file:
-            for j in range(1,binary_mask.max()+1):
-                axs[k][l].imshow(segment_image(dstack((microtubule, endoplasmicrec, nuclei)),binary_mask,j))
-                ascii_mask = binary_mask_to_ascii(binary_mask,j)
-                ascii_mask_file.write(f'{j}\n')
-                ascii_mask_file.write(f'{ascii_mask}\n')
-                l += 1
-                if l>=len(axs[k]):
-                    k += 1
-                    l  = 0
-            savefig(join(args.figs,basename(mt[i]).replace('red','segmented')))
-        if not args.show:
-            close(fig)
+        # post-processing
+        for i, pred in enumerate(cell_segmentations):
+            nuclei_mask, cell_mask = label_cell(nuc_segmentations[i], cell_segmentations[i])
+            FOVname                = basename(mt[i]).replace('red','predictedmask')
+            print (FOVname)
+            imwrite(join(args.segments,FOVname), cell_mask)
+            fig            = figure(figsize=(19,10))
+            microtubule    = imread(mt[i])
+            endoplasmicrec = imread(er[i])
+            nuclei         = imread(nu[i])
+            img            = dstack((microtubule, endoplasmicrec, nuclei))
+            imshow(img)
+            imshow(cell_mask, alpha=0.5)
+            classes = Expectations[file_list[i]]
+            class_descriptions = [Descriptions[class_id] for class_id in classes]
 
-    elapsed = time() - start
-    minutes = int(elapsed/60)
-    seconds = elapsed - 60*minutes
-    print (f'Elapsed Time {minutes} m {seconds:.2f} s')
+            title(f'{file_list[i]} {classes[0]} {class_descriptions[0]}') # # FIXME - this doesn't handle multiple classes
+            axis('off')
+            savefig(join(args.figs,basename(mt[i]).replace('red','full')))
+            if not args.show:
+                close(fig)
+            binary_mask        = label_cell(nuc_segmentations[i], cell_segmentations[i])[1].astype(uint8)
+            number_of_segments = binary_mask.max()+1
+            fig                = figure(figsize=(20,20))
+            m1                 = isqrt(number_of_segments)
+            m2                 = number_of_segments // m1 + 1
+            axs                = fig.subplots(m1, m2,squeeze=False)
+
+            for k in range(m1):
+                for l in range(m2):
+                    axs[k][l].axis('off')
+                    axs[k][l].set_xticklabels([])
+                    axs[k][l].set_yticklabels([])
+            k = 0
+            l = 0
+            with open(join(args.masks,basename(mt[i]).replace('red','full').replace('png','npy')),'wb') as binary_mask_file:
+                save(binary_mask_file,binary_mask)
+            with open(join(args.masks,basename(mt[i]).replace('red','full').replace('png','txt')),'w') as ascii_mask_file:
+                for j in range(1,binary_mask.max()+1):
+                    axs[k][l].imshow(segment_image(dstack((microtubule, endoplasmicrec, nuclei)),binary_mask,j))
+                    ascii_mask = binary_mask_to_ascii(binary_mask,j)
+                    ascii_mask_file.write(f'{j}\n')
+                    ascii_mask_file.write(f'{ascii_mask}\n')
+                    l += 1
+                    if l>=len(axs[k]):
+                        k += 1
+                        l  = 0
+
+                suptitle(f'{file_list[i]} {classes[0]} {class_descriptions[0]}') # FIXME - this doesn't handle multiple classes
+                savefig(join(args.figs,basename(mt[i]).replace('red','segmented')))
+            if not args.show:
+                close(fig)
+
     if args.show:
         show()
