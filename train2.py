@@ -101,17 +101,17 @@ class Net3C(Module):
         super(Net3C, self).__init__()
         self.dropouts = dropouts!=None
         self.conv1    = Conv3d(in_channels  = 4,
-                               out_channels = 6,
+                               out_channels = 20,
                                kernel_size  = (1,5,5),
                                stride       = 1,
                                padding      = 1)
         self.pool     = MaxPool3d(2)
-        self.conv2    = Conv3d(in_channels  = 6,
-                               out_channels = 16,
+        self.conv2    = Conv3d(in_channels  = 20,
+                               out_channels = 25,
                                kernel_size  = (1,5,5),
                                stride       = 1,
                                padding      = 1)
-        self.conv3    = Conv3d(in_channels  = 16,
+        self.conv3    = Conv3d(in_channels  = 25,
                                out_channels = 16,
                                kernel_size  = (1,7,7),
                                stride       = 1,
@@ -160,7 +160,7 @@ def train_epoch(epoch,args,model,criterion,optimizer,logger=None):
         seqs.append(file_name)
         m+= 1
     shuffle(seqs)
-    for epoch,file_name in enumerate(seqs):
+    for file_name in seqs:
         print (f'Epoch {epoch}, file {file_name}')
         dataset   = CellDataset(file_name = file_name)
         loader    = DataLoader(dataset, batch_size=args.batch)
