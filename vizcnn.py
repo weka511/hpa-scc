@@ -15,20 +15,21 @@
 #
 #  To contact me, Simon Crase, email simon@greenweaves.nz
 
-# Code snarfed from https://towardsdatascience.com/visualizing-convolution-neural-networks-using-pytorch-3dfa8443e74e
 
 from argparse           import ArgumentParser
 from matplotlib.pyplot  import figure, axis, imshow, title, show, tight_layout, savefig
 from numpy              import asarray, multiply, transpose, array, minimum, float32, maximum, mean, std
+from os.path            import join
+from torch              import load
 from torch.nn           import Module, Conv3d, Conv2d
 from train2             import Net3C
-from torchvision.models import alexnet
 
+# imshow
+#
+# Code snarfed from https://towardsdatascience.com/visualizing-convolution-neural-networks-using-pytorch-3dfa8443e74e
 def imshow(img, title):
 
-    """Custom function to display the image using matplotlib"""
-
-    #define std correction to be made
+     #define std correction to be made
     std_correction = asarray([0.229, 0.224, 0.225]).reshape(3, 1, 1)
 
     #define mean correction to be made
@@ -37,13 +38,16 @@ def imshow(img, title):
     #convert the tensor img to numpy img and de normalize
     npimg = multiply(img.numpy(), std_correction) + mean_correction
 
-    #plot the numpy image
+
     figure(figsize = (batch_size * 4, 4))
     axis("off")
     imshow(transpose(npimg, (1, 2, 0)))
     title(title)
-    show()
 
+
+# plot_filters_single_channel_big
+#
+# Code snarfed from https://towardsdatascience.com/visualizing-convolution-neural-networks-using-pytorch-3dfa8443e74e
 def plot_filters_single_channel_big(t):
 
     #setting the rows and columns
@@ -60,6 +64,9 @@ def plot_filters_single_channel_big(t):
     fig, ax = plt.subplots(figsize=(ncols/10, nrows/200))
     imgplot = sns.heatmap(npimg, xticklabels=False, yticklabels=False, cmap='gray', ax=ax, cbar=False)
 
+# plot_filters_single_channel
+#
+# Code snarfed from https://towardsdatascience.com/visualizing-convolution-neural-networks-using-pytorch-3dfa8443e74e
 
 def plot_filters_single_channel(t):
 
@@ -89,8 +96,11 @@ def plot_filters_single_channel(t):
             ax1.set_yticklabels([])
 
     plt.tight_layout()
-    plt.show()
 
+
+# plot_filters_multi_channel
+#
+# Code snarfed from https://towardsdatascience.com/visualizing-convolution-neural-networks-using-pytorch-3dfa8443e74e
 def plot_filters_multi_channel(t):
     num_kernels = t.shape[0]
     num_cols = 12
@@ -109,10 +119,12 @@ def plot_filters_multi_channel(t):
         ax1.set_xticklabels([])
         ax1.set_yticklabels([])
 
-    savefig('myimage.png', dpi=100)
     tight_layout()
     show()
 
+# plot_filters_multi_channel3
+
+# Code snarfed from https://towardsdatascience.com/visualizing-convolution-neural-networks-using-pytorch-3dfa8443e74e
 def plot_filters_multi_channel3(t):
     num_kernels = t.shape[0]
     num_cols = 12
@@ -133,9 +145,10 @@ def plot_filters_multi_channel3(t):
         ax1.set_xticklabels([])
         ax1.set_yticklabels([])
 
-    savefig('myimage.png', dpi=100)
     # tight_layout()
-    show()
+
+# plot_weights
+# Code snarfed from https://towardsdatascience.com/visualizing-convolution-neural-networks-using-pytorch-3dfa8443e74e
 
 def plot_weights(model, layer_num, single_channel = True, collated = False):
 
@@ -162,9 +175,32 @@ def plot_weights(model, layer_num, single_channel = True, collated = False):
     else:
         print("Can only visualize layers which are convolutional")
 
-parser = ArgumentParser('Visualize Network')
-parser.add_argument('--test', default=False, action='store_true')
-args = parser.parse_args()
+def load_net(checkpoint_file_name):
+    model      = Net3C([0,0,0])
+    checkpoint = load(checkpoint_file_name)
+    model.load_state_dict(checkpoint['model_state_dict'])
+    return model
 
-net = Net3C([0,0,0]) if args.test else alexnet(pretrained=True)
-plot_weights(net, 0, single_channel = False)
+if __name__=='__main__':
+    parser = ArgumentParser('Visualize Network')
+    parser.add_argument('--chks',
+                        default = 'chks',
+                        help    = 'Folder for checkpoint files')
+    parser.add_argument('--checkpoint',
+                        default = 'monday9',
+                        help    = 'Base of name for checkpoint files')
+    parser.add_argument('--save',
+                        default = None,
+                        help    = 'Base of name for checkpoint files')
+    parser.add_argument('--layer',
+                        default = 0,
+                        type    = int,
+                        help    = 'Layer to plot')
+    args = parser.parse_args()
+
+    plot_weights(load_net(join(args.chks,f'{args.checkpoint}.pth')),
+                 args.layer,
+                 single_channel = False)
+
+    savefig(f'{args.checkpoint}-{args.layer}.png' if args.save==None else f'{args.save.png}')
+    show()
