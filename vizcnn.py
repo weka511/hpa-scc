@@ -20,6 +20,7 @@ from argparse           import ArgumentParser
 from matplotlib.pyplot  import figure, axis, imshow, title, show, tight_layout, savefig,suptitle
 from numpy              import asarray, multiply, transpose, array, minimum, float32, maximum, mean, std
 from os.path            import join
+from seaborn            import heatmap
 from torch              import load
 from torch.nn           import Module, Conv3d, Conv2d
 from train2             import Net3C
@@ -103,35 +104,45 @@ def plot_filters_multi_channel(t):
     show()
 
 # plot_filters_multi_channel3
-
+#
 # Code snarfed from https://towardsdatascience.com/visualizing-convolution-neural-networks-using-pytorch-3dfa8443e74e
+# and adapted
+
 def plot_filters_multi_channel3(t,num_cols = 12,heading=''):
-    ts = t.shape # 20,4,1,5,5
     num_kernels     = t.shape[0]
-    num_in_channels = t.shape[2]
+    num_in_channels = t.shape[1]
     num_groups      = num_kernels//num_cols
     if num_groups * num_cols < num_kernels:
         num_groups +=1
     num_rows = num_groups
-    fig      = figure(figsize=(num_cols,num_rows))
-    for i in range(num_kernels):
-        ax1       = fig.add_subplot(num_rows,num_cols,i+1)
-        npimg     = array(t[i].numpy(), float32)
-        npimg     = (npimg - mean(npimg)) / std(npimg)
-        npimg     = minimum(1, maximum(0, (npimg + 0.5)))
-        a,b,nx,ny = npimg.shape
-        npimg2    = npimg[0,0,:,:]
-
-        ax1.imshow(npimg2)
-        ax1.axis('off')
-        ax1.set_title(str(i))
-        ax1.set_xticklabels([])
-        ax1.set_yticklabels([])
+    fig      = figure(figsize=(20,20))
+    for j in range(num_in_channels):
+        i0 = j * num_rows * num_cols
+        for i in range(num_kernels):
+            ax1       = fig.add_subplot(num_rows*num_in_channels,num_cols,i0+i+1)
+            npimg     = array(t[i].numpy(), float32)
+            npimg     = (npimg - mean(npimg)) / std(npimg)
+            npimg     = minimum(1, maximum(0, (npimg + 0.5)))
+            npimg2    = npimg[j,0,:,:]
+            ax1.imshow(npimg2)
+            heatmap(npimg2,
+                    xticklabels = False,
+                    yticklabels = False,
+                    cmap        = 'viridis',
+                    ax          = ax1,
+                    cbar        = (j==num_in_channels-1) and (i==num_kernels-1))
+            ax1.axis('off')
+            # ax1.set_title(str(i))
+            ax1.set_xticklabels([])
+            ax1.set_yticklabels([])
     suptitle(heading)
-    tight_layout()
+
+    # tight_layout()
 
 # plot_weights
+#
 # Code snarfed from https://towardsdatascience.com/visualizing-convolution-neural-networks-using-pytorch-3dfa8443e74e
+# and adapted
 
 def plot_weights(model, layer_num, single_channel = True, collated = False, heading=''):
 
