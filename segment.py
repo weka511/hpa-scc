@@ -30,7 +30,7 @@ from numpy                      import dstack,uint8, where, bool, squeeze, asfor
 from os                         import environ
 from os.path                    import join,basename
 from pycocotools                import _mask as coco_mask
-from random                     import sample
+from random                     import sample, seed
 from utils                      import Timer
 from zlib                       import compress, Z_BEST_COMPRESSION
 
@@ -122,7 +122,6 @@ if __name__=='__main__':
                             help    = 'Identifies where to store ascii masks')
         parser.add_argument('--sample',
                             type    = int,
-                            # default = 3,
                             help    = 'Specifies number of images to be sampled at random and processed')
         parser.add_argument('--segments',
                             default = './segments',
@@ -147,9 +146,17 @@ if __name__=='__main__':
                             default = False,
                             action  = 'store_true',
                             help    = 'Allow multiple assignments')
+        parser.add_argument('--file_name',
+                            default = 'train.csv',
+                            help    = 'List of image ids and classes')
+        parser.add_argument('--seed',
+                            default = None,
+                            help = 'Seed for random number generator')
         args         = parser.parse_args()
+
+        seed(args.seed)
         Descriptions = create_descriptions(file_name=args.descriptions)
-        Expectations = read_training_expectations() # FIXME - add parameters
+        Expectations = read_training_expectations(path=args.path,file_name=args.file_name)
 
         if not args.multiplets:
             Expectations = {file_name:class_names for file_name,class_names in Expectations.items() if len(class_names)==1}
@@ -190,19 +197,18 @@ if __name__=='__main__':
         for i, pred in enumerate(cell_segmentations):
             nuclei_mask, cell_mask = label_cell(nuc_segmentations[i], cell_segmentations[i])
             FOVname                = basename(mt[i]).replace('red','predictedmask')
-            print (FOVname)
+            print (f'Segmenting {FOVname}')
             imwrite(join(args.segments,FOVname), cell_mask)
             fig            = figure(figsize=(19,10))
             microtubule    = imread(mt[i])
             endoplasmicrec = imread(er[i])
             nuclei         = imread(nu[i])
-            img            = dstack((microtubule, endoplasmicrec, nuclei))
-            imshow(img)
+            imshow(dstack((microtubule, endoplasmicrec, nuclei)))
             imshow(cell_mask, alpha=0.5)
-            classes = Expectations[file_list[i]]
+            classes            = Expectations[file_list[i]]
             class_descriptions = [Descriptions[class_id] for class_id in classes]
 
-            title(f'{file_list[i]} {classes[0]} {class_descriptions[0]}') # # FIXME - this doesn't handle multiple classes
+            title(f'{file_list[i]}  {", ".join(class_descriptions)}')
             axis('off')
             savefig(join(args.figs,basename(mt[i]).replace('red','full')))
             if not args.show:
@@ -234,7 +240,7 @@ if __name__=='__main__':
                         k += 1
                         l  = 0
 
-                suptitle(f'{file_list[i]} {classes[0]} {class_descriptions[0]}') # FIXME - this doesn't handle multiple classes
+                suptitle(f'{file_list[i]}  {", ".join(class_descriptions)}')
                 savefig(join(args.figs,basename(mt[i]).replace('red','segmented')))
             if not args.show:
                 close(fig)
