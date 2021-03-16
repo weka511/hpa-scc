@@ -161,10 +161,10 @@ if __name__=='__main__':
         if not args.multiplets:
             Expectations = {file_name:class_names for file_name,class_names in Expectations.items() if len(class_names)==1}
         if args.classes[0]!='all':   #FIXME
-            classes = [int(c) for c in args.classes]
+            classes      = [int(c) for c in args.classes]
             Expectations = {file_name:class_names for file_name,class_names in Expectations.items() if class_names[0] in classes}
 
-        file_list   = list(Expectations.keys())
+        file_list        = list(Expectations.keys())
 
         if args.sample!=None:
             file_list = sample(file_list,args.sample)
