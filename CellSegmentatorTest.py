@@ -19,10 +19,10 @@ CELL_MODEL = "./cell-model.pth"
 segmentator = cellsegmentator.CellSegmentator(
     NUC_MODEL,
     CELL_MODEL,
-    scale_factor=0.25,
-    device="cpu",    #FIXME
-    padding=False,
-    multi_channel_model=True,
+    scale_factor        = 0.0625,
+    device              = "cpu",
+    padding             = False,
+    multi_channel_model = True,
 )
 
 # For nuclei
