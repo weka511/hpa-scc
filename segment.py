@@ -125,7 +125,7 @@ if __name__=='__main__':
                             help    = 'Specifies number of images to be sampled at random and processed')
         parser.add_argument('--segments',
                             default = './segments',
-                            help    = 'Identifies where to store plots')
+                            help    = 'Identifies where to store cell masks')
         parser.add_argument('--NuclearModel',
                             default = './nuclei-model.pth',
                             help    = 'Identifies where to store nuclear models')
@@ -152,19 +152,25 @@ if __name__=='__main__':
         parser.add_argument('--seed',
                             default = None,
                             help = 'Seed for random number generator')
+        parser.add_argument('--image_id',
+                            default = None,
+                            help    = 'Used to process single file only')
         args         = parser.parse_args()
 
         seed(args.seed)
         Descriptions = create_descriptions(file_name=args.descriptions)
         Expectations = read_training_expectations(path=args.path,file_name=args.file_name)
 
-        if not args.multiplets:
-            Expectations = {file_name:class_names for file_name,class_names in Expectations.items() if len(class_names)==1}
-        if args.classes[0]!='all':   #FIXME
-            classes      = [int(c) for c in args.classes]
-            Expectations = {file_name:class_names for file_name,class_names in Expectations.items() if class_names[0] in classes}
+        if args.image_id!=None:
+            file_list = [args.image_id]
+        else:
+            if not args.multiplets:
+                Expectations = {file_name:class_names for file_name,class_names in Expectations.items() if len(class_names)==1}
+            if args.classes[0]!='all':   #FIXME
+                classes      = [int(c) for c in args.classes]
+                Expectations = {file_name:class_names for file_name,class_names in Expectations.items() if class_names[0] in classes}
 
-        file_list        = list(Expectations.keys())
+            file_list        = list(Expectations.keys())
 
         if args.sample!=None:
             file_list = sample(file_list,args.sample)
@@ -173,36 +179,33 @@ if __name__=='__main__':
             print (f'Processing {len(file_list)} slides')
 
         image_dir   = join(args.path,args.image_set)
-        mt          = [join(image_dir,f'{name}_red.png') for name in file_list]
-        er          = [f.replace('red', 'yellow') for f in mt]
-        nu          = [f.replace('red', 'blue') for f in mt]
+        mt          = [join(image_dir,f'{name}_red.png')    for name in file_list]
+        er          = [join(image_dir,f'{name}_yellow.png') for name in file_list]
+        nu          = [join(image_dir,f'{name}_blue.png')   for name in file_list]
         images      = [mt, er, nu]
 
         segmentator = CellSegmentator(
             nuclei_model        = args.NuclearModel,
             cell_model          = args.CellModel,
-            scale_factor        = 0.25,
+            scale_factor        = 0.0625,       # Changed from https://github.com/CellProfiling/HPA-Cell-Segmentation
+                                                # trial and error shows that this value works with my datasets
             device              = "cpu",
-            padding             = False,
+            padding             = True,      # Changed from https://github.com/CellProfiling/HPA-Cell-Segmentation
             multi_channel_model = True,
         )
 
-        # For nuclei
-        nuc_segmentations = segmentator.pred_nuclei(nu)
+        nuc_segmentations  = segmentator.pred_nuclei(nu)          # For nuclei
 
-        # For full cells
-        cell_segmentations = segmentator.pred_cells(images)
+        cell_segmentations = segmentator.pred_cells(images)       # For full cells
 
         # post-processing
         for i, pred in enumerate(cell_segmentations):
             nuclei_mask, cell_mask = label_cell(nuc_segmentations[i], cell_segmentations[i])
-            FOVname                = basename(mt[i]).replace('red','predictedmask')
-            print (f'Segmenting {FOVname}')
-            imwrite(join(args.segments,FOVname), cell_mask)
-            fig            = figure(figsize=(19,10))
-            microtubule    = imread(mt[i])
-            endoplasmicrec = imread(er[i])
-            nuclei         = imread(nu[i])
+            imwrite(join(args.segments,f'{file_list[i]}_predictedmask.png'), cell_mask)
+            fig                    = figure(figsize=(19,10))
+            microtubule            = imread(mt[i])
+            endoplasmicrec         = imread(er[i])
+            nuclei                 = imread(nu[i])
             imshow(dstack((microtubule, endoplasmicrec, nuclei)))
             imshow(cell_mask, alpha=0.5)
             classes            = Expectations[file_list[i]]
@@ -215,6 +218,10 @@ if __name__=='__main__':
                 close(fig)
             binary_mask        = label_cell(nuc_segmentations[i], cell_segmentations[i])[1].astype(uint8)
             number_of_segments = binary_mask.max()+1
+            if number_of_segments>1:
+                print (f'Segmented {file_list[i]}')
+            else:
+                print (f'Failed {file_list[i]}')
             fig                = figure(figsize=(20,20))
             m1                 = isqrt(number_of_segments)
             m2                 = number_of_segments // m1 + 1
