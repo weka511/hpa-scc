@@ -97,6 +97,13 @@ def binary_mask_to_ascii(mask, mask_val=1): # https://www.kaggle.com/dschettler8
 # segment_image
 #
 # Apply segmentation mask to determine which part of image should actually be shown
+#
+# Parameters:
+#     img_cell       The entire image (destructive - this will be replaced by the return value)
+#     binary_mask    The mask
+#     class_id       The id of the class - all other pixels in image will be zeroed
+#
+#     Returns a copy of the image with all pixels (outside the image) zeroed
 
 def segment_image(img_cell,binary_mask,class_id):
     for i in range(len(img_cell)):
@@ -155,6 +162,10 @@ if __name__=='__main__':
         parser.add_argument('--image_id',
                             default = None,
                             help    = 'Used to process single file only')
+        parser.add_argument('--scale_factor',
+                            default = 0.0625,
+                            type    = float,
+                            help    = 'Used by CellSegmentator')
         args         = parser.parse_args()
 
         seed(args.seed)
@@ -187,8 +198,8 @@ if __name__=='__main__':
         segmentator = CellSegmentator(
             nuclei_model        = args.NuclearModel,
             cell_model          = args.CellModel,
-            scale_factor        = 0.0625,       # Changed from https://github.com/CellProfiling/HPA-Cell-Segmentation
-                                                # trial and error shows that this value works with my datasets
+            scale_factor        = args.scale_factor, # Changed from https://github.com/CellProfiling/HPA-Cell-Segmentation
+                                                     # trial and error shows that this value works with my datasets
             device              = "cpu",
             padding             = True,      # Changed from https://github.com/CellProfiling/HPA-Cell-Segmentation
             multi_channel_model = True,
@@ -199,6 +210,7 @@ if __name__=='__main__':
         cell_segmentations = segmentator.pred_cells(images)       # For full cells
 
         # post-processing
+        Failures = []
         for i, pred in enumerate(cell_segmentations):
             nuclei_mask, cell_mask = label_cell(nuc_segmentations[i], cell_segmentations[i])
             imwrite(join(args.segments,f'{file_list[i]}_predictedmask.png'), cell_mask)
@@ -218,10 +230,13 @@ if __name__=='__main__':
                 close(fig)
             binary_mask        = label_cell(nuc_segmentations[i], cell_segmentations[i])[1].astype(uint8)
             number_of_segments = binary_mask.max()+1
+
             if number_of_segments>1:
                 print (f'Segmented {file_list[i]}')
             else:
                 print (f'Failed {file_list[i]}')
+                Failures.append(file_list[i])
+
             fig                = figure(figsize=(20,20))
             m1                 = isqrt(number_of_segments)
             m2                 = number_of_segments // m1 + 1
@@ -251,6 +266,9 @@ if __name__=='__main__':
                 savefig(join(args.figs,basename(mt[i]).replace('red','segmented')))
             if not args.show:
                 close(fig)
+    print (f'There were {len(Failures)} failures out of {len(file_list)} -- {100*len(Failures)/len(file_list)}% with scale factor={args.scale_factor}')
+    for failure in Failures:
+        print (failure)
 
     if args.show:
         show()
