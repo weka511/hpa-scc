@@ -25,7 +25,7 @@ from hpacellseg.cellsegmentator import CellSegmentator
 from hpacellseg.utils           import label_cell, label_nuclei
 from imageio                    import imwrite
 from math                       import isqrt
-from matplotlib.pyplot          import figure, imread, imshow, axis, savefig, close, show, title,suptitle
+from matplotlib.pyplot          import figure, imread, imshow, axis, savefig, close, show, title,suptitle,plot,xlabel,ylabel
 from numpy                      import dstack,uint8, where, bool, squeeze, asfortranarray, save
 from os                         import environ
 from os.path                    import join,basename
@@ -112,6 +112,94 @@ def segment_image(img_cell,binary_mask,class_id):
                 img_cell[i][j] = 0
     return img_cell
 
+def segment(nuclei_model = None,
+            cell_model   = None,
+            scale_factor = 0.5,
+            nu           = [],
+            images       = []):
+    segmentator = CellSegmentator(
+        nuclei_model        = args.NuclearModel,
+        cell_model          = args.CellModel,
+        scale_factor        = args.scale_factor, # Changed from https://github.com/CellProfiling/HPA-Cell-Segmentation
+                                                 # trial and error shows that this value works with my datasets
+        device              = "cpu",
+        padding             = True,      # Changed from https://github.com/CellProfiling/HPA-Cell-Segmentation
+        multi_channel_model = True,
+    )
+
+    nuc_segmentations  = segmentator.pred_nuclei(nu)          # For nuclei
+
+    cell_segmentations = segmentator.pred_cells(images)       # For full cells
+
+    return nuc_segmentations, cell_segmentations
+
+def apply_masks(nuc_segmentations, cell_segmentations,
+                file_list = [],
+                segments  = './segments',
+                figs      = './figs',
+                masks     = './masks',
+                mt        = [],
+                er        = [],
+                nu        = [],
+                show      = False):
+    Failures = []
+    for i, pred in enumerate(cell_segmentations):
+        nuclei_mask, cell_mask = label_cell(nuc_segmentations[i], cell_segmentations[i])
+        imwrite(join(segments,f'{file_list[i]}_predictedmask.png'), cell_mask)
+        fig                    = figure(figsize=(19,10))
+        microtubule            = imread(mt[i])
+        endoplasmicrec         = imread(er[i])
+        nuclei                 = imread(nu[i])
+        imshow(dstack((microtubule, endoplasmicrec, nuclei)))
+        imshow(cell_mask, alpha=0.5)
+        classes            = Expectations[file_list[i]]
+        class_descriptions = [Descriptions[class_id] for class_id in classes]
+
+        title(f'{file_list[i]}  {", ".join(class_descriptions)}')
+        axis('off')
+        savefig(join(figs,basename(mt[i]).replace('red','full')))
+        if not show:
+            close(fig)
+        binary_mask        = label_cell(nuc_segmentations[i], cell_segmentations[i])[1].astype(uint8)
+        number_of_segments = binary_mask.max()+1
+
+        if number_of_segments>1:
+            print (f'Segmented {file_list[i]}')
+        else:
+            print (f'Failed {file_list[i]}')
+            Failures.append(file_list[i])
+
+        fig                = figure(figsize=(20,20))
+        m1                 = isqrt(number_of_segments)
+        m2                 = number_of_segments // m1 + 1
+        axs                = fig.subplots(m1, m2,squeeze=False)
+
+        for k in range(m1):
+            for l in range(m2):
+                axs[k][l].axis('off')
+                axs[k][l].set_xticklabels([])
+                axs[k][l].set_yticklabels([])
+        k = 0
+        l = 0
+        with open(join(masks,basename(mt[i]).replace('red','full').replace('png','npy')),'wb') as binary_mask_file:
+            save(binary_mask_file,binary_mask)
+        with open(join(masks,basename(mt[i]).replace('red','full').replace('png','txt')),'w') as ascii_mask_file:
+            for j in range(1,binary_mask.max()+1):
+                axs[k][l].imshow(segment_image(dstack((microtubule, endoplasmicrec, nuclei)),binary_mask,j))
+                ascii_mask = binary_mask_to_ascii(binary_mask,j)
+                ascii_mask_file.write(f'{j}\n')
+                ascii_mask_file.write(f'{ascii_mask}\n')
+                l += 1
+                if l>=len(axs[k]):
+                    k += 1
+                    l  = 0
+
+            suptitle(f'{file_list[i]}  {", ".join(class_descriptions)}')
+            savefig(join(figs,basename(mt[i]).replace('red','segmented')))
+        if not show:
+            close(fig)
+    return Failures
+
 if __name__=='__main__':
     with Timer():
         parser = ArgumentParser('Segment HPA data using HPA Cell segmenter')
@@ -166,6 +254,12 @@ if __name__=='__main__':
                             default = 0.0625,
                             type    = float,
                             help    = 'Used by CellSegmentator')
+
+        parser.add_argument('--sfrange',
+                            default = [],
+                            type    = float,
+                            nargs   = 3,
+                            help    = 'Used by CellSegmentator')
         args         = parser.parse_args()
 
         seed(args.seed)
@@ -195,80 +289,61 @@ if __name__=='__main__':
         nu          = [join(image_dir,f'{name}_blue.png')   for name in file_list]
         images      = [mt, er, nu]
 
-        segmentator = CellSegmentator(
-            nuclei_model        = args.NuclearModel,
-            cell_model          = args.CellModel,
-            scale_factor        = args.scale_factor, # Changed from https://github.com/CellProfiling/HPA-Cell-Segmentation
-                                                     # trial and error shows that this value works with my datasets
-            device              = "cpu",
-            padding             = True,      # Changed from https://github.com/CellProfiling/HPA-Cell-Segmentation
-            multi_channel_model = True,
-        )
+        if len(args.sfrange)==0:
+            nuc_segmentations, cell_segmentations = segment(nuclei_model = args.NuclearModel,
+                                                            cell_model   = args.CellModel,
+                                                            scale_factor = args.scale_factor,
+                                                            nu           = nu,
+                                                            images       = images)
 
-        nuc_segmentations  = segmentator.pred_nuclei(nu)          # For nuclei
+            Failures = apply_masks(nuc_segmentations, cell_segmentations,
+                                   file_list = file_list,
+                                   segments  = args.segments,
+                                   mt        = mt,
+                                   er        = er,
+                                   nu        = nu,
+                                   figs      = args.figs,
+                                   masks     = args.masks,
+                                   show      = args.show)
 
-        cell_segmentations = segmentator.pred_cells(images)       # For full cells
+            print (f'There were {len(Failures)} failures out of {len(file_list)} -- {100*len(Failures)/len(file_list)}% with scale factor={args.scale_factor}')
+            for failure in Failures:
+                print (failure)
 
-        # post-processing
-        Failures = []
-        for i, pred in enumerate(cell_segmentations):
-            nuclei_mask, cell_mask = label_cell(nuc_segmentations[i], cell_segmentations[i])
-            imwrite(join(args.segments,f'{file_list[i]}_predictedmask.png'), cell_mask)
-            fig                    = figure(figsize=(19,10))
-            microtubule            = imread(mt[i])
-            endoplasmicrec         = imread(er[i])
-            nuclei                 = imread(nu[i])
-            imshow(dstack((microtubule, endoplasmicrec, nuclei)))
-            imshow(cell_mask, alpha=0.5)
-            classes            = Expectations[file_list[i]]
-            class_descriptions = [Descriptions[class_id] for class_id in classes]
+            if args.show:
+                show()
 
-            title(f'{file_list[i]}  {", ".join(class_descriptions)}')
-            axis('off')
-            savefig(join(args.figs,basename(mt[i]).replace('red','full')))
-            if not args.show:
-                close(fig)
-            binary_mask        = label_cell(nuc_segmentations[i], cell_segmentations[i])[1].astype(uint8)
-            number_of_segments = binary_mask.max()+1
+        else:
+            low  = args.sfrange[0]
+            high = args.sfrange[1]
+            n    = int(args.sfrange[2])
+            step = (high-low)/n
+            xs   = []
+            ys   = []
+            for i in range(n+1):
+                scale_factor = low + i * step
+                nuc_segmentations, cell_segmentations = segment(nuclei_model = args.NuclearModel,
+                                                                cell_model   = args.CellModel,
+                                                                scale_factor = scale_factor,
+                                                                nu           = nu,
+                                                                images       = images)
 
-            if number_of_segments>1:
-                print (f'Segmented {file_list[i]}')
-            else:
-                print (f'Failed {file_list[i]}')
-                Failures.append(file_list[i])
+                Failures = apply_masks(nuc_segmentations, cell_segmentations,
+                                               file_list = file_list,
+                                               segments  = args.segments,
+                                               mt        = mt,
+                                               er        = er,
+                                               nu        = nu,
+                                               figs      = args.figs,
+                                               masks     = args.masks,
+                                               show      = False)
+                xs.append(scale_factor)
+                ys.append(len(Failures)/len(file_list))
 
-            fig                = figure(figsize=(20,20))
-            m1                 = isqrt(number_of_segments)
-            m2                 = number_of_segments // m1 + 1
-            axs                = fig.subplots(m1, m2,squeeze=False)
-
-            for k in range(m1):
-                for l in range(m2):
-                    axs[k][l].axis('off')
-                    axs[k][l].set_xticklabels([])
-                    axs[k][l].set_yticklabels([])
-            k = 0
-            l = 0
-            with open(join(args.masks,basename(mt[i]).replace('red','full').replace('png','npy')),'wb') as binary_mask_file:
-                save(binary_mask_file,binary_mask)
-            with open(join(args.masks,basename(mt[i]).replace('red','full').replace('png','txt')),'w') as ascii_mask_file:
-                for j in range(1,binary_mask.max()+1):
-                    axs[k][l].imshow(segment_image(dstack((microtubule, endoplasmicrec, nuclei)),binary_mask,j))
-                    ascii_mask = binary_mask_to_ascii(binary_mask,j)
-                    ascii_mask_file.write(f'{j}\n')
-                    ascii_mask_file.write(f'{ascii_mask}\n')
-                    l += 1
-                    if l>=len(axs[k]):
-                        k += 1
-                        l  = 0
-
-                suptitle(f'{file_list[i]}  {", ".join(class_descriptions)}')
-                savefig(join(args.figs,basename(mt[i]).replace('red','segmented')))
-            if not args.show:
-                close(fig)
-    print (f'There were {len(Failures)} failures out of {len(file_list)} -- {100*len(Failures)/len(file_list)}% with scale factor={args.scale_factor}')
-    for failure in Failures:
-        print (failure)
-
-    if args.show:
-        show()
+            figure(figsize=(20,20))
+            plot(xs,ys)
+            title('{len(file_list)} {args.seed}')
+            xlabel('Scale Factor')
+            ylabel('Failure Rate')
+            savefig('scale-factors.png')
+            show()
