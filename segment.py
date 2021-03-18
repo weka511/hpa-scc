@@ -120,8 +120,7 @@ def segment(nuclei_model = None,
     segmentator = CellSegmentator(
         nuclei_model        = args.NuclearModel,
         cell_model          = args.CellModel,
-        scale_factor        = args.scale_factor, # Changed from https://github.com/CellProfiling/HPA-Cell-Segmentation
-                                                 # trial and error shows that this value works with my datasets
+        scale_factor        = scale_factor,
         device              = "cpu",
         padding             = True,      # Changed from https://github.com/CellProfiling/HPA-Cell-Segmentation
         multi_channel_model = True,
@@ -321,28 +320,28 @@ if __name__=='__main__':
             xs   = []
             ys   = []
             for i in range(n+1):
-                scale_factor = low + i * step
+                scale_factor                          = low + i * step
                 nuc_segmentations, cell_segmentations = segment(nuclei_model = args.NuclearModel,
                                                                 cell_model   = args.CellModel,
                                                                 scale_factor = scale_factor,
                                                                 nu           = nu,
                                                                 images       = images)
 
-                Failures = apply_masks(nuc_segmentations, cell_segmentations,
-                                               file_list = file_list,
-                                               segments  = args.segments,
-                                               mt        = mt,
-                                               er        = er,
-                                               nu        = nu,
-                                               figs      = args.figs,
-                                               masks     = args.masks,
-                                               show      = False)
+                Failures                              = apply_masks(nuc_segmentations, cell_segmentations,
+                                                                    file_list = file_list,
+                                                                    segments  = args.segments,
+                                                                    mt        = mt,
+                                                                    er        = er,
+                                                                    nu        = nu,
+                                                                    figs      = args.figs,
+                                                                    masks     = args.masks,
+                                                                    show      = False)
                 xs.append(scale_factor)
                 ys.append(len(Failures)/len(file_list))
 
             figure(figsize=(20,20))
             plot(xs,ys)
-            title('{len(file_list)} {args.seed}')
+            title(f'{len(file_list)} images, seed = {args.seed}')
             xlabel('Scale Factor')
             ylabel('Failure Rate')
             savefig('scale-factors.png')
