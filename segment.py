@@ -19,7 +19,7 @@
 
 from argparse                   import ArgumentParser
 from base64                     import b64encode
-from csv                        import reader
+from csv                        import reader, writer
 from glob                       import glob
 from hpacellseg.cellsegmentator import CellSegmentator
 from hpacellseg.utils           import label_cell, label_nuclei
@@ -133,14 +133,15 @@ def segment(nuclei_model = None,
     return nuc_segmentations, cell_segmentations
 
 def apply_masks(nuc_segmentations, cell_segmentations,
-                file_list = [],
-                segments  = './segments',
-                figs      = './figs',
-                masks     = './masks',
-                mt        = [],
-                er        = [],
-                nu        = [],
-                show      = False):
+                file_list     = [],
+                segments      = './segments',
+                figs          = './figs',
+                masks         = './masks',
+                mt            = [],
+                er            = [],
+                nu            = [],
+                show          = False,
+                output_writer = None):
     Failures = []
     for i, pred in enumerate(cell_segmentations):
         nuclei_mask, cell_mask = label_cell(nuc_segmentations[i], cell_segmentations[i])
@@ -161,7 +162,8 @@ def apply_masks(nuc_segmentations, cell_segmentations,
             close(fig)
         binary_mask        = label_cell(nuc_segmentations[i], cell_segmentations[i])[1].astype(uint8)
         number_of_segments = binary_mask.max()+1
-
+        if output_writer!=None:
+            output_writer.writerow([file_list[i],number_of_segments])
         if number_of_segments>1:
             print (f'Segmented {file_list[i]}')
         else:
@@ -250,7 +252,7 @@ if __name__=='__main__':
                             default = None,
                             help    = 'Used to process single file only')
         parser.add_argument('--scale_factor',
-                            default = 0.0625,
+                            default = 0.1125,   #Issue 33,
                             type    = float,
                             help    = 'Used by CellSegmentator')
 
@@ -259,6 +261,9 @@ if __name__=='__main__':
                             type    = float,
                             nargs   = 3,
                             help    = 'Used by CellSegmentator')
+        parser.add_argument('--out',
+                            default = 'segments.csv',
+                            help    = 'Output file for segment counts')
         args         = parser.parse_args()
 
         seed(args.seed)
@@ -294,16 +299,17 @@ if __name__=='__main__':
                                                             scale_factor = args.scale_factor,
                                                             nu           = nu,
                                                             images       = images)
-
-            Failures = apply_masks(nuc_segmentations, cell_segmentations,
-                                   file_list = file_list,
-                                   segments  = args.segments,
-                                   mt        = mt,
-                                   er        = er,
-                                   nu        = nu,
-                                   figs      = args.figs,
-                                   masks     = args.masks,
-                                   show      = args.show)
+            with open(args.out,'w') as output_file:
+                Failures = apply_masks(nuc_segmentations, cell_segmentations,
+                                       file_list     = file_list,
+                                       segments      = args.segments,
+                                       mt            = mt,
+                                       er            = er,
+                                       nu            = nu,
+                                       figs          = args.figs,
+                                       masks         = args.masks,
+                                       show          = args.show,
+                                       output_writer = writer(output_file))
 
             print (f'There were {len(Failures)} failures out of {len(file_list)} -- {100*len(Failures)/len(file_list)}% with scale factor={args.scale_factor}')
             for failure in Failures:
