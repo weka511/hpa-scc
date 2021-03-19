@@ -28,8 +28,12 @@
 \usepackage{amssymb}
 \usepackage{tocloft}
 \usepackage[document]{ragged2e}
+\usepackage{longtable}
+\graphicspath{{figs/}}
 \makeglossaries
 \loadglsentries{glossary-entries}
+\pdfpxdimen=1in
+\divide\pdfpxdimen by 300
 
 %opening
 \title{Human Protein Atlas - Single Cell Classification\\Notes}
@@ -45,6 +49,7 @@ My notes on the Human Protein Atlas - Single Cell Classification project.
 \end{abstract}
 \tableofcontents
 \listoftables
+\listoffigures
 \section{The Task}
 
 \begin{quotation}
@@ -65,32 +70,34 @@ My notes on the Human Protein Atlas - Single Cell Classification project.
 	- No green or green is not present in any organelle. Therefore, the cell level label is Negative. \cite{schettler2021}
 \end{quotation}
 
-\begin{table}[H]
-	\begin{center}
-		\caption{Labels}
-		\begin{tabular}{|r|l|} \hline
-				 0&\Gls{nucleoplasm}\\ \hline
-				 1&\Gls{nuclear_membrane}\\ \hline
-				 2&\Glspl{nucleolus}\\ \hline
-				 3&\Gls{nucleolus_fibrillar_center}\\ \hline
-				 4&\Gls{nuclear_speckles}\\ \hline
-				 5&\Gls{nuclear_bodies}\\ \hline
-				 6&\Gls{endoplasmic_reticulum}\\ \hline
-				 7&\Gls{golgi_apparatus}\\ \hline
-				 8&\Gls{intermediate_filament}\\ \hline
-				 9&\Gls{actin} filaments\\\hline
-				 10&\Gls{microtubules}\\\hline
-				 11&\Gls{mitotic_spindle}\\\hline
-				 12&\Gls{centrosome}\\\hline
-				 13&\Gls{plasma_membrane}\\\hline
-				 14&\Glspl{mitochondrion}\\\hline
-				 15&\Gls{aggresome}\\\hline
-				 16&\Gls{cytosol}\\\hline
-				 17&\Glspl{vesicle} and \gls{punctate} cytosolic patterns\\\hline
-				 18&Negative \\ \hline
-		\end{tabular}
-	\end{center}
-\end{table}
+
+\begin{longtable}{|r|p{ 0.9\textwidth}|}
+	\caption{Labels}\\  \hline
+	Code&Description\\ \hline
+	\endfirsthead
+\hline	Code&Description\\ \hline
+	\endhead
+ 0&\Gls{nucleoplasm}: \glsdesc{nucleoplasm} \\ \hline
+ 1&\Gls{nuclear_membrane}: \glsdesc{nuclear_membrane}\\ \hline
+ 2&\Glspl{nucleolus}: \glsdesc{nucleolus}\\ \hline
+ 3&\Gls{nucleolus_fibrillar_center}: \glsdesc{nucleolus_fibrillar_center}\\ \hline
+ 4&\Gls{nuclear_speckles}: \glsdesc{nuclear_speckles}\\ \hline
+ 5&\Gls{nuclear_bodies}: \glsdesc{nuclear_bodies}\\ \hline
+ 6&\Gls{endoplasmic_reticulum}: \glsdesc{endoplasmic_reticulum}\\ \hline
+ 7&\Gls{golgi_apparatus}: \glsdesc{golgi_apparatus}\\ \hline
+ 8&\Gls{intermediate_filament}: \glsdesc{intermediate_filament}\\ \hline
+ 9&\Gls{actin} filaments: \glsdesc{actin}\\\hline
+ 10&\Gls{microtubules}: \glsdesc{microtubules}\\\hline
+ 11&\Gls{mitotic_spindle}: \glsdesc{mitotic_spindle}\\\hline
+ 12&\Gls{centrosome}: \glsdesc{centrosome}\\\hline
+ 13&\Gls{plasma_membrane}: \glsdesc{plasma_membrane}\\\hline
+ 14&\Glspl{mitochondrion}: \glsdesc{mitochondrion}\\\hline
+ 15&\Gls{aggresome}: \glsdesc{aggresome}\\\hline
+ 16&\Gls{cytosol}: \glsdesc{cytosol}\\\hline
+ 17&\Glspl{vesicle} and \gls{punctate} cytosolic patterns : \glsdesc{vesicle}\\\hline
+ 18&Negative \\ \hline
+\end{longtable}
+
 
 Metric for evaluation--\gls{mAP}.
 
@@ -104,8 +111,23 @@ Metric for evaluation--\gls{mAP}.
 	\item \cite{jo2021puzzle}
 \end{itemize}
 
+\begin{figure}
+	\caption[Nucleoplasm: protein appears to overlap nucleus closely]{Nucleoplasm: protein appears to overlap nucleus closely}
+	\includegraphics[width=\textwidth]{e4646660-bbb8-11e8-b2ba-ac1f6b6435d0}
+	\includegraphics[width=\textwidth]{a45378f8-bbb4-11e8-b2ba-ac1f6b6435d0}
+\end{figure}
 
+\begin{figure}
+	\caption[Nucleoplasm with other labels]{Nucleoplasm with other labels}
+	\includegraphics[width=\textwidth]{dc12ada8-bba1-11e8-b2b9-ac1f6b6435d0}
+	\includegraphics[width=\textwidth]{8793a49c-bb99-11e8-b2b9-ac1f6b6435d0}
+\end{figure}
 
+\begin{figure}
+	\caption[Nuclear Membrane: protein appears to halo nucleus]{Nucleoplasm: protein appears to halo nucleus}
+	\includegraphics[width=\textwidth]{ec0badb6-bbb7-11e8-b2ba-ac1f6b6435d0}
+	\includegraphics[width=\textwidth]{3b286b62-bbc9-11e8-b2bc-ac1f6b6435d0}
+\end{figure}
 
 \clearpage
 
