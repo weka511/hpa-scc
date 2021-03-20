@@ -32,8 +32,7 @@
 \graphicspath{{figs/}}
 \makeglossaries
 \loadglsentries{glossary-entries}
-\pdfpxdimen=1in
-\divide\pdfpxdimen by 300
+
 
 %opening
 \title{Human Protein Atlas - Single Cell Classification\\Notes}
@@ -112,7 +111,7 @@ Metric for evaluation--\gls{mAP}.
 \end{itemize}
 
 \begin{figure}
-	\caption[Nucleoplasm: protein appears to overlap nucleus closely]{Nucleoplasm: protein appears to overlap nucleus closely}
+	\caption[Nucleoplasm: protein appears to overlap nucleus closely]{Nucleoplasm: protein appears to overlap nucleus closely, and it is surrounded by \gls{endoplasmic_reticulum} and \gls{microtubules}. Compare with Figures \ref{fig:er} and \ref{fig:mt}}\label{fig:nucleoplasm}
 	\includegraphics[width=\textwidth]{e4646660-bbb8-11e8-b2ba-ac1f6b6435d0}
 	\includegraphics[width=\textwidth]{a45378f8-bbb4-11e8-b2ba-ac1f6b6435d0}
 \end{figure}
@@ -142,7 +141,13 @@ Metric for evaluation--\gls{mAP}.
 \end{figure}
 
 \begin{figure}
-	\caption{Microtubules}
+	\caption{Endoplasmic Reticulum}\label{fig:er}
+	\includegraphics[width=\textwidth]{5bc093f8-bbb1-11e8-b2ba-ac1f6b6435d0}
+	\includegraphics[width=\textwidth]{3979bdfe-bba9-11e8-b2ba-ac1f6b6435d0}
+\end{figure}
+
+\begin{figure}
+	\caption{Microtubules}\label{fig:mt}
 	\includegraphics[width=\textwidth]{d18a5b1a-bbba-11e8-b2ba-ac1f6b6435d0}
 	\includegraphics[width=\textwidth]{0cd92bf2-bbab-11e8-b2ba-ac1f6b6435d0}
 \end{figure}
