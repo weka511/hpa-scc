@@ -26,7 +26,7 @@ from   numpy             import zeros, array, var, mean, std, histogram
 from   os                import remove
 from   os.path           import join,basename,exists
 from   random            import sample
-from   sys               import float_info, exc_info
+from   sys               import float_info, exc_info, exit
 from   tempfile          import gettempdir
 from   utils             import Timer
 from   uuid              import uuid4
@@ -592,9 +592,8 @@ def segment(Image, image_id,
                             show           = show,
                             Descriptions   = Descriptions)
 
-            if shouldDisplayThinned:
-                Thinned.append([get_thinned(Component,n=5) for Component  in generate_components(component_files[-1],
-                                                                                                 P=P)])
+        if shouldDisplayIndividuals or shouldDisplayThinned:
+            Thinned.append([get_thinned(C,n=5) for C in generate_components(component_files[-1], P=P)])
 
         if shouldDisplayIndividuals:
             display_individual_clusters(Image,image_id,
@@ -625,7 +624,7 @@ if __name__=='__main__':
                             default = 'train512x512',
                             help    = 'Identified subset of data-- e.g. train512x512')
         parser.add_argument('--image_id',
-                            default = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
+                            default = None,
                             help    = 'Identifies image to be segmented (if only one). See --sample, --all, and --read')
         parser.add_argument('--show',
                             default = False,
@@ -682,8 +681,8 @@ if __name__=='__main__':
                             show                     = args.show,
                             channels                 = channels,
                             Descriptions             = Descriptions,
-                            shouldDisplayThinned     = args.individuals,
-                            shouldDisplayIndividuals = args.thinned)
+                            shouldDisplayThinned     = args.thinned,
+                            shouldDisplayIndividuals = args.individuals)
         elif args.sample:
             n = args.sample
             with open(args.history,'w') as history:
@@ -698,8 +697,8 @@ if __name__=='__main__':
                             show                     = args.show,
                             channels                 = channels,
                             Descriptions             = Descriptions,
-                            shouldDisplayThinned     = args.individuals,
-                            shouldDisplayIndividuals = args.thinned)
+                            shouldDisplayThinned     = args.thinned,
+                            shouldDisplayIndividuals = args.individuals)
                     n-=1
         elif args.all:
             n = len(Training)
@@ -713,10 +712,10 @@ if __name__=='__main__':
                         show                     = args.show,
                         channels                 = channels,
                         Descriptions             = Descriptions,
-                        shouldDisplayThinned     = args.individuals,
-                        shouldDisplayIndividuals = args.thinned)
+                        shouldDisplayThinned     = args.thinned,
+                        shouldDisplayIndividuals = args.individuals)
                 n -= 1
-        else:
+        elif args.image_id is not None:
             segment(read_image(path      = args.path,
                                image_id  = args.image_id,
                                image_set = args.image_set),
@@ -726,8 +725,10 @@ if __name__=='__main__':
                     keep_temp                = args.keep_temp,
                     channels                 = channels,
                     Descriptions             = Descriptions,
-                    shouldDisplayThinned     = args.individuals,
-                    shouldDisplayIndividuals = args.thinned)
+                    shouldDisplayThinned     = args.thinned,
+                    shouldDisplayIndividuals = args.individuals)
+        else:
+            exit('Image not specified')
 
     if args.show:
         show()
