@@ -24,7 +24,7 @@ from numpy             import zeros, array
 from os                import environ
 from os.path           import join
 from random            import sample, seed
-
+from scipy.signal      import correlate2d,fftconvolve
 
 RED         = 0
 GREEN       = 1
@@ -68,9 +68,16 @@ def visualize(image_id     = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
               image_set    = 'train512x512',
               figs         = './figs',
               Descriptions = [],
-              dpi          = 300):
-    fig          = figure(figsize=(20,10))
-    axs          = fig.subplots(2, 4)
+              dpi          = 300,
+              correlate2d  = False,
+              bins         = None):
+    fig          = figure(figsize=(20,20))
+    nrows        = 2
+    if correlate2d:
+        nrows += 1
+    if bins!=None:
+        nrows += 1
+    axs          = fig.subplots(nrows = nrows, ncols = NCOLOURS + 1)
     Greys        = []
 
     for seq,colour in enumerate([BLUE,RED,YELLOW,GREEN]):
@@ -95,14 +102,29 @@ def visualize(image_id     = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
         nx,ny           = Greys[-1].shape
         Image           = zeros((nx,ny,NCOLOURS))
         Image[:,:,BLUE] = Greys[seq][:,:]
-        Image[:,:,RED]  = Greys[-1][:,:]
+        Image[:,:,RED]  = Greys[GREEN][:,:]
         axs[1,seq].imshow(Image)
         axs[1,seq].axes.xaxis.set_ticks([])
         axs[1,seq].axes.yaxis.set_ticks([])
         axs[1,seq].set_title(f'{meanings[GREEN]}+{meanings[colour]}')
+        next_row = 2
+        if correlate2d or bins!=None:
+            green_reversed = Greys[GREEN][::-1,::-1]
+            corr           = fftconvolve(Greys[seq], green_reversed)
+            if correlate2d:
+                corr_plot = axs[next_row,seq].imshow(corr)
+                axs[next_row,seq].axes.xaxis.set_ticks([])
+                axs[next_row,seq].axes.yaxis.set_ticks([])
+                fig.colorbar(corr_plot, ax=axs[next_row,seq])
+                axs[next_row,seq].grid(True)
+                next_row+=1
+            if bins!=None:
+                axs[next_row,seq].hist(corr.flatten(),bins='stone',color=colours[colour])
 
-    axs[1,NCOLOURS].axes.xaxis.set_ticks([])
-    axs[1,NCOLOURS].axes.yaxis.set_ticks([])
+    for i in range(nrows):
+        axs[i,NCOLOURS].axes.xaxis.set_ticks([])
+        axs[i,NCOLOURS].axes.yaxis.set_ticks([])
+
     fig.suptitle(f'{image_id}: {"+".join([Descriptions[label] for label in Training[image_id]])}')
     savefig(join(figs,image_id), dpi=dpi, bbox_inches='tight')
     return fig
@@ -161,6 +183,10 @@ if __name__=='__main__':
                         default = 300,
                         type    = int,
                         help    = 'Resolution for saving images')
+    parser.add_argument('--correlate2d',
+                        default = False,
+                        action  = 'store_true')
+    parser.add_argument('--bins')
     args         = parser.parse_args()
     seed(args.seed)
     Descriptions = read_descriptions('descriptions.csv')
@@ -175,7 +201,9 @@ if __name__=='__main__':
                                 path         = args.path,
                                 image_set    = args.image_set,
                                 figs         = args.figs,
-                                Descriptions = Descriptions)
+                                Descriptions = Descriptions,
+                                correlate2d  = args.correlate2d,
+                                bins         = args.bins)
                 if not args.show:
                     close(fig)
     elif args.sample == None:
@@ -183,14 +211,18 @@ if __name__=='__main__':
                   path         = args.path,
                   image_set    = args.image_set,
                   figs         = args.figs,
-                  Descriptions = Descriptions)
+                  Descriptions = Descriptions,
+                  correlate2d  = args.correlate2d,
+                  bins         = args.bins)
     else:
         for image_id in sample(list(Training.keys()),args.sample):
             fig = visualize(image_id     = image_id,
                             path         = args.path,
                             image_set    = args.image_set,
                             figs         = args.figs,
-                            Descriptions = Descriptions)
+                            Descriptions = Descriptions,
+                            correlate2d  = args.correlate2d,
+                            bins         = args.bins)
             if not args.show:
                 close(fig)
 
