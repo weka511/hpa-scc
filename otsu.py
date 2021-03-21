@@ -44,6 +44,8 @@ COLOUR_NAMES       = ['red',
                       'blue',
                       'yellow']
 
+CHANNELS = {'blue':BLUE, 'red': RED, 'green': GREEN, 'yellow' : YELLOW}
+
 IMAGE_LEVEL_LABELS = ['Microtubules',
                       'Protein/antibody',
                       'Nuclei channels',
@@ -499,9 +501,10 @@ def get_nearest_centroid(component,
                 minimum_distance = distance
     return (nearest_centroid,minimum_distance)
 
-def display_individual_clusters(Image,image_id,Thinned,
-                                    path            = '',
-                                    component_files = []):
+def display_individual_clusters(Image,image_id,
+                                Thinned=[],
+                                path            = '',
+                                component_files = []):
     nx,ny,_           = Image.shape
     blue_index        = channels.index(BLUE)
     NuclearCentroids  = [get_centroid(component) for component in Thinned[blue_index]]
@@ -511,7 +514,7 @@ def display_individual_clusters(Image,image_id,Thinned,
     my                = 2
     ix                = 0
     iy                = 0
-
+    step              = mx * my
     for centroid_index in range(len(NuclearCentroids)):
         if ix==0 and iy ==0:
             fig        = figure(figsize=(10,10))
@@ -531,7 +534,7 @@ def display_individual_clusters(Image,image_id,Thinned,
         Mask.establish_background()
         Mask.show(axs[ix][iy])
         if ix==0 and iy ==0:
-            fig.suptitle(f'Centroids from {centroid_index} {image_id}')
+            fig.suptitle(f'Centroids {centroid_index}-{min(centroid_index+step-1,len(NuclearCentroids)-1)} for {image_id}')
         x,y = NuclearCentroids[centroid_index]
         axs[ix][iy].set_title(f'({x:.0f},{y:.0f})')
 
@@ -559,12 +562,14 @@ def display_individual_clusters(Image,image_id,Thinned,
 #     cmaps       Colour maps for displaying each channel
 
 def segment(Image, image_id,
-            path         = './',
-            show         = False,
-            channels     = [BLUE, RED, GREEN, YELLOW],
-            cmaps        = {BLUE:'Blues', RED:'Reds', GREEN:'Greens', YELLOW:'YlOrBr'},
-            keep_temp    = False,
-            Descriptions = {}):
+            path                     = './',
+            show                     = False,
+            channels                 = [BLUE, RED, GREEN, YELLOW],
+            cmaps                    = {BLUE:'Blues', RED:'Reds', GREEN:'Greens', YELLOW:'YlOrBr'},
+            keep_temp                = False,
+            Descriptions             = {},
+            shouldDisplayThinned     = False,
+            shouldDisplayIndividuals = False):
     component_files = []
     Thinned         = []
     try:
@@ -585,15 +590,20 @@ def segment(Image, image_id,
                             cmap           = cmaps[channel],
                             path           = path,
                             show           = show,
-                            Descriptions = Descriptions)
+                            Descriptions   = Descriptions)
 
-            Thinned.append([get_thinned(Component,n=5) for Component  in generate_components(component_files[-1],P=P)])
+            if shouldDisplayThinned:
+                Thinned.append([get_thinned(Component,n=5) for Component  in generate_components(component_files[-1],
+                                                                                                 P=P)])
 
-        display_individual_clusters(Image,image_id,Thinned,
-                                    path            = path,
-                                    component_files = component_files)
+        if shouldDisplayIndividuals:
+            display_individual_clusters(Image,image_id,
+                                        Thinned         = Thinned,
+                                        path            = path,
+                                        component_files = component_files)
 
-        display_thinned(image_id,Thinned,Image,path=path,channels=channels)
+        if shouldDisplayThinned:
+            display_thinned(image_id,Thinned,Image,path=path,channels=channels)
 
     except Exception as _:
         print (f'{image_id} {exc_info()[0]}')
@@ -604,21 +614,6 @@ def segment(Image, image_id,
             if exists(component_file):  # If there was an exception, file might not actually exist!
                 remove(component_file)
 
-# colour2channel
-#
-# Convert colour name to channel number
-
-def colour2channel(c):
-    if c.lower() == 'blue':
-        return BLUE
-    elif c.lower() == 'red':
-        return RED
-    elif c.lower() == 'green':
-        return GREEN
-    elif c.lower() == 'yellow':
-        return YELLOW
-    else:
-        raise Exception(f'Channel {c} Not recognized')
 
 if __name__=='__main__':
     with Timer():
@@ -661,10 +656,18 @@ if __name__=='__main__':
                             default = ['blue', 'red', 'green','yellow'],
                             nargs   = '*',
                             help    = 'Used to restrict the channels that are processed')
+        parser.add_argument('--individuals',
+                            default = False,
+                            action  = 'store_true',
+                            help    = 'Display individual clusters')
+        parser.add_argument('--thinned',
+                            default = False,
+                            action  = 'store_true',
+                            help    = 'Display thinned clusters')
         args         = parser.parse_args()
         Descriptions = read_descriptions('descriptions.csv')
         Training     = read_training_expectations(path=args.path)
-        channels     = [colour2channel(c) for c in args.channels]
+        channels     = [CHANNELS[c.lower()] for c in args.channels]
 
         if len(args.read)>0:
             with open(args.read) as history:
@@ -674,11 +677,13 @@ if __name__=='__main__':
                     segment(read_image(path      = args.path,
                                        image_id  = image_id,
                                        image_set = args.image_set),
-                            image_id     = image_id,
-                            path         = args.figs,
-                            show         = args.show,
-                            channels     = channels,
-                            Descriptions = Descriptions)
+                            image_id                 = image_id,
+                            path                     = args.figs,
+                            show                     = args.show,
+                            channels                 = channels,
+                            Descriptions             = Descriptions,
+                            shouldDisplayThinned     = args.individuals,
+                            shouldDisplayIndividuals = args.thinned)
         elif args.sample:
             n = args.sample
             with open(args.history,'w') as history:
@@ -688,11 +693,13 @@ if __name__=='__main__':
                     segment(read_image(path      = args.path,
                                        image_id  = image_id,
                                        image_set = args.image_set),
-                            image_id     = image_id,
-                            path         = args.figs,
-                            show         = args.show,
-                            channels     = channels,
-                            Descriptions = Descriptions)
+                            image_id                 = image_id,
+                            path                     = args.figs,
+                            show                     = args.show,
+                            channels                 = channels,
+                            Descriptions             = Descriptions,
+                            shouldDisplayThinned     = args.individuals,
+                            shouldDisplayIndividuals = args.thinned)
                     n-=1
         elif args.all:
             n = len(Training)
@@ -701,22 +708,26 @@ if __name__=='__main__':
                 segment(read_image(path      = args.path,
                                    image_id  = image_id,
                                    image_set = args.image_set),
-                        image_id     = image_id,
-                        path         = args.figs,
-                        show         = args.show,
-                        channels     = channels,
-                        Descriptions = Descriptions)
+                        image_id                 = image_id,
+                        path                     = args.figs,
+                        show                     = args.show,
+                        channels                 = channels,
+                        Descriptions             = Descriptions,
+                        shouldDisplayThinned     = args.individuals,
+                        shouldDisplayIndividuals = args.thinned)
                 n -= 1
         else:
             segment(read_image(path      = args.path,
                                image_id  = args.image_id,
                                image_set = args.image_set),
-                    image_id      = args.image_id,
-                    path          = args.figs,
-                    show          = args.show,
-                    keep_temp     = args.keep_temp,
-                    channels      = channels,
-                    Descriptions = Descriptions)
+                    image_id                 = args.image_id,
+                    path                     = args.figs,
+                    show                     = args.show,
+                    keep_temp                = args.keep_temp,
+                    channels                 = channels,
+                    Descriptions             = Descriptions,
+                    shouldDisplayThinned     = args.individuals,
+                    shouldDisplayIndividuals = args.thinned)
 
     if args.show:
         show()
