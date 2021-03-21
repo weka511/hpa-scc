@@ -28,7 +28,7 @@ from   os.path           import join,basename,exists
 from   random            import sample
 from   sys               import float_info, exc_info
 from   tempfile          import gettempdir
-from   time              import time
+from   utils             import Timer
 from   uuid              import uuid4
 from   traceback         import print_exc
 
@@ -49,30 +49,11 @@ IMAGE_LEVEL_LABELS = ['Microtubules',
                       'Nuclei channels',
                       'Endoplasmic reticulum channels']
 
-DESCRIPTIONS       = [
-    'Nucleoplasm',
-    'Nuclear membrane',
-    'Nucleoli',
-    'Nucleoli fibrillar center',
-    'Nuclear speckles',
-    'Nuclear bodies',
-    'Endoplasmic reticulum',
-    'Golgi apparatus',
-    'Intermediate filaments',
-    'Actin filaments',
-    'Microtubules',
-    'Mitotic spindle',
-    'Centrosome',
-    'Plasma membrane',
-    'Mitochondria',
-    'Aggresome',
-    'Cytosol',
-    'Vesicles and punctate cytosolic patterns',
-    'Negative'
-]
+# read_descriptions
 
-
-
+def read_descriptions(name):
+    with open(name) as descriptions_file:
+        return {int(row[0]) : row[1] for row in  reader(descriptions_file)}
 
 # read_training_expectations
 #
@@ -155,6 +136,7 @@ def generate_neighbours(x,y,delta=[-1,0,1]):
 #
 def parse_tuple(s):
     return tuple([int(x) for x in s[1:-1].split(',')])
+
 # CMask
 #
 # A class used for diplaying 4 colour data in RGB
@@ -391,7 +373,8 @@ def display_channel(Image, image_id,
                     channel       = BLUE,
                     cmap          = 'Blues',
                     path          = './',
-                    show          = False):
+                    show          = False,
+                    Descriptions  = []):
     nx,ny,_  = Image.shape
 
     fig      = figure(figsize=(20,20))
@@ -422,19 +405,22 @@ def display_channel(Image, image_id,
                 if channel<YELLOW:
                     Partitioned[i,j,channel] = Image[i,j,channel]
                 else:
-                    Partitioned[i,j,RED] = Image[i,j,channel]
-                    Partitioned[i,j,GREEN] = Image[i,j,channel]
+                    Partitioned[i,j,RED]     = Image[i,j,channel]
+                    Partitioned[i,j,GREEN]   = Image[i,j,channel]
 
     axs[0,1].imshow(Partitioned)
     axs[0,1].axes.xaxis.set_ticks([])
     axs[0,1].axes.yaxis.set_ticks([])
     axs[0,1].set_title('Partitioned')
-    plot_hist(n_component,bins_component,axs=axs[1,2],channel=channel,title='Components')
+    plot_hist(n_component,bins_component,
+              axs     = axs[1,2],
+              channel = channel,
+              title   ='Components')
     axs[1,2].set_xlabel('Componenet counts')
     Mask.establish_background()
     Mask.show( axs[0,2])
 
-    fig.suptitle(f'{"+".join([DESCRIPTIONS[label] for label in Training[image_id]])  }')
+    fig.suptitle(f'{IMAGE_LEVEL_LABELS[channel]}: {"+".join([Descriptions[label] for label in Training[image_id]])  }')
 
     fig.savefig(join(path,f'{image_id}_{COLOUR_NAMES[channel]}.png'))
 
@@ -486,7 +472,7 @@ def display_thinned(image_id,Thinned,Image, background = 0.5,path='./',channels=
         Mask.establish_background()
         Mask.show(axs[index//2][index%2])
         index += 1
-        fig.suptitle(f'Segmenting {image_id}')
+        fig.suptitle(f'Thinned {image_id}')
 
         fig.savefig(join(path,f'{image_id}-segment.png'))
 
@@ -513,6 +499,52 @@ def get_nearest_centroid(component,
                 minimum_distance = distance
     return (nearest_centroid,minimum_distance)
 
+def display_individual_clusters(Image,image_id,Thinned,
+                                    path            = '',
+                                    component_files = []):
+    nx,ny,_           = Image.shape
+    blue_index        = channels.index(BLUE)
+    NuclearCentroids  = [get_centroid(component) for component in Thinned[blue_index]]
+    min_distance      = min([get_distance(NuclearCentroids[i], NuclearCentroids[j]) for  i in range(len(NuclearCentroids)) for j in range(i)])
+
+    mx                = 2
+    my                = 2
+    ix                = 0
+    iy                = 0
+
+    for centroid_index in range(len(NuclearCentroids)):
+        if ix==0 and iy ==0:
+            fig        = figure(figsize=(10,10))
+            axs        = fig.subplots(mx, my)
+        Mask       = CMask(nx,ny)
+
+        for (x,y) in Thinned[blue_index][centroid_index]:
+            Mask.set(x,y,BLUE)
+        for channel in channels:
+            if channel == BLUE: continue
+            for component in generate_components(component_files[channel]):
+                centroid_index1,minimum_distance = get_nearest_centroid(component,Centroids=NuclearCentroids,maximum_gap=min_distance)
+                if centroid_index == centroid_index1:
+                    for (x,y) in component:
+                        Mask.set(x,y,channel)
+
+        Mask.establish_background()
+        Mask.show(axs[ix][iy])
+        if ix==0 and iy ==0:
+            fig.suptitle(f'Centroids from {centroid_index} {image_id}')
+        x,y = NuclearCentroids[centroid_index]
+        axs[ix][iy].set_title(f'({x:.0f},{y:.0f})')
+
+        ix += 1
+        if ix == mx:
+            ix = 0
+            iy += 1
+            if iy == my:
+                iy = 0
+                fig.savefig(join(path,f'{image_id}-{centroid_index}.png'))
+    if ix!=0 or iy!=0:
+        fig.savefig(join(path,f'{image_id}-{centroid_index}.png'))
+
 # segment
 #
 # Segment all channels for one image. This is the supervisor that coordinates  functions that
@@ -527,11 +559,12 @@ def get_nearest_centroid(component,
 #     cmaps       Colour maps for displaying each channel
 
 def segment(Image, image_id,
-            path     = './',
-            show     = False,
-            channels = [BLUE, RED, GREEN, YELLOW],
-            cmaps    = {BLUE:'Blues', RED:'Reds', GREEN:'Greens', YELLOW:'YlOrBr'},
-            keep_temp = False):
+            path         = './',
+            show         = False,
+            channels     = [BLUE, RED, GREEN, YELLOW],
+            cmaps        = {BLUE:'Blues', RED:'Reds', GREEN:'Greens', YELLOW:'YlOrBr'},
+            keep_temp    = False,
+            Descriptions = {}):
     component_files = []
     Thinned         = []
     try:
@@ -551,54 +584,14 @@ def segment(Image, image_id,
                             channel        = channel,
                             cmap           = cmaps[channel],
                             path           = path,
-                            show           = show)
+                            show           = show,
+                            Descriptions = Descriptions)
 
             Thinned.append([get_thinned(Component,n=5) for Component  in generate_components(component_files[-1],P=P)])
 
-
-
-        nx,ny,_           = Image.shape
-        blue_index        = channels.index(BLUE)
-        NuclearCentroids  = [get_centroid(component) for component in Thinned[blue_index]]
-        min_distance      = min([get_distance(NuclearCentroids[i], NuclearCentroids[j]) for  i in range(len(NuclearCentroids)) for j in range(i)])
-
-        mx                = 2
-        my                = 2
-        ix                = 0
-        iy                = 0
-
-        for centroid_index in range(len(NuclearCentroids)):
-            if ix==0 and iy ==0:
-                fig        = figure(figsize=(10,10))
-                axs        = fig.subplots(mx, my)
-            Mask       = CMask(nx,ny)
-
-            for (x,y) in Thinned[blue_index][centroid_index]:
-                Mask.set(x,y,BLUE)
-            for channel in channels:
-                if channel == BLUE: continue
-                for component in generate_components(component_files[channel]):
-                    centroid_index1,minimum_distance = get_nearest_centroid(component,Centroids=NuclearCentroids,maximum_gap=min_distance)
-                    if centroid_index == centroid_index1:
-                        for (x,y) in component:
-                            Mask.set(x,y,channel)
-
-            Mask.establish_background()
-            Mask.show(axs[ix][iy])
-            if ix==0 and iy ==0:
-                fig.suptitle(f'{image_id}')
-            x,y = NuclearCentroids[centroid_index]
-            axs[ix][iy].set_title(f'({x:.0f},{y:.0f})')
-
-            ix += 1
-            if ix == mx:
-                ix = 0
-                iy += 1
-                if iy == my:
-                    iy = 0
-                    fig.savefig(join(path,f'{image_id}-{centroid_index}.png'))
-        if ix!=0 or iy!=0:
-            fig.savefig(join(path,f'{image_id}-{centroid_index}.png'))
+        display_individual_clusters(Image,image_id,Thinned,
+                                    path            = path,
+                                    component_files = component_files)
 
         display_thinned(image_id,Thinned,Image,path=path,channels=channels)
 
@@ -628,104 +621,102 @@ def colour2channel(c):
         raise Exception(f'Channel {c} Not recognized')
 
 if __name__=='__main__':
-    start  = time()
-    parser = ArgumentParser('Segment HPA data using Otsu\'s algorithm')
-    parser.add_argument('--path',
-                        default = r'd:\data\hpa-scc',
-                        help    = 'Path to data')
-    parser.add_argument('--image_set',
-                        default = 'train512x512',
-                        help    = 'Identified subset of data-- e.g. train512x512')
-    parser.add_argument('--image_id',
-                        default = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
-                        help    = 'Identifies image to be segmented (if only one). See --sample, --all, and --read')
-    parser.add_argument('--show',
-                        default = False,
-                        action  = 'store_true',
-                        help    = 'Display plots')
-    parser.add_argument('--figs',
-                        default = './figs',
-                        help    = 'Identifies where to store plots')
-    parser.add_argument('--all',
-                        default = False,
-                        action  = 'store_true',
-                        help    = 'Specifes that all images are to be processed')
-    parser.add_argument('--sample',
-                        type    = int,
-                        default = 0,
-                        help    = 'Specified number of images are to be sampled at random and processed')
-    parser.add_argument('--keep_temp',
-                        default = False,
-                        action  = 'store_true',
-                        help    = 'Retain temporary files after processing')
-    parser.add_argument('--history',
-                        default = 'history.txt',
-                        help    = 'File name for keeping list of files processed (only if --sample)')
-    parser.add_argument('--read',
-                        default = '',
-                        help    = 'Used to process images whose names are specified in file')
-    parser.add_argument('--channels',
-                        default = ['blue', 'red', 'green','yellow'],
-                        nargs   = '*',
-                        help    = 'Used to restrict the channels that are processed')
-    args     = parser.parse_args()
+    with Timer():
+        parser = ArgumentParser('Segment HPA data using Otsu\'s algorithm')
+        parser.add_argument('--path',
+                            default = r'd:\data\hpa-scc',
+                            help    = 'Path to data')
+        parser.add_argument('--image_set',
+                            default = 'train512x512',
+                            help    = 'Identified subset of data-- e.g. train512x512')
+        parser.add_argument('--image_id',
+                            default = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
+                            help    = 'Identifies image to be segmented (if only one). See --sample, --all, and --read')
+        parser.add_argument('--show',
+                            default = False,
+                            action  = 'store_true',
+                            help    = 'Display plots')
+        parser.add_argument('--figs',
+                            default = './figs',
+                            help    = 'Identifies where to store plots')
+        parser.add_argument('--all',
+                            default = False,
+                            action  = 'store_true',
+                            help    = 'Specifes that all images are to be processed')
+        parser.add_argument('--sample',
+                            type    = int,
+                            default = 0,
+                            help    = 'Specified number of images are to be sampled at random and processed')
+        parser.add_argument('--keep_temp',
+                            default = False,
+                            action  = 'store_true',
+                            help    = 'Retain temporary files after processing')
+        parser.add_argument('--history',
+                            default = 'history.txt',
+                            help    = 'File name for keeping list of files processed (only if --sample)')
+        parser.add_argument('--read',
+                            default = '',
+                            help    = 'Used to process images whose names are specified in file')
+        parser.add_argument('--channels',
+                            default = ['blue', 'red', 'green','yellow'],
+                            nargs   = '*',
+                            help    = 'Used to restrict the channels that are processed')
+        args         = parser.parse_args()
+        Descriptions = read_descriptions('descriptions.csv')
+        Training     = read_training_expectations(path=args.path)
+        channels     = [colour2channel(c) for c in args.channels]
 
-    Training = read_training_expectations(path=args.path)
-    channels = [colour2channel(c) for c in args.channels]
-
-    if len(args.read)>0:
-        with open(args.read) as history:
-            for line in history:
-                image_id = line.strip()
-                print (f'{image_id}')
-                segment(read_image(path      = args.path,
-                                   image_id  = image_id,
-                                   image_set = args.image_set),
-                        image_id = image_id,
-                        path     = args.figs,
-                        show     = args.show,
-                        channels = channels)
-    elif args.sample:
-        n = args.sample
-
-        with open(args.history,'w') as history:
-            for image_id in sample(list(Training.keys()),args.sample):
+        if len(args.read)>0:
+            with open(args.read) as history:
+                for line in history:
+                    image_id = line.strip()
+                    print (f'{image_id}')
+                    segment(read_image(path      = args.path,
+                                       image_id  = image_id,
+                                       image_set = args.image_set),
+                            image_id     = image_id,
+                            path         = args.figs,
+                            show         = args.show,
+                            channels     = channels,
+                            Descriptions = Descriptions)
+        elif args.sample:
+            n = args.sample
+            with open(args.history,'w') as history:
+                for image_id in sample(list(Training.keys()),args.sample):
+                    print (f'{image_id}. {n} remaining')
+                    history.write(f'{image_id}\n')
+                    segment(read_image(path      = args.path,
+                                       image_id  = image_id,
+                                       image_set = args.image_set),
+                            image_id     = image_id,
+                            path         = args.figs,
+                            show         = args.show,
+                            channels     = channels,
+                            Descriptions = Descriptions)
+                    n-=1
+        elif args.all:
+            n = len(Training)
+            for image_id in sorted(Training.keys()):
                 print (f'{image_id}. {n} remaining')
-                history.write(f'{image_id}\n')
                 segment(read_image(path      = args.path,
                                    image_id  = image_id,
                                    image_set = args.image_set),
-                        image_id = image_id,
-                        path     = args.figs,
-                        show     = args.show,
-                        channels = channels)
-                n-=1
-    elif args.all:
-        n = len(Training)
-        for image_id in sorted(Training.keys()):
-            print (f'{image_id}. {n} remaining')
+                        image_id     = image_id,
+                        path         = args.figs,
+                        show         = args.show,
+                        channels     = channels,
+                        Descriptions = Descriptions)
+                n -= 1
+        else:
             segment(read_image(path      = args.path,
-                               image_id  = image_id,
+                               image_id  = args.image_id,
                                image_set = args.image_set),
-                    image_id = image_id,
-                    path     = args.figs,
-                    show     = args.show,
-                    channels = channels)
-            n -= 1
-    else:
-        segment(read_image(path      = args.path,
-                           image_id  = args.image_id,
-                           image_set = args.image_set),
-                image_id  = args.image_id,
-                path      = args.figs,
-                show      = args.show,
-                keep_temp = args.keep_temp,
-                channels  = channels)
-
-    elapsed = time() - start
-    minutes = int(elapsed/60)
-    seconds = elapsed - 60*minutes
-    print (f'Elapsed Time {minutes} m {seconds:.2f} s')
+                    image_id      = args.image_id,
+                    path          = args.figs,
+                    show          = args.show,
+                    keep_temp     = args.keep_temp,
+                    channels      = channels,
+                    Descriptions = Descriptions)
 
     if args.show:
         show()
