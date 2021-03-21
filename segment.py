@@ -211,7 +211,7 @@ if __name__=='__main__':
                             default = 'train512x512',
                             help    = 'Identified subset of data-- e.g. train512x512')
         parser.add_argument('--figs',
-                            default = './figs',
+                            default = './seg2',
                             help    = 'Identifies where to store plots')
         parser.add_argument('--masks',
                             default = './masks',
