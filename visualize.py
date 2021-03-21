@@ -25,12 +25,15 @@ from os                import environ
 from os.path           import join
 from random            import sample, seed
 from scipy.signal      import correlate2d,fftconvolve
+from sys               import exit
 
-RED         = 0
-GREEN       = 1
-BLUE        = 2
-YELLOW      = 3
-NCOLOURS    = 3
+RED                = 0      # Channel number for Microtubules
+GREEN              = 1      # Channel number for Protein of interest
+BLUE               = 2      # Channel number for Nucelus
+YELLOW             = 3      # Channel number for Endoplasmic reticulum
+NCHANNELS          = 4      # Number of channels
+NRGB               = 3      # Number of actual channels for graphcs
+
 
 colours     = ['red',
                'green',
@@ -63,21 +66,22 @@ def read_training_expectations(path=join(environ['DATA'],'hpa-scc'),file_name='t
 #
 # Display images for one slide.
 
-def visualize(image_id     = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
+def visualize(image_id     = None,
               path         = join(environ['DATA'],'hpa-scc'),
               image_set    = 'train512x512',
               figs         = './figs',
-              Descriptions = [],
               dpi          = 300,
               correlate2d  = False,
-              bins         = None):
+              bins         = None,
+              Descriptions = {},
+              Training     =  {}):
     fig          = figure(figsize=(20,20))
     nrows        = 2
     if correlate2d:
         nrows += 1
     if bins!=None:
         nrows += 1
-    axs          = fig.subplots(nrows = nrows, ncols = NCOLOURS + 1)
+    axs          = fig.subplots(nrows = nrows, ncols = NCHANNELS)
     Greys        = []
 
     for seq,colour in enumerate([BLUE,RED,YELLOW,GREEN]):
@@ -85,7 +89,7 @@ def visualize(image_id     = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
         path_name        = join(path,image_set,file_name)
         Greys.append(imread(path_name))
         nx,ny            = Greys[-1].shape
-        Image            = zeros((nx,ny,NCOLOURS))
+        Image            = zeros((nx,ny,NRGB))
 
         if colour==YELLOW:
             Image[:,:,RED]    = Greys[-1][:,:]
@@ -100,7 +104,7 @@ def visualize(image_id     = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
 
     for seq,colour in enumerate([BLUE,RED,YELLOW]):
         nx,ny           = Greys[-1].shape
-        Image           = zeros((nx,ny,NCOLOURS))
+        Image           = zeros((nx,ny,NRGB))
         Image[:,:,BLUE] = Greys[seq][:,:]
         Image[:,:,RED]  = Greys[GREEN][:,:]
         axs[1,seq].imshow(Image)
@@ -122,8 +126,8 @@ def visualize(image_id     = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
                 axs[next_row,seq].hist(corr.flatten(),bins='stone',color=colours[colour])
 
     for i in range(nrows):
-        axs[i,NCOLOURS].axes.xaxis.set_ticks([])
-        axs[i,NCOLOURS].axes.yaxis.set_ticks([])
+        axs[i,NRGB].axes.xaxis.set_ticks([])
+        axs[i,NRGB].axes.yaxis.set_ticks([])
 
     fig.suptitle(f'{image_id}: {"+".join([Descriptions[label] for label in Training[image_id]])}')
     savefig(join(figs,image_id), dpi=dpi, bbox_inches='tight')
@@ -149,8 +153,8 @@ if __name__=='__main__':
                         default = 'train512x512',
                         help    = 'Set resolution of raw images')
     parser.add_argument('--image_id',
-                        default = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
-                        help    = 'Used to vew a single image only')
+                        default = None,
+                        help    = 'Used to view a single image only')
     parser.add_argument('--figs',
                         default = './figs',
                         help    = 'Identifies where to store plots')
@@ -185,8 +189,11 @@ if __name__=='__main__':
                         help    = 'Resolution for saving images')
     parser.add_argument('--correlate2d',
                         default = False,
-                        action  = 'store_true')
-    parser.add_argument('--bins')
+                        action  = 'store_true',
+                        help    = 'Specify that we want correlation plotted')
+    parser.add_argument('--bins',
+                        help    = 'Plot histogram - specifes binning strategy')
+
     args         = parser.parse_args()
     seed(args.seed)
     Descriptions = read_descriptions('descriptions.csv')
@@ -201,30 +208,35 @@ if __name__=='__main__':
                                 path         = args.path,
                                 image_set    = args.image_set,
                                 figs         = args.figs,
-                                Descriptions = Descriptions,
                                 correlate2d  = args.correlate2d,
-                                bins         = args.bins)
+                                bins         = args.bins,
+                                Descriptions = Descriptions,
+                                Training     = Training)
                 if not args.show:
                     close(fig)
-    elif args.sample == None:
+    elif args.sample == None and args.image_id!=None:
         visualize(image_id     = args.image_id,
                   path         = args.path,
                   image_set    = args.image_set,
                   figs         = args.figs,
-                  Descriptions = Descriptions,
                   correlate2d  = args.correlate2d,
-                  bins         = args.bins)
-    else:
+                  bins         = args.bins,
+                  Descriptions = Descriptions,
+                  Training     = Training)
+    elif args.sample != None:
         for image_id in sample(list(Training.keys()),args.sample):
             fig = visualize(image_id     = image_id,
                             path         = args.path,
                             image_set    = args.image_set,
                             figs         = args.figs,
-                            Descriptions = Descriptions,
                             correlate2d  = args.correlate2d,
-                            bins         = args.bins)
+                            bins         = args.bins,
+                            Descriptions = Descriptions,
+                            Training     = Training)
             if not args.show:
                 close(fig)
+    else:
+        exit('Missing argument')
 
     if args.show:
         show()
