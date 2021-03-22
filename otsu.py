@@ -26,6 +26,7 @@ from   numpy             import zeros, array, var, mean, std, histogram
 from   os                import remove
 from   os.path           import join,basename,exists
 from   random            import sample
+from scipy.spatial       import Voronoi, voronoi_plot_2d
 from   sys               import float_info, exc_info, exit
 from   tempfile          import gettempdir
 from   utils             import Timer
@@ -106,7 +107,10 @@ def read_image(path        = r'C:\data\hpa-scc',
 #     axs
 #     title
 
-def plot_hist(n,bins,axs=None,title=None,channel=BLUE):
+def plot_hist(n,bins,
+              axs     = None,
+              title   = None,
+              channel = BLUE):
     axs.bar((bins[:-1] + bins[1:]) / 2,
             n,
             align = 'center',
@@ -141,7 +145,7 @@ def parse_tuple(s):
 
 # CMask
 #
-# A class used for diplaying 4 colour data in RGB
+# A class used for displaying 4 colour data in RGB
 
 class CMask:
     YGweight = 0.5
@@ -376,16 +380,17 @@ def display_channel(Image, image_id,
                     cmap          = 'Blues',
                     path          = './',
                     show          = False,
-                    Descriptions  = []):
+                    Descriptions  = [],
+                    voronoi       = None):
     nx,ny,_  = Image.shape
 
     fig      = figure(figsize=(20,20))
-    axs      = fig.subplots(2, 3)
+    axs      = fig.subplots(2, 3 if voronoi==None else 4)
 
     im       = axs[0,0].imshow(Image[:,:,channel],cmap=cm.get_cmap(cmap))
     axs[0,0].axes.xaxis.set_ticks([])
     axs[0,0].axes.yaxis.set_ticks([])
-    axs[0,0].set_title(image_id)
+    axs[0,0].set_title('Raw Data')
     fig.colorbar(im, ax=axs[0,0], orientation='vertical')
 
     plot_hist(n_otsu,bins_otsu,axs=axs[1,1],title=IMAGE_LEVEL_LABELS[channel],channel=channel)
@@ -418,11 +423,16 @@ def display_channel(Image, image_id,
               axs     = axs[1,2],
               channel = channel,
               title   ='Components')
-    axs[1,2].set_xlabel('Componenet counts')
+    axs[1,2].set_xlabel('Component counts')
     Mask.establish_background()
     Mask.show( axs[0,2])
 
-    fig.suptitle(f'{IMAGE_LEVEL_LABELS[channel]}: {"+".join([Descriptions[label] for label in Training[image_id]])  }')
+    if voronoi!=None:
+        voronoi_plot_2d(voronoi, ax=axs[0,3], show_vertices=False)
+        axs[0,3].set_ylim(axs[0,0].get_ylim())
+        axs[0,3].set_xlim(axs[0,0].get_xlim())
+
+    fig.suptitle(f'{image_id} {IMAGE_LEVEL_LABELS[channel]}: {"+".join([Descriptions[label] for label in Training[image_id]])  }')
 
     fig.savefig(join(path,f'{image_id}_{COLOUR_NAMES[channel]}.png'))
 
@@ -550,7 +560,7 @@ def display_individual_clusters(Image,image_id,
 
 # segment
 #
-# Segment all channels for one image. This is the supervisor that coordinates  functions that
+# Segment all channels for one image. This function coordinates thers that
 # perform the actual detailed work
 #
 # Parameters:
@@ -560,7 +570,10 @@ def display_individual_clusters(Image,image_id,
 #     show        Indicates whter images are to be displayed (or only saved)
 #     channels    The channels to be segments
 #     cmaps       Colour maps for displaying each channel
-
+#     keep_temp
+#     Descriptions
+#     shouldDisplayThinned
+#     shouldDisplayIndividuals
 def segment(Image, image_id,
             path                     = './',
             show                     = False,
@@ -578,6 +591,12 @@ def segment(Image, image_id,
             P,Thresholds,ICVs,n_otsu,bins_otsu,n_component,bins_component,Mask = segment_channel(Image,
                                                                                                  channel        = channel,
                                                                                                  component_file = component_files[-1])
+            voronoi = None
+            if channel == BLUE:
+                component_file = component_files[-1]
+                centroids = [get_centroid(get_thinned(C,n=5)) for C in generate_components(component_file, P=P)]
+                voronoi = Voronoi(centroids)
+
             display_channel(Image, image_id,
                             Thresholds     = Thresholds,
                             ICVs           = ICVs,
@@ -590,10 +609,14 @@ def segment(Image, image_id,
                             cmap           = cmaps[channel],
                             path           = path,
                             show           = show,
-                            Descriptions   = Descriptions)
+                            Descriptions   = Descriptions,
+                            voronoi        = voronoi)
+
+                # fig = voronoi_plot_2d(vor)
 
         if shouldDisplayIndividuals or shouldDisplayThinned:
-            Thinned.append([get_thinned(C,n=5) for C in generate_components(component_files[-1], P=P)])
+            for file in component_files:
+                Thinned.append([get_thinned(C,n=5) for C in generate_components(file, P=P)])
 
         if shouldDisplayIndividuals:
             display_individual_clusters(Image,image_id,
