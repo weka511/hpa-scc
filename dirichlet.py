@@ -68,7 +68,7 @@ def read_image(path        = r'C:\data\hpa-scc',
 
     return Image
 
-def DPmeans(Image,Lambda=200,threshold=0):
+def DPmeans(Image,Lambda=2000,background=0):
     def get_centroid(Points):
         return (mean([x for x,_ in Points]),
                 mean([y for _,y in Points]))
@@ -76,15 +76,20 @@ def DPmeans(Image,Lambda=200,threshold=0):
         return [Xs[i] for i in range(n) if Zs[i]==c]
 
     nx,ny = Image.shape
-    Xs    = [(i,j) for i in range(nx) for j in range(ny) if Image[i,j]>threshold]
+    Xs    = [(i,j) for i in range(nx) for j in range(ny) if Image[i,j]>background]
     n     = len(Xs)
     k     = 1
     L     = [Xs]
     mu    = [get_centroid(Xs)]
     Zs    = [0 for _ in Xs]
-    fig          = figure(figsize=(20,20))
-    axs          = fig.subplots(nrows = 4, ncols = 4)
-    for l in range(10):
+    fig   = figure(figsize=(20,20))
+    nrows = 5
+    ncols = 5
+    axs   = fig.subplots(nrows = nrows, ncols = ncols)
+    converged = False
+    for l in range(nrows*ncols):
+        if converged: break
+        converged = True      # presumption
         for i in range(n):
             x,y    = Xs[i]
             d = []
@@ -93,15 +98,20 @@ def DPmeans(Image,Lambda=200,threshold=0):
                 d.append((x-x0)**2 + (y-y0)**2)
             c = argmin(d)
             if d[c] > Lambda:
-                Zs[i] = k
-                k += 1
+                Zs[i]     = k
+                k         += 1
                 mu.append(Xs[i])
+                converged = False
             else:
-                Zs[i] = c
+                if Zs[i] != c:
+                    Zs[i] = c
+                    converged = False
 
-        L = [generate_cluster(c) for c in range(k)]
+        L =  [generate_cluster(c) for c in range(k)]
         mu = [get_centroid(Xs) for Xs in L]
-        axs[l//4,l%4].scatter([x for x,_ in mu],[y for _,y in mu])
+        axs[l//ncols,l%ncols].scatter([x for x,_ in Xs],[y for _,y in Xs],c='b',s=1,alpha=0.5)
+        axs[l//ncols,l%ncols].scatter([x for x,_ in mu],[y for _,y in mu],c='r',s=1,alpha=0.5)
+        axs[l//ncols,l%ncols].set_title(f'k={k}')
 
 if __name__=='__main__':
     parser = ArgumentParser('Cluster HPA data')
