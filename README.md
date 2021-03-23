@@ -28,6 +28,7 @@
 |---------------------|-------------------------------------------------------------------------------------------------|
 |analyze-labels|Find images  that have only one label|
 |CellSegmenterTest.py|Demo for HPA cellsegmentator|
+|dirichlet.py|Spike for exploring dirichlet process-means|
 |encoding.py|Example of encoding|
 |otsu.py|Segment images using Otsu's method|
 |split.py|Partition data into training and validation|
