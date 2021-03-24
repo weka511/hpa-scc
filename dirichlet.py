@@ -220,6 +220,7 @@ if __name__=='__main__':
     axs[0,0].set_title(f'k={k}, iteration={seq}')
     Thinned0 = [t for T in Thinned for t in T]
     axs[0,1].scatter([x for x,_ in Thinned0],[y for _,y in Thinned0],c='b',s=1)
+    axs[1,0].scatter([x for x,_ in Xs],[y for _,y in Xs],c='b',s=1,alpha=0.5)
     voronoi_plot_2d(voronoi, ax=axs[1,0], show_vertices=False)
     fig.suptitle(f'{args.image_id}')
     savefig(join(args.figs,f'{args.image_id}_dirichlet'), dpi=args.dpi, bbox_inches='tight')
