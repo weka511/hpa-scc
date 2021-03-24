@@ -21,6 +21,8 @@ from matplotlib.image  import imread
 from numpy             import zeros, mean, std, argmin
 from os                import environ
 from os.path           import join
+from scipy.spatial     import Voronoi, voronoi_plot_2d
+from sys               import float_info
 
 RED                = 0      # Channel number for Microtubules
 GREEN              = 1      # Channel number for Protein of interest
@@ -68,15 +70,16 @@ def read_image(path        = r'C:\data\hpa-scc',
 
     return Image
 
-def DPmeans(Image,Lambda=2000,background=0,delta=64):
-    def get_dist2(p0,p1):
-        x0,y0 = p0
-        x1,y1 = p1
-        return (x1-x0)**2 + (y1-y0)**2
+def get_dist2(p0,p1):
+    x0,y0 = p0
+    x1,y1 = p1
+    return (x1-x0)**2 + (y1-y0)**2
 
-    def get_centroid(Points):
-        return (mean([x for x,_ in Points]),
-                mean([y for _,y in Points]))
+def get_centroid(Points):
+    return (mean([x for x,_ in Points]),
+            mean([y for _,y in Points]))
+
+def DPmeans(Image,Lambda=2000,background=0,delta=64):
 
     def generate_cluster(c):
         return [Xs[i] for i in range(n) if Zs[i]==c]
@@ -91,9 +94,8 @@ def DPmeans(Image,Lambda=2000,background=0,delta=64):
     Xs        = [(i,j) for i in range(nx) for j in range(ny) if Image[i,j]>background]
     n         = len(Xs)
     k         = 1
-    L         = [Xs]
     mu        = [get_centroid(Xs)]
-    Zs        = [0 for _ in Xs]
+    Zs        = [0] * n
     while True:
         for i in range(n):
             D = [get_dist2(Xs[i],mu[c]) for c in range(k)]
@@ -110,6 +112,49 @@ def DPmeans(Image,Lambda=2000,background=0,delta=64):
         mu0 = mu[:]
         mu  = [get_centroid(Xs) for Xs in L]
         yield has_converged(mu,mu0),k,L,mu,Xs,Zs
+
+# generate_neighbours
+#
+# Used to iterate through 8 neighbours of a point
+#
+# Parameters:
+#     x         x coordinate of point
+#     y         y coordinate of point
+#     delta     Used to generate neighbours from cartesian product delta x delta
+
+def generate_neighbours(x,y,delta=[-1,0,1]):
+    for dx in delta:
+        for dy in delta:
+            if dx==0 and dy==0: continue  # Don't visit the original point
+            yield x + dx, y + dy
+
+# get_thinned
+#
+# Eliminate interior points from compoent
+
+def get_thinned(Component,n=4):
+    # is_isolated
+    #
+    # Establish whether point is isolated by counting neighbours.
+
+    def is_isolated(x,y):
+        count = 0
+        for x1,y1 in generate_neighbours(x,y,delta=[-1,0,1]):
+            if (x1,y1) in Neighbours:
+                count+=1
+                if count>n:
+                    return False
+        return True
+    Neighbours = set(Component)
+    return [(x,y) for (x,y) in Component if is_isolated(x,y)]
+
+def get_min_distance(C1,C2):
+    min_distance = float_info.max
+    for pt1 in C1:
+        for pt2 in C2:
+            min_distance = min(min_distance,get_dist2(pt1,pt2))
+    return min_distance
+
 
 if __name__=='__main__':
     parser = ArgumentParser('Cluster HPA data')
@@ -133,21 +178,49 @@ if __name__=='__main__':
                         default = 300,
                         type    = int,
                         help    = 'Resolution for saving images')
+    parser.add_argument('--min_count',
+                        default = 10,
+                        type    = int,
+                        help    = 'Discard clusters with fewer points')
     args = parser.parse_args()
     Image = read_image(image_id  = args.image_id,
                        path      = args.path,
                        image_set = args.image_set)
 
-    for l,(converged,k,L,mu,Xs,Zs) in enumerate(DPmeans(Image[:,:,BLUE])):
+    for seq,(converged,k,L,mu,Xs,Zs) in enumerate(DPmeans(Image[:,:,BLUE])):
         if converged: break
 
+    Thinned = [get_thinned(Component) for Component in L]
+    Deltas = [(k1,k2,get_min_distance(Thinned[k1],Thinned[k2])) for k1 in range(k) for k2 in range(k1)]
+    delta_max = 16
+    Pairs = [(k1,k2) for k1,k2,delta in Deltas if delta<delta_max]
+    print (Pairs)
+    Clusters = {c:[c] for c in range(k)}
+    for a,b in Pairs:
+        Cluster = Clusters[b]
+        Clusters[b].insert(0,a)
+        Clusters[a] = Clusters[b]
+    Closed = []
+    Merged = []
+    for a,B in Clusters.items():
+        if a in Closed: continue
+        Merged.append(B)
+        Closed.append(a)
+        for b in B:
+            Closed.append(b)
+    Centroids = []
+    for m in Merged:
+        Centroids.append(get_centroid([pt for c in list(set(m)) for pt in L[c]]))
+
+    voronoi = Voronoi(Centroids)
     fig   = figure(figsize=(20,20))
-    nrows = 4
-    ncols = 4
     axs   = fig.subplots(nrows = 2, ncols = 2)
     axs[0,0].scatter([x for x,_ in Xs],[y for _,y in Xs],c='b',s=1,alpha=0.5)
-    axs[0,0].scatter([x for x,_ in mu],[y for _,y in mu],c='r',s=1,alpha=0.5)
-    axs[0,0].set_title(f'k={k},l={l}')
+    axs[0,0].scatter([x for x,_ in mu],[y for _,y in mu],c='r',s=2,alpha=0.5)
+    axs[0,0].set_title(f'k={k}, iteration={seq}')
+    Thinned0 = [t for T in Thinned for t in T]
+    axs[0,1].scatter([x for x,_ in Thinned0],[y for _,y in Thinned0],c='b',s=1)
+    voronoi_plot_2d(voronoi, ax=axs[1,0], show_vertices=False)
     fig.suptitle(f'{args.image_id}')
     savefig(join(args.figs,f'{args.image_id}_dirichlet'), dpi=args.dpi, bbox_inches='tight')
     if args.show:
