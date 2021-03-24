@@ -45,6 +45,33 @@ IMAGE_LEVEL_LABELS    = [
     'Nuclei channels',
     'Endoplasmic reticulum'
 ]
+
+class Image4(object):
+    def __init__(self,
+                 path        = r'd:\data\hpa-scc',
+                 image_set   = 'train512x512',
+                 image_id    = '000a6c98-bb9b-11e8-b2b9-ac1f6b6435d0'):
+
+        for channel in range(NCHANNELS):
+            image_mono = imread(join(path,
+                                     image_set,
+                                     f'{image_id}_{COLOUR_NAMES[channel]}.png'))
+            if channel==0:
+                self.nx,self.ny     = image_mono.shape
+                self.Image          = zeros((self.nx,self.ny,NCHANNELS))
+
+            self.Image[:,:,channel] = image_mono
+
+    def get(self,channels=[BLUE]):
+        Image            = zeros((self.nx,self.ny,NRGB))
+        for channel in channels:
+            if channel==YELLOW:
+                Image[:,:,RED]    =  self.Image [:,:,channel]
+                Image[:,:,GREEN]  =  self.Image [:,:,channel]
+            else:
+                Image[:,:,channel] =  self.Image [:,:,channel]
+        return Image
+
 # read_image
 #
 # Read set of images (keeping Yellow separate)
@@ -101,7 +128,7 @@ def DPmeans(Image,Lambda=8000,background=0,delta=64):
         return len(mu)==len(mu0) and all(get_dist2(p1,p2)<delta for p1,p2 in zip(sorted(mu),sorted(mu0)))
 
     nx,ny = Image.shape
-    Xs        = [(i,j) for i in range(nx) for j in range(ny) if Image[i,j]>background]
+    Xs        = [(i,j) for i in range(nx) for j in range(ny) if Image[j,i]>background]
     n         = len(Xs)
     k         = 1
     mu        = [get_centroid(Xs)]
@@ -219,33 +246,38 @@ if __name__=='__main__':
                         type    = int,
                         help    = 'Discard clusters with fewer points')
     args = parser.parse_args()
-    Image = read_image(image_id  = args.image_id,
+    Image = Image4(image_id  = args.image_id,
                        path      = args.path,
                        image_set = args.image_set)
-
-    for seq,(converged,k,L,mu,Xs,Zs) in enumerate(DPmeans(Image[:,:,BLUE])):
+    blues = Image.get()
+    for seq,(converged,k,L,mu,Xs,Zs) in enumerate(DPmeans(blues[:,:,BLUE])):
         if converged: break
 
     Thinned, Centroids = merge_clusters(k,L,mu,Xs,Zs)
     voronoi            = Voronoi(Centroids)
-    nx,ny              = Image[:,:,RED].shape
-    Microtubules       =  [(i,j) for i in range(nx) for j in range(ny) if Image[i,j,RED]>0.5]
-    ER                 =  [(i,j) for i in range(nx) for j in range(ny) if Image[i,j,YELLOW]>0.5]
+
     fig   = figure(figsize=(20,20))
     axs   = fig.subplots(nrows = 2, ncols = 2)
-    axs[0,0].scatter([x for x,_ in Xs],[y for _,y in Xs],c='b',s=1,alpha=0.5)
+
+    axs[0,0].imshow(blues,extent=[0,Image.nx-1,0,Image.ny-1],origin='lower')
     axs[0,0].scatter([x for x,_ in mu],[y for _,y in mu],c='m',s=2,alpha=0.5)
     axs[0,0].set_title(f'k={k}, iteration={seq}')
+    axs[0,0].set_xlim(0,Image.nx-1)
+    axs[0,0].set_ylim(0,Image.ny-1)
 
     axs[0,1].scatter([x for x,_ in flatten(Thinned)],[y for _,y in flatten(Thinned)],c='b',s=1)
+    axs[0,1].set_xlim(0,Image.nx-1)
+    axs[0,1].set_ylim(0,Image.ny-1)
 
-    axs[1,0].scatter([x for x,_ in Xs],[y for _,y in Xs],c='b',s=1,alpha=0.5)
-    axs[1,0].scatter([x for x,_ in Microtubules],[y for _,y in Microtubules],c='r',s=1,alpha=0.5)
-    voronoi_plot_2d(voronoi, ax=axs[1,0], show_vertices=False)
+    axs[1,0].imshow(Image.get(channels=[RED,BLUE]),extent=[0,Image.nx-1,0,Image.ny-1],origin='lower')
+    voronoi_plot_2d(voronoi, ax=axs[1,0], show_vertices=False, line_colors='orange')
+    axs[1,0].set_xlim(0,Image.nx-1)
+    axs[1,0].set_ylim(0,Image.ny-1)
 
-    axs[1,1].scatter([x for x,_ in Xs],[y for _,y in Xs],c='b',s=1,alpha=0.5)
-    axs[1,1].scatter([x for x,_ in ER],[y for _,y in ER],c='y',s=1,alpha=0.5)
-    voronoi_plot_2d(voronoi, ax=axs[1,1], show_vertices=False)
+    axs[1,1].imshow(Image.get(channels=[YELLOW,BLUE]),extent=[0,Image.nx-1,0,Image.ny-1],origin='lower')
+    voronoi_plot_2d(voronoi, ax=axs[1,1], show_vertices=False, line_colors='cyan')
+    axs[1,1].set_xlim(0,Image.nx-1)
+    axs[1,1].set_ylim(0,Image.ny-1)
 
     fig.suptitle(f'{args.image_id}')
     savefig(join(args.figs,f'{args.image_id}_dirichlet'), dpi=args.dpi, bbox_inches='tight')
