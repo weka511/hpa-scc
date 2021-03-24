@@ -26,7 +26,7 @@ from   numpy             import zeros, array, var, mean, std, histogram
 from   os                import remove
 from   os.path           import join,basename,exists
 from   random            import sample
-from scipy.spatial       import Voronoi, voronoi_plot_2d
+from   scipy.spatial     import Voronoi, voronoi_plot_2d
 from   sys               import float_info, exc_info, exit
 from   tempfile          import gettempdir
 from   utils             import Timer
