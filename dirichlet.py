@@ -79,16 +79,26 @@ def get_centroid(Points):
     return (mean([x for x,_ in Points]),
             mean([y for _,y in Points]))
 
-def DPmeans(Image,Lambda=2000,background=0,delta=64):
+# DPmeans
+#
+# Find clusters using Dirichlet process means
+
+# Revisiting k-means: New Algorithms via Bayesian Nonparametrics
+# Brian Kulis  and Michael I. Jordan
+# https://arxiv.org/abs/1111.0352
+#
+# Parameters:
+#     Image
+#     Lambda         Penalty
+#     background
+#     delta
+def DPmeans(Image,Lambda=8000,background=0,delta=64):
 
     def generate_cluster(c):
         return [Xs[i] for i in range(n) if Zs[i]==c]
 
     def has_converged(mu,mu0):
-        if len(mu)!=len(mu0):
-            return False
-        else:
-            return all(get_dist2(p1,p2)<delta for p1,p2 in zip(sorted(mu),sorted(mu0)))
+        return len(mu)==len(mu0) and all(get_dist2(p1,p2)<delta for p1,p2 in zip(sorted(mu),sorted(mu0)))
 
     nx,ny = Image.shape
     Xs        = [(i,j) for i in range(nx) for j in range(ny) if Image[i,j]>background]
@@ -130,7 +140,7 @@ def generate_neighbours(x,y,delta=[-1,0,1]):
 
 # get_thinned
 #
-# Eliminate interior points from compoent
+# Eliminate interior points from component
 
 def get_thinned(Component,n=4):
     # is_isolated
@@ -155,9 +165,35 @@ def get_min_distance(C1,C2):
             min_distance = min(min_distance,get_dist2(pt1,pt2))
     return min_distance
 
+def merge_clusters(k,L,mu,Xs,Zs,delta_max = 64):
+    Thinned = [get_thinned(Component) for Component in L]
+    Deltas = [(k1,k2,get_min_distance(Thinned[k1],Thinned[k2])) for k1 in range(k) for k2 in range(k1)]
+
+    Pairs = [(k1,k2) for k1,k2,delta in Deltas if delta<delta_max]
+    print (Pairs)
+    Clusters = {c:[c] for c in range(k)}
+    for a,b in Pairs:
+        Cluster = Clusters[b]
+        Clusters[b].insert(0,a)
+        Clusters[a] = Clusters[b]
+    Closed = []
+    Merged = []
+    for a,B in Clusters.items():
+        if a in Closed: continue
+        Merged.append(B)
+        Closed.append(a)
+        for b in B:
+            Closed.append(b)
+    Centroids = []
+    for m in Merged:
+        Centroids.append(get_centroid([pt for c in list(set(m)) for pt in L[c]]))
+    return Thinned, Centroids
+
+def flatten(TT):
+    return [t for T in TT for t in T]
 
 if __name__=='__main__':
-    parser = ArgumentParser('Cluster HPA data')
+    parser = ArgumentParser('Cluster HPA data using Dirichlet Process Means')
     parser.add_argument('--path',
                         default = join(environ['DATA'],'hpa-scc'),
                         help    = 'Folder for data files')
@@ -190,38 +226,27 @@ if __name__=='__main__':
     for seq,(converged,k,L,mu,Xs,Zs) in enumerate(DPmeans(Image[:,:,BLUE])):
         if converged: break
 
-    Thinned = [get_thinned(Component) for Component in L]
-    Deltas = [(k1,k2,get_min_distance(Thinned[k1],Thinned[k2])) for k1 in range(k) for k2 in range(k1)]
-    delta_max = 16
-    Pairs = [(k1,k2) for k1,k2,delta in Deltas if delta<delta_max]
-    print (Pairs)
-    Clusters = {c:[c] for c in range(k)}
-    for a,b in Pairs:
-        Cluster = Clusters[b]
-        Clusters[b].insert(0,a)
-        Clusters[a] = Clusters[b]
-    Closed = []
-    Merged = []
-    for a,B in Clusters.items():
-        if a in Closed: continue
-        Merged.append(B)
-        Closed.append(a)
-        for b in B:
-            Closed.append(b)
-    Centroids = []
-    for m in Merged:
-        Centroids.append(get_centroid([pt for c in list(set(m)) for pt in L[c]]))
-
-    voronoi = Voronoi(Centroids)
+    Thinned, Centroids = merge_clusters(k,L,mu,Xs,Zs)
+    voronoi            = Voronoi(Centroids)
+    nx,ny              = Image[:,:,RED].shape
+    Microtubules       =  [(i,j) for i in range(nx) for j in range(ny) if Image[i,j,RED]>0.5]
+    ER                 =  [(i,j) for i in range(nx) for j in range(ny) if Image[i,j,YELLOW]>0.5]
     fig   = figure(figsize=(20,20))
     axs   = fig.subplots(nrows = 2, ncols = 2)
     axs[0,0].scatter([x for x,_ in Xs],[y for _,y in Xs],c='b',s=1,alpha=0.5)
-    axs[0,0].scatter([x for x,_ in mu],[y for _,y in mu],c='r',s=2,alpha=0.5)
+    axs[0,0].scatter([x for x,_ in mu],[y for _,y in mu],c='m',s=2,alpha=0.5)
     axs[0,0].set_title(f'k={k}, iteration={seq}')
-    Thinned0 = [t for T in Thinned for t in T]
-    axs[0,1].scatter([x for x,_ in Thinned0],[y for _,y in Thinned0],c='b',s=1)
+
+    axs[0,1].scatter([x for x,_ in flatten(Thinned)],[y for _,y in flatten(Thinned)],c='b',s=1)
+
     axs[1,0].scatter([x for x,_ in Xs],[y for _,y in Xs],c='b',s=1,alpha=0.5)
+    axs[1,0].scatter([x for x,_ in Microtubules],[y for _,y in Microtubules],c='r',s=1,alpha=0.5)
     voronoi_plot_2d(voronoi, ax=axs[1,0], show_vertices=False)
+
+    axs[1,1].scatter([x for x,_ in Xs],[y for _,y in Xs],c='b',s=1,alpha=0.5)
+    axs[1,1].scatter([x for x,_ in ER],[y for _,y in ER],c='y',s=1,alpha=0.5)
+    voronoi_plot_2d(voronoi, ax=axs[1,1], show_vertices=False)
+
     fig.suptitle(f'{args.image_id}')
     savefig(join(args.figs,f'{args.image_id}_dirichlet'), dpi=args.dpi, bbox_inches='tight')
     if args.show:
