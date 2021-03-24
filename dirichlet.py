@@ -16,7 +16,7 @@
 #  To contact me, Simon Crase, email simon@greenweaves.nz
 
 from argparse          import ArgumentParser
-from matplotlib.pyplot import hist, show, figure
+from matplotlib.pyplot import hist, show, figure, savefig
 from matplotlib.image  import imread
 from numpy             import zeros, mean, std, argmin
 from os                import environ
@@ -68,50 +68,48 @@ def read_image(path        = r'C:\data\hpa-scc',
 
     return Image
 
-def DPmeans(Image,Lambda=2000,background=0):
+def DPmeans(Image,Lambda=2000,background=0,delta=64):
+    def get_dist2(p0,p1):
+        x0,y0 = p0
+        x1,y1 = p1
+        return (x1-x0)**2 + (y1-y0)**2
+
     def get_centroid(Points):
         return (mean([x for x,_ in Points]),
                 mean([y for _,y in Points]))
+
     def generate_cluster(c):
         return [Xs[i] for i in range(n) if Zs[i]==c]
 
+    def has_converged(mu,mu0):
+        if len(mu)!=len(mu0):
+            return False
+        else:
+            return all(get_dist2(p1,p2)<delta for p1,p2 in zip(sorted(mu),sorted(mu0)))
+
     nx,ny = Image.shape
-    Xs    = [(i,j) for i in range(nx) for j in range(ny) if Image[i,j]>background]
-    n     = len(Xs)
-    k     = 1
-    L     = [Xs]
-    mu    = [get_centroid(Xs)]
-    Zs    = [0 for _ in Xs]
-    fig   = figure(figsize=(20,20))
-    nrows = 5
-    ncols = 5
-    axs   = fig.subplots(nrows = nrows, ncols = ncols)
-    converged = False
-    for l in range(nrows*ncols):
-        if converged: break
-        converged = True      # presumption
+    Xs        = [(i,j) for i in range(nx) for j in range(ny) if Image[i,j]>background]
+    n         = len(Xs)
+    k         = 1
+    L         = [Xs]
+    mu        = [get_centroid(Xs)]
+    Zs        = [0 for _ in Xs]
+    while True:
         for i in range(n):
-            x,y    = Xs[i]
-            d = []
-            for c in range(k):
-                x0,y0  = mu[c]
-                d.append((x-x0)**2 + (y-y0)**2)
-            c = argmin(d)
-            if d[c] > Lambda:
+            D = [get_dist2(Xs[i],mu[c]) for c in range(k)]
+            c = argmin(D)
+            if D[c] > Lambda:
                 Zs[i]     = k
                 k         += 1
                 mu.append(Xs[i])
-                converged = False
             else:
                 if Zs[i] != c:
                     Zs[i] = c
-                    converged = False
 
-        L =  [generate_cluster(c) for c in range(k)]
-        mu = [get_centroid(Xs) for Xs in L]
-        axs[l//ncols,l%ncols].scatter([x for x,_ in Xs],[y for _,y in Xs],c='b',s=1,alpha=0.5)
-        axs[l//ncols,l%ncols].scatter([x for x,_ in mu],[y for _,y in mu],c='r',s=1,alpha=0.5)
-        axs[l//ncols,l%ncols].set_title(f'k={k}')
+        L   =  [generate_cluster(c) for c in range(k)]
+        mu0 = mu[:]
+        mu  = [get_centroid(Xs) for Xs in L]
+        yield has_converged(mu,mu0),k,L,mu,Xs,Zs
 
 if __name__=='__main__':
     parser = ArgumentParser('Cluster HPA data')
@@ -124,9 +122,33 @@ if __name__=='__main__':
     parser.add_argument('--image_id',
                         default = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
                         help    = 'Used to view a single image only')
+    parser.add_argument('--figs',
+                        default = './figs',
+                        help    = 'Identifies where to store plots')
+    parser.add_argument('--show',
+                        default = True,
+                        action  = 'store_true',
+                        help    = 'Display images')
+    parser.add_argument('--dpi',
+                        default = 300,
+                        type    = int,
+                        help    = 'Resolution for saving images')
     args = parser.parse_args()
     Image = read_image(image_id  = args.image_id,
                        path      = args.path,
                        image_set = args.image_set)
-    DPmeans(Image[:,:,BLUE])
-    show()
+
+    for l,(converged,k,L,mu,Xs,Zs) in enumerate(DPmeans(Image[:,:,BLUE])):
+        if converged: break
+
+    fig   = figure(figsize=(20,20))
+    nrows = 4
+    ncols = 4
+    axs   = fig.subplots(nrows = 2, ncols = 2)
+    axs[0,0].scatter([x for x,_ in Xs],[y for _,y in Xs],c='b',s=1,alpha=0.5)
+    axs[0,0].scatter([x for x,_ in mu],[y for _,y in mu],c='r',s=1,alpha=0.5)
+    axs[0,0].set_title(f'k={k},l={l}')
+    fig.suptitle(f'{args.image_id}')
+    savefig(join(args.figs,f'{args.image_id}_dirichlet'), dpi=args.dpi, bbox_inches='tight')
+    if args.show:
+        show()
