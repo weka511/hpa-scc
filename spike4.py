@@ -62,7 +62,10 @@ class Image4(object):
 
 image = Image4()
 blues = image.get()
-imshow(blues,extent=[0,511,0,511],origin='upper')
+for i in range(10):
+    for j in range(10):
+        blues[i,j]=1
+imshow(blues,extent=[0,image.nx-1,0,image.ny-1],origin='lower')
 scatter([0],[0],c='r')
-scatter([511],[511],c='m')
+scatter([image.nx-1],[image.ny-1],c='m')
 show()
