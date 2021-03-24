@@ -16,13 +16,16 @@
 #  To contact me, Simon Crase, email simon@greenweaves.nz
 
 from argparse          import ArgumentParser
-from matplotlib.pyplot import hist, show, figure, savefig
+from csv               import reader
+from matplotlib.pyplot import hist, show, figure, savefig, close
 from matplotlib.image  import imread
 from numpy             import zeros, mean, std, argmin
 from os                import environ
 from os.path           import join
+from random            import sample, seed
 from scipy.spatial     import Voronoi, voronoi_plot_2d
 from sys               import float_info
+from utils             import Timer
 
 RED                = 0      # Channel number for Microtubules
 GREEN              = 1      # Channel number for Protein of interest
@@ -48,7 +51,7 @@ IMAGE_LEVEL_LABELS    = [
 
 class Image4(object):
     def __init__(self,
-                 path        = r'd:\data\hpa-scc',
+                 path        = join(environ['DATA'],'hpa-scc'),
                  image_set   = 'train512x512',
                  image_id    = '000a6c98-bb9b-11e8-b2b9-ac1f6b6435d0'):
 
@@ -72,30 +75,29 @@ class Image4(object):
                 Image[:,:,channel] =  self.Image [:,:,channel]
         return Image
 
-# read_image
+# restrict
 #
-# Read set of images (keeping Yellow separate)
-#
-# Parameters:
-#    path            Location of data
-#    image_set       Identifies high or low res
-#    image_id        Identified image
+# Used to restrict training data to specified labels
 
-def read_image(path        = r'C:\data\hpa-scc',
-               image_set   = 'train512512',
-               image_id    = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0'):
-    Image = None
-    for channel in range(NCHANNELS):
-        image_mono = imread(join(path,
-                                 image_set,
-                                 f'{image_id}_{COLOUR_NAMES[channel]}.png'))
-        if channel==0:
-            nx,ny          = image_mono.shape
-            Image          = zeros((nx,ny,NCHANNELS))
+def restrict(Training,labels,multiple=False):
+    def should_include(image_labels):
+        return (len(set(image_labels)& set(labels))>0) and (multiple or len(image_labels)==1)
+    return {image_id: image_labels for image_id,image_labels in Training.items() if should_include(image_labels)}
 
-        Image[:,:,channel] = image_mono
+# read_descriptions
 
-    return Image
+def read_descriptions(name):
+    with open(name) as descriptions_file:
+        return {int(row[0]) : row[1] for row in  reader(descriptions_file)}
+
+
+# read_training_expectations
+
+def read_training_expectations(path=join(environ['DATA'],'hpa-scc'),file_name='train.csv'):
+    with open(join(path,file_name)) as train:
+        rows = reader(train)
+        next(rows)
+        return {row[0] : list(set([int(label) for label in row[1].split('|')])) for row in rows}
 
 def get_dist2(p0,p1):
     x0,y0 = p0
@@ -219,36 +221,15 @@ def merge_clusters(k,L,mu,Xs,Zs,delta_max = 64):
 def flatten(TT):
     return [t for T in TT for t in T]
 
-if __name__=='__main__':
-    parser = ArgumentParser('Cluster HPA data using Dirichlet Process Means')
-    parser.add_argument('--path',
-                        default = join(environ['DATA'],'hpa-scc'),
-                        help    = 'Folder for data files')
-    parser.add_argument('--image_set',
-                        default = 'train512x512',
-                        help    = 'Set resolution of raw images')
-    parser.add_argument('--image_id',
-                        default = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
-                        help    = 'Used to view a single image only')
-    parser.add_argument('--figs',
-                        default = './figs',
-                        help    = 'Identifies where to store plots')
-    parser.add_argument('--show',
-                        default = True,
-                        action  = 'store_true',
-                        help    = 'Display images')
-    parser.add_argument('--dpi',
-                        default = 300,
-                        type    = int,
-                        help    = 'Resolution for saving images')
-    parser.add_argument('--min_count',
-                        default = 10,
-                        type    = int,
-                        help    = 'Discard clusters with fewer points')
-    args = parser.parse_args()
-    Image = Image4(image_id  = args.image_id,
-                       path      = args.path,
-                       image_set = args.image_set)
+def process(image_id  = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
+            path      = join(environ['DATA'],'hpa-scc'),
+            image_set = 'train512x512',
+            figs      = '.'):
+
+    Image = Image4(image_id  =image_id,
+                   path      = path,
+                   image_set = image_set)
+
     blues = Image.get()
     for seq,(converged,k,L,mu,Xs,Zs) in enumerate(DPmeans(blues[:,:,BLUE])):
         if converged: break
@@ -279,7 +260,74 @@ if __name__=='__main__':
     axs[1,1].set_xlim(0,Image.nx-1)
     axs[1,1].set_ylim(0,Image.ny-1)
 
-    fig.suptitle(f'{args.image_id}')
-    savefig(join(args.figs,f'{args.image_id}_dirichlet'), dpi=args.dpi, bbox_inches='tight')
+    fig.suptitle(f'{image_id}')
+    savefig(join(figs,f'{image_id}_dirichlet'), dpi=args.dpi, bbox_inches='tight')
+    return fig
+
+if __name__=='__main__':
+    parser = ArgumentParser('Cluster HPA data using Dirichlet Process Means')
+    parser.add_argument('--path',
+                        default = join(environ['DATA'],'hpa-scc'),
+                        help    = 'Folder for data files')
+    parser.add_argument('--image_set',
+                        default = 'train512x512',
+                        help    = 'Set resolution of raw images')
+    parser.add_argument('--image_id',
+                        default = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
+                        help    = 'Used to view a single image only')
+    parser.add_argument('--figs',
+                        default = './figs',
+                        help    = 'Identifies where to store plots')
+    parser.add_argument('--show',
+                        default = False,
+                        action  = 'store_true',
+                        help    = 'Display images')
+    parser.add_argument('--dpi',
+                        default = 300,
+                        type    = int,
+                        help    = 'Resolution for saving images')
+    parser.add_argument('--min_count',
+                        default = 10,
+                        type    = int,
+                        help    = 'Discard clusters with fewer points')
+    parser.add_argument('--sample',
+                        default = None,
+                        type    = int,
+                        help    = 'Used to sample a specified number of images')
+    parser.add_argument('--multiple',
+                        default = False,
+                        action  = 'store_true',
+                        help    = 'Process images that belong to multiple labels')
+    parser.add_argument('--labels',
+                        default = list(range(19)),
+                        type    = int,
+                        nargs   = '*',
+                        help    = 'Used to restrict Locations')
+    parser.add_argument('--seed',
+                        default = None,
+                        type    = int,
+                        help    = 'Used to seed random number generator')
+    args = parser.parse_args()
+
+    with Timer():
+        seed(args.seed)
+        Descriptions = read_descriptions('descriptions.csv')
+        Training     = restrict(read_training_expectations(path=args.path),
+                                labels   = args.labels,
+                                multiple = args.multiple)
+        if sample!=None:
+            for image_id in sample(list(Training.keys()),args.sample):
+                fig = process(image_id  = image_id,
+                              path      = args.path,
+                              image_set = args.image_set,
+                              figs      = args.figs)
+                if not args.show:
+                    close(fig)
+        else:
+            process(image_id  = args.image_id,
+                    path      = args.path,
+                    image_set = args.image_set,
+                    figs      = args.figs)
+
     if args.show:
         show()
