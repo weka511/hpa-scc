@@ -40,4 +40,3 @@
 |download.py|Download training images from kaggle|
 |summarize.py|Organize image names by description|
 |unzip.py|Unzip downloaded files|
-
