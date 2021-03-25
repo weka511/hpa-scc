@@ -75,6 +75,16 @@ class Image4(object):
                 Image[:,:,channel] =  self.Image [:,:,channel]
         return Image
 
+    def show(self,
+            channels = [BLUE],
+            axis     = None,
+            origin   = 'lower'):
+        axis.imshow(self.get(channels),
+                    extent = [0,self.nx-1,0,self.ny-1],
+                    origin = origin)
+        axis.set_xlim(0,self.nx-1)
+        axis.set_ylim(0,self.ny-1)
+
 # restrict
 #
 # Used to restrict training data to specified labels
@@ -129,8 +139,14 @@ def DPmeans(Image,Lambda=8000,background=0,delta=64):
     def has_converged(mu,mu0):
         return len(mu)==len(mu0) and all(get_dist2(p1,p2)<delta for p1,p2 in zip(sorted(mu),sorted(mu0)))
 
+    # create_observations
+    #
+    # Generate the Xs. Note that we need to transpose so that scatter (Xs) agree with imshow(...)
+    def create_observations():
+        return [(i,j) for i in range(nx) for j in range(ny) if Image[j,i]>background]
+
     nx,ny = Image.shape
-    Xs        = [(i,j) for i in range(nx) for j in range(ny) if Image[j,i]>background]
+    Xs        = create_observations()
     n         = len(Xs)
     k         = 1
     mu        = [get_centroid(Xs)]
@@ -226,7 +242,7 @@ def process(image_id  = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
             image_set = 'train512x512',
             figs      = '.'):
 
-    Image = Image4(image_id  =image_id,
+    Image = Image4(image_id  = image_id,
                    path      = path,
                    image_set = image_set)
 
@@ -240,28 +256,20 @@ def process(image_id  = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
     fig   = figure(figsize=(20,20))
     axs   = fig.subplots(nrows = 2, ncols = 2)
 
-    axs[0,0].imshow(blues,extent=[0,Image.nx-1,0,Image.ny-1],origin='lower')
+    Image.show(axis=axs[0,0])
     axs[0,0].scatter([x for x,_ in mu],[y for _,y in mu],c='m',s=2,alpha=0.5)
     axs[0,0].set_title(f'k={k}, iteration={seq}')
-    axs[0,0].set_xlim(0,Image.nx-1)
-    axs[0,0].set_ylim(0,Image.ny-1)
 
     axs[0,0].scatter([x for x,_ in flatten(Thinned)],[y for _,y in flatten(Thinned)],c='c',s=1,alpha=0.5)
 
-    axs[0,1].imshow(Image.get(channels=[RED,BLUE]),extent=[0,Image.nx-1,0,Image.ny-1],origin='lower')
+    Image.show(axis=axs[0,1],channels=[RED,BLUE])
     voronoi_plot_2d(voronoi, ax=axs[0,1], show_vertices=False, line_colors='orange')
-    axs[0,1].set_xlim(0,Image.nx-1)
-    axs[0,1].set_ylim(0,Image.ny-1)
 
-    axs[1,0].imshow(Image.get(channels=[YELLOW,BLUE]),extent=[0,Image.nx-1,0,Image.ny-1],origin='lower')
+    Image.show(axis=axs[1,0],channels=[YELLOW,BLUE])
     voronoi_plot_2d(voronoi, ax=axs[1,0], show_vertices=False, line_colors='orange')
-    axs[1,0].set_xlim(0,Image.nx-1)
-    axs[1,0].set_ylim(0,Image.ny-1)
 
-    axs[1,1].imshow(Image.get(channels=[GREEN,BLUE]),extent=[0,Image.nx-1,0,Image.ny-1],origin='lower')
+    Image.show(axis=axs[1,1],channels=[GREEN,BLUE])
     voronoi_plot_2d(voronoi, ax=axs[1,1], show_vertices=False, line_colors='cyan')
-    axs[1,1].set_xlim(0,Image.nx-1)
-    axs[1,1].set_ylim(0,Image.ny-1)
 
     fig.suptitle(f'{image_id}')
     savefig(join(figs,f'{image_id}_dirichlet'), dpi=args.dpi, bbox_inches='tight')
