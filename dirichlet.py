@@ -22,9 +22,9 @@ from matplotlib.image  import imread
 from numpy             import zeros, mean, std, argmin
 from os                import environ
 from os.path           import join
-from random            import sample, seed
+from random            import randrange, sample, seed
 from scipy.spatial     import Voronoi, voronoi_plot_2d
-from sys               import float_info, exc_info
+from sys               import float_info, exc_info, maxsize
 from utils             import Timer
 
 RED                = 0      # Channel number for Microtubules
@@ -324,13 +324,21 @@ if __name__=='__main__':
     args = parser.parse_args()
 
     with Timer():
-        seed(args.seed)
         Descriptions = read_descriptions('descriptions.csv')
         Training     = restrict(read_training_expectations(path=args.path),
                                 labels   = args.labels,
                                 multiple = args.multiple or args.sample==None)
 
         if args.sample!=None:
+            if args.seed==None:
+                new_seed = randrange(maxsize)
+                print (f'Seed = {new_seed}')
+                with open('seed.txt','w') as out:
+                    out.write(f'Seed = {new_seed}\n')
+                seed(new_seed)
+            else:
+                print (f'Reusing seed = {args.seed}')
+                seed(args.seed)
             for image_id in sample(list(Training.keys()),args.sample):
                 fig = None
                 try:
