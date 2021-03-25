@@ -237,10 +237,12 @@ def merge_clusters(k,L,mu,Xs,Zs,delta_max = 64):
 def flatten(TT):
     return [t for T in TT for t in T]
 
-def process(image_id  = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
-            path      = join(environ['DATA'],'hpa-scc'),
-            image_set = 'train512x512',
-            figs      = '.'):
+def process(image_id     = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
+            path         = join(environ['DATA'],'hpa-scc'),
+            image_set    = 'train512x512',
+            figs         = '.',
+            Descriptions = [],
+            Training     = []):
 
     Image = Image4(image_id  = image_id,
                    path      = path,
@@ -253,8 +255,8 @@ def process(image_id  = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
     Thinned, Centroids = merge_clusters(k,L,mu,Xs,Zs)
     voronoi            = Voronoi(Centroids)
 
-    fig   = figure(figsize=(20,20))
-    axs   = fig.subplots(nrows = 2, ncols = 2)
+    fig                = figure(figsize=(20,20))
+    axs                = fig.subplots(nrows = 2, ncols = 2)
 
     Image.show(axis=axs[0,0])
     axs[0,0].scatter([x for x,_ in mu],[y for _,y in mu],c='m',s=2,alpha=0.5)
@@ -272,6 +274,7 @@ def process(image_id  = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
     voronoi_plot_2d(voronoi, ax=axs[1,1], show_vertices=False, line_colors='cyan')
 
     fig.suptitle(f'{image_id}')
+    fig.suptitle(f'{image_id}: {", ".join([Descriptions[label] for label in Training[image_id]])}')
     savefig(join(figs,f'{image_id}_dirichlet'), dpi=args.dpi, bbox_inches='tight')
     return fig
 
@@ -325,16 +328,18 @@ if __name__=='__main__':
         Descriptions = read_descriptions('descriptions.csv')
         Training     = restrict(read_training_expectations(path=args.path),
                                 labels   = args.labels,
-                                multiple = args.multiple)
+                                multiple = args.multiple or args.sample==None)
 
         if args.sample!=None:
             for image_id in sample(list(Training.keys()),args.sample):
                 fig = None
                 try:
-                    fig = process(image_id  = image_id,
-                                  path      = args.path,
-                                  image_set = args.image_set,
-                                  figs      = args.figs)
+                    fig = process(image_id     = image_id,
+                                  path         = args.path,
+                                  image_set    = args.image_set,
+                                  figs         = args.figs,
+                                  Descriptions = Descriptions,
+                                  Training     = Training)
                     print (f'Segmented {image_id}')
                 except:
                     print(f'Error segmenting {image_id} {exc_info()[0]}')
@@ -342,10 +347,12 @@ if __name__=='__main__':
                     if not args.show and fig!=None:
                         close(fig)
         else:
-            process(image_id  = args.image_id,
-                    path      = args.path,
-                    image_set = args.image_set,
-                    figs      = args.figs)
+            process(image_id     = args.image_id,
+                    path         = args.path,
+                    image_set    = args.image_set,
+                    figs         = args.figs,
+                    Descriptions = Descriptions,
+                    Training     = Training)
 
     if args.show:
         show()
