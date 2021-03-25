@@ -24,7 +24,7 @@ from os                import environ
 from os.path           import join
 from random            import sample, seed
 from scipy.spatial     import Voronoi, voronoi_plot_2d
-from sys               import float_info
+from sys               import float_info, exc_info
 from utils             import Timer
 
 RED                = 0      # Channel number for Microtubules
@@ -246,16 +246,19 @@ def process(image_id  = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
     axs[0,0].set_xlim(0,Image.nx-1)
     axs[0,0].set_ylim(0,Image.ny-1)
 
-    axs[0,1].scatter([x for x,_ in flatten(Thinned)],[y for _,y in flatten(Thinned)],c='b',s=1)
+    axs[0,0].scatter([x for x,_ in flatten(Thinned)],[y for _,y in flatten(Thinned)],c='c',s=1,alpha=0.5)
+
+    axs[0,1].imshow(Image.get(channels=[RED,BLUE]),extent=[0,Image.nx-1,0,Image.ny-1],origin='lower')
+    voronoi_plot_2d(voronoi, ax=axs[0,1], show_vertices=False, line_colors='orange')
     axs[0,1].set_xlim(0,Image.nx-1)
     axs[0,1].set_ylim(0,Image.ny-1)
 
-    axs[1,0].imshow(Image.get(channels=[RED,BLUE]),extent=[0,Image.nx-1,0,Image.ny-1],origin='lower')
+    axs[1,0].imshow(Image.get(channels=[YELLOW,BLUE]),extent=[0,Image.nx-1,0,Image.ny-1],origin='lower')
     voronoi_plot_2d(voronoi, ax=axs[1,0], show_vertices=False, line_colors='orange')
     axs[1,0].set_xlim(0,Image.nx-1)
     axs[1,0].set_ylim(0,Image.ny-1)
 
-    axs[1,1].imshow(Image.get(channels=[YELLOW,BLUE]),extent=[0,Image.nx-1,0,Image.ny-1],origin='lower')
+    axs[1,1].imshow(Image.get(channels=[GREEN,BLUE]),extent=[0,Image.nx-1,0,Image.ny-1],origin='lower')
     voronoi_plot_2d(voronoi, ax=axs[1,1], show_vertices=False, line_colors='cyan')
     axs[1,1].set_xlim(0,Image.nx-1)
     axs[1,1].set_ylim(0,Image.ny-1)
@@ -315,14 +318,21 @@ if __name__=='__main__':
         Training     = restrict(read_training_expectations(path=args.path),
                                 labels   = args.labels,
                                 multiple = args.multiple)
-        if sample!=None:
+
+        if args.sample!=None:
             for image_id in sample(list(Training.keys()),args.sample):
-                fig = process(image_id  = image_id,
-                              path      = args.path,
-                              image_set = args.image_set,
-                              figs      = args.figs)
-                if not args.show:
-                    close(fig)
+                fig = None
+                try:
+                    fig = process(image_id  = image_id,
+                                  path      = args.path,
+                                  image_set = args.image_set,
+                                  figs      = args.figs)
+                    print (f'Segmented {image_id}')
+                except:
+                    print(f'Error segmenting {image_id} {exc_info()[0]}')
+                finally:
+                    if not args.show and fig!=None:
+                        close(fig)
         else:
             process(image_id  = args.image_id,
                     path      = args.path,
