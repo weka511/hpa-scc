@@ -22,10 +22,10 @@ from matplotlib.image  import imread
 from numpy             import zeros, mean, std, argmin
 from os                import environ
 from os.path           import join
-from random            import randrange, sample, seed
+from random            import sample
 from scipy.spatial     import Voronoi, voronoi_plot_2d
-from sys               import float_info, exc_info, maxsize
-from utils             import Timer
+from sys               import float_info, exc_info, exit
+from utils             import set_random_seed, Timer
 
 RED                = 0      # Channel number for Microtubules
 GREEN              = 1      # Channel number for Protein of interest
@@ -330,15 +330,7 @@ if __name__=='__main__':
                                 multiple = args.multiple or args.sample==None)
 
         if args.sample!=None:
-            if args.seed==None:
-                new_seed = randrange(maxsize)
-                print (f'Seed = {new_seed}')
-                with open('seed.txt','w') as out:
-                    out.write(f'Seed = {new_seed}\n')
-                seed(new_seed)
-            else:
-                print (f'Reusing seed = {args.seed}')
-                seed(args.seed)
+            set_random_seed(args.seed)
             for image_id in sample(list(Training.keys()),args.sample):
                 fig = None
                 try:
@@ -349,6 +341,8 @@ if __name__=='__main__':
                                   Descriptions = Descriptions,
                                   Training     = Training)
                     print (f'Segmented {image_id}')
+                except KeyboardInterrupt:
+                    exit(f'Interrupted while segmenting {image_id}')
                 except:
                     print(f'Error segmenting {image_id} {exc_info()[0]}')
                 finally:

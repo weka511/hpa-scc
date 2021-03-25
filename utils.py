@@ -16,6 +16,8 @@
 
 from os      import walk
 from os.path import exists, join, splitext
+from random  import randrange, seed
+from sys     import maxsize
 from time    import time
 
 # Timer
@@ -63,6 +65,32 @@ class Logger:
             self.log(f'{exc_type}')
             self.log(f'{exc_val}')
         self.logfile.close()
+
+# set_seed
+#
+# Seed random number so run can be reproduced. If seed is not specified
+# generate a new seed and record it.
+#
+# Parameters:
+#     specified_seed  Seed to be used (or None if random seed)
+#     file_name       Name of file where actual seed will be stored
+#
+# Returns:
+#    Seed value that was actually used
+
+def set_random_seed(specified_seed=None,file_name='seed.txt'):
+    if specified_seed==None:
+        seed()
+        new_seed = randrange(maxsize)
+        print (f'Seed = {new_seed}')
+        with open(file_name,'w') as out:
+            out.write(f'Seed = {new_seed}\n')
+        seed(new_seed)
+        return new_seed
+    else:
+        print (f'Reusing seed = {specified_seed}')
+        seed(specified_seed)
+        return specified_seed
 
 if __name__=='__main__':
     with Timer('Test') as timer, Logger(prefix='foo') as log:
