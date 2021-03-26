@@ -34,7 +34,6 @@ YELLOW             = 3      # Channel number for Endoplasmic reticulum
 NCHANNELS          = 4      # Number of channels
 NRGB               = 3      # Number of actual channels for graphcs
 
-
 COLOUR_NAMES     = [
     'red',
     'green',
@@ -95,9 +94,11 @@ def restrict(Training,labels,multiple=False):
     return {image_id: image_labels for image_id,image_labels in Training.items() if should_include(image_labels)}
 
 # read_descriptions
+#
+# Create a lookup table for the inerpretation of each label
 
-def read_descriptions(name):
-    with open(name) as descriptions_file:
+def read_descriptions(file_name='descriptions.csv'):
+    with open(file_name) as descriptions_file:
         return {int(row[0]) : row[1] for row in  reader(descriptions_file)}
 
 
@@ -109,10 +110,18 @@ def read_training_expectations(path=join(environ['DATA'],'hpa-scc'),file_name='t
         next(rows)
         return {row[0] : list(set([int(label) for label in row[1].split('|')])) for row in rows}
 
-def get_dist2(p0,p1):
-    x0,y0 = p0
-    x1,y1 = p1
+# get_dist_sq
+#
+# Compute squared Euclidean distance between two points
+
+def get_dist_sq(pt0,pt1):
+    x0,y0 = pt0
+    x1,y1 = pt1
     return (x1-x0)**2 + (y1-y0)**2
+
+# get_centroid
+#
+# Determine centroids of a list of points
 
 def get_centroid(Points):
     return (mean([x for x,_ in Points]),
@@ -121,49 +130,60 @@ def get_centroid(Points):
 # DPmeans
 #
 # Find clusters using Dirichlet process means
-
+#
 # Revisiting k-means: New Algorithms via Bayesian Nonparametrics
 # Brian Kulis  and Michael I. Jordan
 # https://arxiv.org/abs/1111.0352
 #
 # Parameters:
-#     Image
-#     Lambda         Penalty
-#     background
-#     delta
+#     Image        Image to be segmented
+#     Lambda       Penalty to discourage creating new clusters
+#     background   Threshold for blue pixels. We consider pixels only if they exceed this value.
+#     delta        Used to assess convergence. If no centroids have shifted by more than this limit, we have converged
+
 def DPmeans(Image,Lambda=8000,background=0,delta=64):
 
-    def generate_cluster(c):
-        return [Xs[i] for i in range(n) if Zs[i]==c]
+    # extract_one_cluster
+    #
+    # Extract observations that should be assigned to specified cluster index
+    def extract_one_cluster(index):
+        return [Xs[i] for i in range(n) if Zs[i]==index]
+
+    # has_converged
+    #
+    # Establish whether iterations have converged, i.e.: number of clusters hasn't changed since last iteration
+    # and the centroids haven't moved by a distance of mre than sqrt(delta)
 
     def has_converged(mu,mu0):
-        return len(mu)==len(mu0) and all(get_dist2(p1,p2)<delta for p1,p2 in zip(sorted(mu),sorted(mu0)))
+        return len(mu)==len(mu0) and all(get_dist_sq(p1,p2)<delta for p1,p2 in zip(sorted(mu),sorted(mu0)))
 
     # create_observations
     #
-    # Generate the Xs. Note that we need to transpose so that scatter (Xs) agree with imshow(...)
+    # Generate the Xs. Note that we need to transpose so that scatter(Xs...) agree with imshow(...)
+
     def create_observations():
         return [(i,j) for i in range(nx) for j in range(ny) if Image[j,i]>background]
 
     nx,ny = Image.shape
-    Xs        = create_observations()
-    n         = len(Xs)
-    k         = 1
-    mu        = [get_centroid(Xs)]
-    Zs        = [0] * n
+    Xs    = create_observations()
+    n     = len(Xs)
+    k     = 1                    # Initially all points are in just one cluster
+    mu    = [get_centroid(Xs)]   # So there is only one centroid
+    Zs    = [0] * n              # Hidden variables - initially all points are in just one cluster
+
     while True:
         for i in range(n):
-            D = [get_dist2(Xs[i],mu[c]) for c in range(k)]
+            D = [get_dist_sq(Xs[i],mu[c]) for c in range(k)]
             c = argmin(D)
-            if D[c] > Lambda:
+            if D[c] > Lambda:     # Create new cluster
                 Zs[i]     = k
                 k         += 1
                 mu.append(Xs[i])
-            else:
+            else:                  # Assign point to closest cluster
                 if Zs[i] != c:
                     Zs[i] = c
 
-        L   =  [generate_cluster(c) for c in range(k)]
+        L   =  [extract_one_cluster(c) for c in range(k)]
         mu0 = mu[:]
         mu  = [get_centroid(Xs) for Xs in L]
         yield has_converged(mu,mu0),k,L,mu,Xs,Zs
@@ -203,12 +223,19 @@ def get_thinned(Component,n=4):
     Neighbours = set(Component)
     return [(x,y) for (x,y) in Component if is_isolated(x,y)]
 
-def get_min_distance(C1,C2):
-    min_distance = float_info.max
-    for pt1 in C1:
-        for pt2 in C2:
-            min_distance = min(min_distance,get_dist2(pt1,pt2))
-    return min_distance
+# get_min_distance
+#
+# Determine minimum distance between two lists of points
+#
+# Parameters:
+#     C1         One list of points
+#     C2         The other list of points
+#     distance   Function used to calculate points. We assume distance(a,b)==distance(b,a)
+def get_min_distance(C1,C2,distance=get_dist_sq):
+    return min(distance(C1[i],C2[j]) for i in range(len(C1)) for j in range(i,len(C2)))
+
+
+# merge_clusters
 
 def merge_clusters(k,L,mu,Xs,Zs,delta_max = 64):
     Thinned = [get_thinned(Component) for Component in L]
@@ -237,19 +264,38 @@ def merge_clusters(k,L,mu,Xs,Zs,delta_max = 64):
 def flatten(TT):
     return [t for T in TT for t in T]
 
-def process(image_id     = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
+# segment
+#
+#  Read slides and segment image: start with Dirichlet process means, then postprecees to remove phantom cells.
+#
+#     image_id     The slide to be procesed
+#     path         Location of images
+#     image_set    Set resolution of raw images
+#     figs         Where to store figures
+#     Descriptions Map numerical labels into description
+#     Training     Map image name to expected labels
+#     Lambda       Penalty to discourage creating new clusters
+#     background   Threshold for blue pixels. We consider pixels only if they exceed this value.
+#     delta        Used to assess convergence. If no centroids have shifted by more than this limit, we have converged
+
+def segment(image_id     = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
             path         = join(environ['DATA'],'hpa-scc'),
             image_set    = 'train512x512',
             figs         = '.',
             Descriptions = [],
-            Training     = []):
+            Training     = [],
+            Lambda       = 8000,
+            background   = 0,
+            delta        = 64):
 
     Image = Image4(image_id  = image_id,
                    path      = path,
                    image_set = image_set)
 
-    blues = Image.get()
-    for seq,(converged,k,L,mu,Xs,Zs) in enumerate(DPmeans(blues[:,:,BLUE])):
+    for seq,(converged,k,L,mu,Xs,Zs) in enumerate(DPmeans(Image.get()[:,:,BLUE],
+                                                          Lambda     = Lambda,
+                                                          background = background,
+                                                          delta      = delta)):
         if converged: break
 
     Thinned, Centroids = merge_clusters(k,L,mu,Xs,Zs)
@@ -321,6 +367,18 @@ if __name__=='__main__':
                         default = None,
                         type    = int,
                         help    = 'Used to seed random number generator')
+    parser.add_argument('--Lambda',
+                        type    = float,
+                        default = 8000,
+                        help    = 'Penalty to discourage creating new clusters')
+    parser.add_argument('--background',
+                        type    = float,
+                        default = 0,
+                        help    = 'Threshold for blue pixels. We consider pixels only if they exceed this value.')
+    parser.add_argument('--delta',
+                        type    = float,
+                        default = 64,
+                        help    = 'Used to assess convergence. If no centroids have shifted by more than this limit, we have converged')
     args = parser.parse_args()
 
     with Timer():
@@ -334,7 +392,7 @@ if __name__=='__main__':
             for image_id in sample(list(Training.keys()),args.sample):
                 fig = None
                 try:
-                    fig = process(image_id     = image_id,
+                    fig = segment(image_id     = image_id,
                                   path         = args.path,
                                   image_set    = args.image_set,
                                   figs         = args.figs,
@@ -349,7 +407,7 @@ if __name__=='__main__':
                     if not args.show and fig!=None:
                         close(fig)
         else:
-            process(image_id     = args.image_id,
+            segment(image_id     = args.image_id,
                     path         = args.path,
                     image_set    = args.image_set,
                     figs         = args.figs,
