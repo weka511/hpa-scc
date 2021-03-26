@@ -237,7 +237,7 @@ def get_min_distance(C1,C2,distance=get_dist_sq):
 
 # merge_clusters
 
-def merge_clusters(k,L,mu,Xs,Zs,delta_max = 64):
+def merge_clusters(k,L,delta_max = 64):
     Thinned = [get_thinned(Component) for Component in L]
     Deltas = [(k1,k2,get_min_distance(Thinned[k1],Thinned[k2])) for k1 in range(k) for k2 in range(k1)]
 
@@ -261,8 +261,21 @@ def merge_clusters(k,L,mu,Xs,Zs,delta_max = 64):
         Centroids.append(get_centroid([pt for c in list(set(m)) for pt in L[c]]))
     return Thinned, Centroids
 
-def flatten(TT):
-    return [t for T in TT for t in T]
+# flatten
+#
+# Flatten  a list of lists into a single list
+
+def flatten(Ts):
+    return [t for T in Ts for t in T]
+
+# purge_tiny
+#
+# Remove centroids that have fewer than a specified number of points
+
+def purge_tiny(L,mu,cutoff = 10):
+    mu = [m for m,cluster in zip(mu,L) if len(cluster) > cutoff]
+    L  = [cluster for cluster in L if len(cluster) > cutoff]
+    return len(L),mu,L
 
 # segment
 #
@@ -298,7 +311,8 @@ def segment(image_id     = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
                                                           delta      = delta)):
         if converged: break
 
-    Thinned, Centroids = merge_clusters(k,L,mu,Xs,Zs)
+    k,mu,L             = purge_tiny(L,mu)
+    Thinned, Centroids = merge_clusters(k,L)
     voronoi            = Voronoi(Centroids)
 
     fig                = figure(figsize=(20,20))
@@ -319,7 +333,6 @@ def segment(image_id     = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
     Image.show(axis=axs[1,1],channels=[GREEN,BLUE])
     voronoi_plot_2d(voronoi, ax=axs[1,1], show_vertices=False, line_colors='cyan')
 
-    fig.suptitle(f'{image_id}')
     fig.suptitle(f'{image_id}: {", ".join([Descriptions[label] for label in Training[image_id]])}')
     savefig(join(figs,f'{image_id}_dirichlet'), dpi=args.dpi, bbox_inches='tight')
     return fig
