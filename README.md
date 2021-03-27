@@ -6,8 +6,10 @@
 |File|Description|
 |---------------------|-------------------------------------------------------------------------------------------------|
 |descriptions.csv|Text labels for classes|
+|dirichlet.py|Segment using dirichlet process means|
 |hpa-scc.wpr|Python project|
 |logs.py|Analyze log files from training/testing|
+|rgb.txt|List of xkcd colours|
 |segment.py|Segment images using HPA cellsegmentator|
 |slice.py|Slice and downsample dataset|
 |train2.py|Build and train neural network using sliced data|
@@ -28,7 +30,6 @@
 |---------------------|-------------------------------------------------------------------------------------------------|
 |analyze-labels|Find images  that have only one label|
 |CellSegmenterTest.py|Demo for HPA cellsegmentator|
-|dirichlet.py|Spike for exploring dirichlet process-means|
 |encoding.py|Example of encoding|
 |otsu.py|Segment images using Otsu's method|
 |split.py|Partition data into training and validation|

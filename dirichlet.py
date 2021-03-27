@@ -23,6 +23,7 @@ from numpy             import zeros, mean, std, argmin
 from os                import environ
 from os.path           import join
 from random            import sample
+from re                import split
 from scipy.spatial     import Voronoi, voronoi_plot_2d
 from sys               import float_info, exc_info, exit
 from utils             import set_random_seed, Timer
@@ -83,6 +84,7 @@ class Image4(object):
                     origin = origin)
         axis.set_xlim(0,self.nx-1)
         axis.set_ylim(0,self.ny-1)
+
 
 # restrict
 #
@@ -268,18 +270,43 @@ def merge_clusters(k,L,delta_max = 64):
 def flatten(Ts):
     return [t for T in Ts for t in T]
 
-# purge_tiny
+# remove_isolated_centroids
 #
 # Remove centroids that have fewer than a specified number of points
 
-def purge_tiny(L,mu,cutoff = 10):
+def remove_isolated_centroids(L,mu,cutoff = 20):
+    # temp  = [len(cluster) for cluster in L]
     mu = [m for m,cluster in zip(mu,L) if len(cluster) > cutoff]
     L  = [cluster for cluster in L if len(cluster) > cutoff]
     return len(L),mu,L
 
+def  remove_connected_centroids(L,mu,delta=3):
+    def find_path(a,b):
+        for x0,y0 in L1[a]:
+            for x1,y1 in L1[b]:
+                if abs(x0-x1) < delta and abs(y0-y1) < delta:
+                    return (a,b,(x0,y0),(x1,y1))
+
+    L1 = [sorted(l) for l in L]
+    distances = sorted([(i,j,get_dist_sq(mu[i],mu[j])) for i in range(1,len(mu)) for j in range(i) ],key=lambda x:x[2])
+    paths     = [p for p in [find_path(a,b) for a,b,_ in distances] if p!=None]
+    for p in paths:
+        print (p)
+    x=0
+
+# create_xkcd_colours
+#
+# Create list of XKCD colours
+def create_xkcd_colours(file_name='rgb.txt'):
+    with open(file_name) as colours:
+        for row in colours:
+            parts = split(r'\s+#',row)
+            if len(parts)>1:
+                yield parts[0]
+
 # segment
 #
-#  Read slides and segment image: start with Dirichlet process means, then postprecees to remove phantom cells.
+#  Read slides and segment image: start with Dirichlet process means, then postprocess to remove phantom cells.
 #
 #     image_id     The slide to be procesed
 #     path         Location of images
@@ -299,7 +326,8 @@ def segment(image_id     = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
             Training     = [],
             Lambda       = 8000,
             background   = 0,
-            delta        = 64):
+            delta        = 64,
+            XKCD         = []):
 
     Image = Image4(image_id  = image_id,
                    path      = path,
@@ -311,18 +339,25 @@ def segment(image_id     = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
                                                           delta      = delta)):
         if converged: break
 
-    k,mu,L             = purge_tiny(L,mu)
-    Thinned, Centroids = merge_clusters(k,L)
-    voronoi            = Voronoi(Centroids)
+
+
+    # Thinned, Centroids = merge_clusters(k,L)
+    k,mu,L             = remove_isolated_centroids(L,mu)
+    # remove_connected_centroids(L,mu,delta=3)
+    voronoi            = Voronoi(mu)
 
     fig                = figure(figsize=(20,20))
     axs                = fig.subplots(nrows = 2, ncols = 2)
 
     Image.show(axis=axs[0,0])
-    axs[0,0].scatter([x for x,_ in mu],[y for _,y in mu],c='m',s=2,alpha=0.5)
+    for l in range(len(L)):
+        axs[0,0].scatter([x for x,_ in L[l]],[y for _,y in L[l]],c=f'xkcd:{XKCD[l]}',s=1)
+    axs[0,0].scatter([x for x,_ in mu],[y for _,y in mu],marker='X',c=f'xkcd:{XKCD[l+1]}',s=10)
+    # axs[0,0].scatter([mu[x][0] for x,_ in close_pairs],[mu[x][1] for x,_ in close_pairs],c='c',s=4,alpha=0.5)
+    # axs[0,0].scatter([mu[x][0] for _,x in close_pairs],[mu[x][1] for _,x in close_pairs],c='c',s=4,alpha=0.5)
     axs[0,0].set_title(f'k={k}, iteration={seq}')
 
-    axs[0,0].scatter([x for x,_ in flatten(Thinned)],[y for _,y in flatten(Thinned)],c='c',s=1,alpha=0.5)
+    # axs[0,0].scatter([x for x,_ in flatten(Thinned)],[y for _,y in flatten(Thinned)],c='c',s=1,alpha=0.5)
 
     Image.show(axis=axs[0,1],channels=[RED,BLUE])
     voronoi_plot_2d(voronoi, ax=axs[0,1], show_vertices=False, line_colors='orange')
@@ -395,6 +430,7 @@ if __name__=='__main__':
     args = parser.parse_args()
 
     with Timer():
+        XKCD         = [colour for colour in create_xkcd_colours()][::-1]
         Descriptions = read_descriptions('descriptions.csv')
         Training     = restrict(read_training_expectations(path=args.path),
                                 labels   = args.labels,
@@ -410,7 +446,8 @@ if __name__=='__main__':
                                   image_set    = args.image_set,
                                   figs         = args.figs,
                                   Descriptions = Descriptions,
-                                  Training     = Training)
+                                  Training     = Training,
+                                  XKCD         = XKCD)
                     print (f'Segmented {image_id}')
                 except KeyboardInterrupt:
                     exit(f'Interrupted while segmenting {image_id}')
@@ -425,7 +462,8 @@ if __name__=='__main__':
                     image_set    = args.image_set,
                     figs         = args.figs,
                     Descriptions = Descriptions,
-                    Training     = Training)
+                    Training     = Training,
+                    XKCD         = XKCD)
 
     if args.show:
         show()
