@@ -15,7 +15,7 @@
 #  To contact me, Simon Crase, email simon@greenweaves.nz
 
 from os      import walk
-from os.path import exists, join, splitext
+from os.path import basename,exists, join, splitext
 from random  import randrange, seed
 from sys     import maxsize
 from time    import time
@@ -39,8 +39,24 @@ class Timer:
         seconds = elapsed - 60*minutes
         print (f'Elapsed Time {self.message}{minutes} m {seconds:.2f} s')
 
+# Logger
+#
+# Record log data in logfile
+
 class Logger:
-    def __init__(self,prefix='log',suffix='.csv',logdir='./logs'):
+    # __init__
+    #
+    # Initializa logger
+    #
+    # Parameters:
+    #     prefix   Logfile names are of form prefixnnn.suffix
+    #     suffix   Logfile names are of form prefixnnn.suffix
+    #     logdir   Directory for logfiles
+    #     dummy    Used to suppress logging
+
+    def __init__(self,prefix='log',suffix='.csv',logdir='./logs',dummy=False):
+        self.dummy = dummy
+        if self.dummy: return
         logs = [join(logdir,filename) for _,_,filenames in walk(logdir) \
                 for filename in filenames                               \
                 if filename.startswith(prefix) and splitext(filename)[-1]==suffix]
@@ -52,15 +68,18 @@ class Logger:
         self.logfile = None
 
     def __enter__(self):
+        if self.dummy: return self
         self.logfile = open(self.logfile_path,'w')
         return self
 
     def log(self,text):
+        if self.dummy: return
         print (text)
         self.logfile.write(f'{text}\n')
         self.logfile.flush()
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        if self.dummy: return
         if exc_type!=None:
             self.log(f'{exc_type}')
             self.log(f'{exc_val}')
@@ -78,7 +97,8 @@ class Logger:
 # Returns:
 #    Seed value that was actually used
 
-def set_random_seed(specified_seed=None,file_name='seed.txt'):
+def set_random_seed(specified_seed=None,prefix='seed',suffix='txt'):
+    file_name = f'{splitext(basename(prefix))[0]}.{suffix}'
     if specified_seed==None:
         seed()
         new_seed = randrange(maxsize)
@@ -93,6 +113,5 @@ def set_random_seed(specified_seed=None,file_name='seed.txt'):
         return specified_seed
 
 if __name__=='__main__':
-    with Timer('Test') as timer, Logger(prefix='foo') as log:
-        x=1
-
+    with Timer('Test') as timer, Logger(prefix='utilstest') as log:
+        set_random_seed(prefix=__file__)
