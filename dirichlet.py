@@ -283,16 +283,12 @@ def segment(image_id     = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
     for l in range(len(L)):
         axs[0,0].scatter([x for x,_ in L[l]],[y for _,y in L[l]],c=f'xkcd:{XKCD[l]}',s=1)
     axs[0,0].scatter([x for x,_ in mu],[y for _,y in mu],marker='X',c=f'xkcd:{XKCD[k+1]}',s=10)
-    axs[0,0].set_title(f'k={k}, iteration={seq}')
+    axs[0,0].set_title(f'{IMAGE_LEVEL_LABELS[BLUE]}: k={k}, iteration={seq}')
 
-    Image.show(axis=axs[0,1],channels=[RED,BLUE])
-    voronoi_plot_2d(voronoi, ax=axs[0,1], show_vertices=False, line_colors='orange')
-
-    Image.show(axis=axs[1,0],channels=[YELLOW,BLUE])
-    voronoi_plot_2d(voronoi, ax=axs[1,0], show_vertices=False, line_colors='orange')
-
-    Image.show(axis=axs[1,1],channels=[GREEN,BLUE])
-    voronoi_plot_2d(voronoi, ax=axs[1,1], show_vertices=False, line_colors='cyan')
+    for channel,ax in zip([RED,YELLOW,GREEN],[axs[0,1],axs[1,0],axs[1,1]]):
+        voronoi_plot_2d(voronoi, ax=ax, show_vertices=False, line_colors='orange')
+        Image.show(axis=ax,channels=[BLUE,channel])
+        ax.set_title(IMAGE_LEVEL_LABELS[channel])
 
     fig.suptitle(f'{image_id}: {", ".join([Descriptions[label] for label in Training[image_id]])}')
     savefig(get_image_file_name(image_id,figs=figs),
@@ -367,7 +363,7 @@ if __name__=='__main__':
                         help    = 'Maximum number of iterations for DPmeans')
     args = parser.parse_args()
 
-    with Timer(),Logger('dirichlet') as logger:
+    with Timer(),Logger('dirichlet',dummy = not args.all and args.sample==None) as logger:
         XKCD         = [colour for colour in create_xkcd_colours()][::-1]
         Descriptions = read_descriptions('descriptions.csv')
         Training     = restrict(read_training_expectations(path=args.path),
@@ -399,20 +395,20 @@ if __name__=='__main__':
                     if not args.show and fig!=None:
                         close(fig)
         elif args.sample!=None:
-            set_random_seed(args.seed)
+            set_random_seed(args.seed,prefix=__file__)
             for image_id in sample(list(Training.keys()),args.sample):
                 fig = None
                 try:
                     fig,seq = segment(image_id     = image_id,
-                                  path         = args.path,
-                                  image_set    = args.image_set,
-                                  figs         = args.figs,
-                                  Descriptions = Descriptions,
-                                  Training     = Training,
-                                  background   = args.background,
-                                  XKCD         = XKCD,
-                                  N            = args.N,
-                                  delta        = args.delta)
+                                      path         = args.path,
+                                      image_set    = args.image_set,
+                                      figs         = args.figs,
+                                      Descriptions = Descriptions,
+                                      Training     = Training,
+                                      background   = args.background,
+                                      XKCD         = XKCD,
+                                      N            = args.N,
+                                      delta        = args.delta)
                     print (f'Segmented {image_id},{seq}')
                     logger.log(f'{image_id},{seq}')
                 except KeyboardInterrupt:
