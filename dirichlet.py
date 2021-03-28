@@ -21,12 +21,12 @@ from matplotlib.pyplot import hist, show, figure, savefig, close
 from matplotlib.image  import imread
 from numpy             import zeros, mean, std, argmin
 from os                import environ
-from os.path           import join
+from os.path           import exists,join
 from random            import sample
 from re                import split
 from scipy.spatial     import Voronoi, voronoi_plot_2d
 from sys               import float_info, exc_info, exit
-from utils             import set_random_seed, Timer
+from utils             import Logger, set_random_seed, Timer
 
 RED                = 0      # Channel number for Microtubules
 GREEN              = 1      # Channel number for Protein of interest
@@ -229,6 +229,9 @@ def create_xkcd_colours(file_name='rgb.txt'):
             if len(parts)>1:
                 yield parts[0]
 
+def get_image_file_name(image_id, figs = '.'):
+    return join(figs,f'{image_id}_dirichlet.png')
+
 # segment
 #
 #  Read slides and segment image: start with Dirichlet process means, then postprocess to remove phantom cells.
@@ -252,17 +255,22 @@ def segment(image_id     = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
             Lambda       = 8000,
             background   = 0,
             delta        = 64,
-            XKCD         = []):
+            XKCD         = [],
+            N            = 100):
 
     Image = Image4(image_id  = image_id,
                    path      = path,
                    image_set = image_set)
-
+    seq = None
     for seq,(converged,k,L,mu,Xs,Zs) in enumerate(DPmeans(Image.get()[:,:,BLUE],
                                                           Lambda     = Lambda,
                                                           background = background,
                                                           delta      = delta)):
         if converged: break
+
+        if seq>N:
+            print (f'Failed to converge in {N} steps')
+            break
 
     k,mu,L             = remove_isolated_centroids(L,mu)
 
@@ -287,8 +295,12 @@ def segment(image_id     = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
     voronoi_plot_2d(voronoi, ax=axs[1,1], show_vertices=False, line_colors='cyan')
 
     fig.suptitle(f'{image_id}: {", ".join([Descriptions[label] for label in Training[image_id]])}')
-    savefig(join(figs,f'{image_id}_dirichlet'), dpi=args.dpi, bbox_inches='tight')
-    return fig
+    savefig(get_image_file_name(image_id,figs=figs),
+            dpi         = args.dpi,
+            bbox_inches = 'tight')
+    return fig,seq
+
+
 
 if __name__=='__main__':
     parser = ArgumentParser('Cluster HPA data using Dirichlet Process Means')
@@ -343,31 +355,66 @@ if __name__=='__main__':
                         help    = 'Threshold for blue pixels. We consider pixels only if they exceed this value.')
     parser.add_argument('--delta',
                         type    = float,
-                        default = 64,
-                        help    = 'Used to assess convergence. If no centroids have shifted by more than this limit, we have converged')
+                        default = 1,
+                        help    = 'If no centroids have shifted by more than this limit, we deem iterations to have converged')
+    parser.add_argument('--all',
+                        default = False,
+                        action = 'store_true',
+                        help   = 'Used to process all unprocessed slides')
+    parser.add_argument('--N',
+                        default = 100,
+                        type    = int,
+                        help    = 'Maximum number of iterations for DPmeans')
     args = parser.parse_args()
 
-    with Timer():
+    with Timer(),Logger('dirichlet') as logger:
         XKCD         = [colour for colour in create_xkcd_colours()][::-1]
         Descriptions = read_descriptions('descriptions.csv')
         Training     = restrict(read_training_expectations(path=args.path),
                                 labels   = args.labels,
                                 multiple = args.multiple or args.sample==None)
 
-        if args.sample!=None:
+        if args.all:
+            for image_id in Training.keys():
+                if exists(get_image_file_name(image_id,figs=args.figs)): continue
+                fig = None
+                try:
+                    fig,seq = segment(image_id     = image_id,
+                                      path         = args.path,
+                                      image_set    = args.image_set,
+                                      figs         = args.figs,
+                                      Descriptions = Descriptions,
+                                      Training     = Training,
+                                      background   = args.background,
+                                      XKCD         = XKCD,
+                                      N            = args.N,
+                                      delta        = args.delta)
+                    print (f'Segmented {image_id},{seq}')
+                    logger.log(f'{image_id},{seq}')
+                except KeyboardInterrupt:
+                    exit(f'Interrupted while segmenting {image_id}')
+                except:
+                    print(f'Error segmenting {image_id} {exc_info()[0]}')
+                finally:
+                    if not args.show and fig!=None:
+                        close(fig)
+        elif args.sample!=None:
             set_random_seed(args.seed)
             for image_id in sample(list(Training.keys()),args.sample):
                 fig = None
                 try:
-                    fig = segment(image_id     = image_id,
+                    fig,seq = segment(image_id     = image_id,
                                   path         = args.path,
                                   image_set    = args.image_set,
                                   figs         = args.figs,
                                   Descriptions = Descriptions,
                                   Training     = Training,
                                   background   = args.background,
-                                  XKCD         = XKCD)
-                    print (f'Segmented {image_id}')
+                                  XKCD         = XKCD,
+                                  N            = args.N,
+                                  delta        = args.delta)
+                    print (f'Segmented {image_id},{seq}')
+                    logger.log(f'{image_id},{seq}')
                 except KeyboardInterrupt:
                     exit(f'Interrupted while segmenting {image_id}')
                 except:
@@ -376,14 +423,18 @@ if __name__=='__main__':
                     if not args.show and fig!=None:
                         close(fig)
         else:
-            segment(image_id     = args.image_id,
-                    path         = args.path,
-                    image_set    = args.image_set,
-                    figs         = args.figs,
-                    Descriptions = Descriptions,
-                    Training     = Training,
-                    background   = args.background,
-                    XKCD         = XKCD)
+            _,seq =segment(image_id     = args.image_id,
+                           path         = args.path,
+                           image_set    = args.image_set,
+                           figs         = args.figs,
+                           Descriptions = Descriptions,
+                           Training     = Training,
+                           background   = args.background,
+                           XKCD         = XKCD,
+                           N            = args.N,
+                           delta        = args.delta)
+            print (f'Segmented {args.image_id},{seq}')
+            logger.log(f'{args.image_id},{seq}')
 
     if args.show:
         show()
