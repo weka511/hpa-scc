@@ -143,7 +143,10 @@ def get_centroid(Points):
 #     background   Threshold for blue pixels. We consider pixels only if they exceed this value.
 #     delta        Used to assess convergence. If no centroids have shifted by more than this limit, we have converged
 
-def DPmeans(Image,Lambda=8000,background=0,delta=64):
+def DPmeans(Image,
+            Lambda     = 8000,
+            background = 0,
+            delta      = 64):
 
     # extract_one_cluster
     #
@@ -205,94 +208,16 @@ def generate_neighbours(x,y,delta=[-1,0,1]):
             if dx==0 and dy==0: continue  # Don't visit the original point
             yield x + dx, y + dy
 
-# get_thinned
-#
-# Eliminate interior points from component
-
-def get_thinned(Component,n=4):
-    # is_isolated
-    #
-    # Establish whether point is isolated by counting neighbours.
-
-    def is_isolated(x,y):
-        count = 0
-        for x1,y1 in generate_neighbours(x,y,delta=[-1,0,1]):
-            if (x1,y1) in Neighbours:
-                count+=1
-                if count>n:
-                    return False
-        return True
-    Neighbours = set(Component)
-    return [(x,y) for (x,y) in Component if is_isolated(x,y)]
-
-# get_min_distance
-#
-# Determine minimum distance between two lists of points
-#
-# Parameters:
-#     C1         One list of points
-#     C2         The other list of points
-#     distance   Function used to calculate points. We assume distance(a,b)==distance(b,a)
-def get_min_distance(C1,C2,distance=get_dist_sq):
-    return min(distance(C1[i],C2[j]) for i in range(len(C1)) for j in range(i,len(C2)))
-
-
-# merge_clusters
-
-def merge_clusters(k,L,delta_max = 64):
-    Thinned = [get_thinned(Component) for Component in L]
-    Deltas = [(k1,k2,get_min_distance(Thinned[k1],Thinned[k2])) for k1 in range(k) for k2 in range(k1)]
-
-    Pairs = [(k1,k2) for k1,k2,delta in Deltas if delta<delta_max]
-    print (Pairs)
-    Clusters = {c:[c] for c in range(k)}
-    for a,b in Pairs:
-        Cluster = Clusters[b]
-        Clusters[b].insert(0,a)
-        Clusters[a] = Clusters[b]
-    Closed = []
-    Merged = []
-    for a,B in Clusters.items():
-        if a in Closed: continue
-        Merged.append(B)
-        Closed.append(a)
-        for b in B:
-            Closed.append(b)
-    Centroids = []
-    for m in Merged:
-        Centroids.append(get_centroid([pt for c in list(set(m)) for pt in L[c]]))
-    return Thinned, Centroids
-
-# flatten
-#
-# Flatten  a list of lists into a single list
-
-def flatten(Ts):
-    return [t for T in Ts for t in T]
 
 # remove_isolated_centroids
 #
 # Remove centroids that have fewer than a specified number of points
 
 def remove_isolated_centroids(L,mu,cutoff = 20):
-    # temp  = [len(cluster) for cluster in L]
     mu = [m for m,cluster in zip(mu,L) if len(cluster) > cutoff]
     L  = [cluster for cluster in L if len(cluster) > cutoff]
     return len(L),mu,L
 
-def  remove_connected_centroids(L,mu,delta=3):
-    def find_path(a,b):
-        for x0,y0 in L1[a]:
-            for x1,y1 in L1[b]:
-                if abs(x0-x1) < delta and abs(y0-y1) < delta:
-                    return (a,b,(x0,y0),(x1,y1))
-
-    L1 = [sorted(l) for l in L]
-    distances = sorted([(i,j,get_dist_sq(mu[i],mu[j])) for i in range(1,len(mu)) for j in range(i) ],key=lambda x:x[2])
-    paths     = [p for p in [find_path(a,b) for a,b,_ in distances] if p!=None]
-    for p in paths:
-        print (p)
-    x=0
 
 # create_xkcd_colours
 #
@@ -339,11 +264,8 @@ def segment(image_id     = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
                                                           delta      = delta)):
         if converged: break
 
-
-
-    # Thinned, Centroids = merge_clusters(k,L)
     k,mu,L             = remove_isolated_centroids(L,mu)
-    # remove_connected_centroids(L,mu,delta=3)
+
     voronoi            = Voronoi(mu)
 
     fig                = figure(figsize=(20,20))
@@ -352,12 +274,8 @@ def segment(image_id     = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
     Image.show(axis=axs[0,0])
     for l in range(len(L)):
         axs[0,0].scatter([x for x,_ in L[l]],[y for _,y in L[l]],c=f'xkcd:{XKCD[l]}',s=1)
-    axs[0,0].scatter([x for x,_ in mu],[y for _,y in mu],marker='X',c=f'xkcd:{XKCD[l+1]}',s=10)
-    # axs[0,0].scatter([mu[x][0] for x,_ in close_pairs],[mu[x][1] for x,_ in close_pairs],c='c',s=4,alpha=0.5)
-    # axs[0,0].scatter([mu[x][0] for _,x in close_pairs],[mu[x][1] for _,x in close_pairs],c='c',s=4,alpha=0.5)
+    axs[0,0].scatter([x for x,_ in mu],[y for _,y in mu],marker='X',c=f'xkcd:{XKCD[k+1]}',s=10)
     axs[0,0].set_title(f'k={k}, iteration={seq}')
-
-    # axs[0,0].scatter([x for x,_ in flatten(Thinned)],[y for _,y in flatten(Thinned)],c='c',s=1,alpha=0.5)
 
     Image.show(axis=axs[0,1],channels=[RED,BLUE])
     voronoi_plot_2d(voronoi, ax=axs[0,1], show_vertices=False, line_colors='orange')
@@ -421,7 +339,7 @@ if __name__=='__main__':
                         help    = 'Penalty to discourage creating new clusters')
     parser.add_argument('--background',
                         type    = float,
-                        default = 0,
+                        default = 0.05,
                         help    = 'Threshold for blue pixels. We consider pixels only if they exceed this value.')
     parser.add_argument('--delta',
                         type    = float,
@@ -447,6 +365,7 @@ if __name__=='__main__':
                                   figs         = args.figs,
                                   Descriptions = Descriptions,
                                   Training     = Training,
+                                  background   = args.background,
                                   XKCD         = XKCD)
                     print (f'Segmented {image_id}')
                 except KeyboardInterrupt:
@@ -463,6 +382,7 @@ if __name__=='__main__':
                     figs         = args.figs,
                     Descriptions = Descriptions,
                     Training     = Training,
+                    background   = args.background,
                     XKCD         = XKCD)
 
     if args.show:
