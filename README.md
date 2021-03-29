@@ -7,6 +7,7 @@
 |---------------------|-------------------------------------------------------------------------------------------------|
 |descriptions.csv|Text labels for classes|
 |dirichlet.py|Segment using dirichlet process means|
+|establish-N.R|R script used to establish value for maximum nomber of iterations|
 |hpa-scc.wpr|Python project|
 |logs.py|Analyze log files from training/testing|
 |rgb.txt|List of xkcd colours|
