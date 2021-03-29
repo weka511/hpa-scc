@@ -49,6 +49,10 @@ IMAGE_LEVEL_LABELS    = [
     'Endoplasmic reticulum'
 ]
 
+# Image4
+#
+# This class manages a complete set of images for one slide
+
 class Image4(object):
     def __init__(self,
                  path        = join(environ['DATA'],'hpa-scc'),
@@ -65,8 +69,10 @@ class Image4(object):
 
             self.Image[:,:,channel] = image_mono
 
+    # Get a regular 3 colour image from selected channels
+
     def get(self,channels=[BLUE]):
-        Image            = zeros((self.nx,self.ny,NRGB))
+        Image = zeros((self.nx,self.ny,NRGB))
         for channel in channels:
             if channel==YELLOW:
                 Image[:,:,RED]    =  self.Image [:,:,channel]
@@ -74,6 +80,8 @@ class Image4(object):
             else:
                 Image[:,:,channel] =  self.Image [:,:,channel]
         return Image
+
+    # Display selected channels
 
     def show(self,
             channels = [BLUE],
@@ -97,7 +105,7 @@ def restrict(Training,labels,multiple=False):
 
 # read_descriptions
 #
-# Create a lookup table for the inerpretation of each label
+# Create a lookup table for the interpretation of each label
 
 def read_descriptions(file_name='descriptions.csv'):
     with open(file_name) as descriptions_file:
@@ -229,19 +237,30 @@ def create_xkcd_colours(file_name='rgb.txt'):
             if len(parts)>1:
                 yield parts[0]
 
+# get_image_file_name
+
 def get_image_file_name(image_id, figs = '.'):
     return join(figs,f'{image_id}_dirichlet.png')
 
-def join_greedy_centroids(k,L,mu,delta=1):
-    def get_middle(pt1,pt2):
-        x1,y1 = pt1
-        x2,y2 = pt2
-        return (0.5*(x1+x2), 0.5*(y1+y2))
+# merge_greedy_centroids
+
+def merge_greedy_centroids(k,L,mu,delta=1):
+    # binary_search
+    #
+    # Find the nearest match to a specified value within a sorted list
+    #
+    # Parameters:
+    #     x   The value to be found
+    #     Xs The list
+    #
+    # Returns:
+    #    Index of best match, or None
+
     def binary_search(x,Xs):
         if x<Xs[0] or x>Xs[-1]: return None
         low  = 0
         high = len(Xs)-1
-        while low<high-1:
+        while low < high-1:
             mid = (low+high)//2
             if Xs[mid]<x:
                 low = mid
@@ -249,8 +268,12 @@ def join_greedy_centroids(k,L,mu,delta=1):
                 high = mid
         return mid
 
+    # found
+    #
+    # Find point within a list
+
     def found(pt,L):
-        Xs = [x for x,_ in L]
+        Xs  = [x for x,_ in L]
         mid = binary_search(pt[0],Xs)
         if mid==None: return False
         i0 = mid
@@ -260,14 +283,40 @@ def join_greedy_centroids(k,L,mu,delta=1):
         while i1<len(Xs) and Xs[i1]-pt[0]<delta:
             i1+=1
         for i in range(i0,i1):
-            if get_dist_sq(pt,L[i])<delta**2: return True
+            if get_dist_sq(pt,L[i]) < delta**2: return True
         return False
+
+    # create_merges
+    #
+    # Create lists of elements to be merged or skipped
+    # Each pair of elements (a,b) has the property a>b
+    # All data will go into clutser b, so a will need to
+    # be skipped
+
+    def create_merges(merge_pairs):
+        merges = {}
+        skips  = set()
+        for a,b in merge_pairs:
+            assert a>b
+            skips.add(a)
+            if not b in merges:
+                merges[b] = [a]
+            else:
+                merges[b].append(a)
+            if a in merges:
+                merges[b].append(merges[a])
+                del merges[a]
+        return merges,skips
+
+    # can_merge
+    #
+    # Determines whether to cluster can be merged
 
     def can_merge(i,j):
         mu_i  = mu[i]
         mu_j = mu[j]
         while delta < get_dist_sq(mu_i,mu_j):
-            mid = get_middle(mu_i,mu_j)
+            mid = get_centroid([mu_i,mu_j])
             if found(mid,L[i]):
                 mu_i = mid
             elif found(mid,L[j]):
@@ -275,27 +324,17 @@ def join_greedy_centroids(k,L,mu,delta=1):
             else:
                 return False
         return True
-    L = [sorted(l) for l in L]
-    to_be_merged = [(i,j) for i in range(1,k) for j in range(i) if can_merge(i,j)]
-    merges = {}
-    to_be_removed = set()
-    for a,b in to_be_merged:
-        assert a>b
-        to_be_removed.add(a)
-        if not b in merges:
-            merges[b] = [a]
-        else:
-            merges[b].append(a)
-        if a in merges:
-            merges[b].append(merges[a])
-            del merges[a]
+
+    L            = [sorted(l,key=lambda x:x[0]) for l in L]
+    merges,skips = create_merges([(i,j) for i in range(1,k) for j in range(i) if can_merge(i,j)])
+
     if len(merges)==0:
         return len(L),mu,L
     else:
         L1 = []
         mu1 = []
         for i in range(len(L)):
-            if i in to_be_removed: continue
+            if i in skips: continue
             if i in merges:
                 Merged = L[i][:]
                 for j in merges[i]:
@@ -355,10 +394,8 @@ def segment(image_id     = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
     axs[0,0].set_title(f'{IMAGE_LEVEL_LABELS[BLUE]}: k={k}, iteration={seq}')
 
     k,mu,L             = remove_isolated_centroids(L,mu)
-    k,mu,L             = join_greedy_centroids(k,L,mu)
+    k,mu,L             = merge_greedy_centroids(k,L,mu)
     voronoi            = Voronoi(mu)
-
-
 
     Image.show(axis=axs[0,1])
     for l in range(len(L)):
