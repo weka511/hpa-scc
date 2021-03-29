@@ -232,7 +232,7 @@ def create_xkcd_colours(file_name='rgb.txt'):
 def get_image_file_name(image_id, figs = '.'):
     return join(figs,f'{image_id}_dirichlet.png')
 
-def join_greedy_centroids(k,L,mu,delta=2):
+def join_greedy_centroids(k,L,mu,delta=1):
     def get_middle(pt1,pt2):
         x1,y1 = pt1
         x2,y2 = pt2
@@ -332,7 +332,8 @@ def segment(image_id     = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
             delta        = 64,
             XKCD         = [],
             N            = 100):
-
+    fig                = figure(figsize=(20,20))
+    axs                = fig.subplots(nrows = 2, ncols = 3)
     Image = Image4(image_id  = image_id,
                    path      = path,
                    image_set = image_set)
@@ -347,21 +348,26 @@ def segment(image_id     = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
             print (f'Failed to converge in {N} steps')
             break
 
-    k,mu,L             = remove_isolated_centroids(L,mu)
-    k,mu,L             = join_greedy_centroids(k,L,mu)
-    voronoi            = Voronoi(mu)
-
-    fig                = figure(figsize=(20,20))
-    axs                = fig.subplots(nrows = 2, ncols = 2)
-
     Image.show(axis=axs[0,0])
     for l in range(len(L)):
         axs[0,0].scatter([x for x,_ in L[l]],[y for _,y in L[l]],c=f'xkcd:{XKCD[l]}',s=1)
     axs[0,0].scatter([x for x,_ in mu],[y for _,y in mu],marker='X',c=f'xkcd:{XKCD[k+1]}',s=10)
     axs[0,0].set_title(f'{IMAGE_LEVEL_LABELS[BLUE]}: k={k}, iteration={seq}')
 
+    k,mu,L             = remove_isolated_centroids(L,mu)
+    k,mu,L             = join_greedy_centroids(k,L,mu)
+    voronoi            = Voronoi(mu)
+
+
+
+    Image.show(axis=axs[0,1])
+    for l in range(len(L)):
+        axs[0,1].scatter([x for x,_ in L[l]],[y for _,y in L[l]],c=f'xkcd:{XKCD[l]}',s=1)
+    axs[0,1].scatter([x for x,_ in mu],[y for _,y in mu],marker='X',c=f'xkcd:{XKCD[k+1]}',s=10)
+    axs[0,1].set_title(f'{IMAGE_LEVEL_LABELS[BLUE]}: k={k}, iteration={seq}')
+
     for channel,ax in zip([RED,YELLOW,GREEN],
-                          [axs[0,1],axs[1,0],axs[1,1]]):
+                          [axs[0,2],axs[1,0],axs[1,1]]):
         voronoi_plot_2d(voronoi, ax=ax, show_vertices=False, line_colors='orange')
         Image.show(axis=ax,channels=[BLUE,channel])
         ax.set_title(IMAGE_LEVEL_LABELS[channel])
@@ -434,7 +440,7 @@ if __name__=='__main__':
                         action = 'store_true',
                         help   = 'Used to process all unprocessed slides')
     parser.add_argument('--N',
-                        default = 100,
+                        default = 75, # Processed 1307 slides, and the most iteration I have observed was 57.
                         type    = int,
                         help    = 'Maximum number of iterations for DPmeans')
     args = parser.parse_args()

@@ -16,7 +16,9 @@
 #  To contact me, Simon Crase, email simon@greenweaves.nz
 
 rm(list=ls())
+setwd(dirname(parent.frame(2)$ofile))
 df = read.csv(file='./logs/dirichlet13.csv')
 colnames(df) = c('name','N')
-hist(df$N)
-print(max(df$N))
+df <- na.omit(df)
+hist(df$N,xlab='Number of Iterations',main='DPmeans')
+print(sprintf('Maximum Number of Iterations in %d trials = %d', nrow(df), max(df$N)),quote = FALSE)
