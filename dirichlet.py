@@ -232,9 +232,84 @@ def create_xkcd_colours(file_name='rgb.txt'):
 def get_image_file_name(image_id, figs = '.'):
     return join(figs,f'{image_id}_dirichlet.png')
 
+def join_greedy_centroids(k,L,mu,delta=2):
+    def get_middle(pt1,pt2):
+        x1,y1 = pt1
+        x2,y2 = pt2
+        return (0.5*(x1+x2), 0.5*(y1+y2))
+    def binary_search(x,Xs):
+        if x<Xs[0] or x>Xs[-1]: return None
+        low  = 0
+        high = len(Xs)-1
+        while low<high-1:
+            mid = (low+high)//2
+            if Xs[mid]<x:
+                low = mid
+            else:
+                high = mid
+        return mid
+
+    def found(pt,L):
+        Xs = [x for x,_ in L]
+        mid = binary_search(pt[0],Xs)
+        if mid==None: return False
+        i0 = mid
+        while i0>0 and pt[0]-Xs[i0]<delta:
+            i0-=1
+        i1 = mid
+        while i1<len(Xs) and Xs[i1]-pt[0]<delta:
+            i1+=1
+        for i in range(i0,i1):
+            if get_dist_sq(pt,L[i])<delta**2: return True
+        return False
+
+    def can_merge(i,j):
+        mu_i  = mu[i]
+        mu_j = mu[j]
+        while delta < get_dist_sq(mu_i,mu_j):
+            mid = get_middle(mu_i,mu_j)
+            if found(mid,L[i]):
+                mu_i = mid
+            elif found(mid,L[j]):
+                mu_j = mid
+            else:
+                return False
+        return True
+    L = [sorted(l) for l in L]
+    to_be_merged = [(i,j) for i in range(1,k) for j in range(i) if can_merge(i,j)]
+    merges = {}
+    to_be_removed = set()
+    for a,b in to_be_merged:
+        assert a>b
+        to_be_removed.add(a)
+        if not b in merges:
+            merges[b] = [a]
+        else:
+            merges[b].append(a)
+        if a in merges:
+            merges[b].append(merges[a])
+            del merges[a]
+    if len(merges)==0:
+        return len(L),mu,L
+    else:
+        L1 = []
+        mu1 = []
+        for i in range(len(L)):
+            if i in to_be_removed: continue
+            if i in merges:
+                Merged = L[i][:]
+                for j in merges[i]:
+                    Merged = Merged + L[j]
+                L1.append(Merged)
+                mu1.append(get_centroid(Merged))
+            else:
+                L1.append(L[i])
+                mu1.append(mu[i])
+        return len(L1),mu1,L1
+
 # segment
 #
-#  Read slides and segment image: start with Dirichlet process means, then postprocess to remove phantom cells.
+# Read slides and segment image: start with Dirichlet process means, then postprocess to remove phantom cells.
 #
 #     image_id     The slide to be procesed
 #     path         Location of images
@@ -273,7 +348,7 @@ def segment(image_id     = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
             break
 
     k,mu,L             = remove_isolated_centroids(L,mu)
-
+    k,mu,L             = join_greedy_centroids(k,L,mu)
     voronoi            = Voronoi(mu)
 
     fig                = figure(figsize=(20,20))
@@ -285,7 +360,8 @@ def segment(image_id     = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
     axs[0,0].scatter([x for x,_ in mu],[y for _,y in mu],marker='X',c=f'xkcd:{XKCD[k+1]}',s=10)
     axs[0,0].set_title(f'{IMAGE_LEVEL_LABELS[BLUE]}: k={k}, iteration={seq}')
 
-    for channel,ax in zip([RED,YELLOW,GREEN],[axs[0,1],axs[1,0],axs[1,1]]):
+    for channel,ax in zip([RED,YELLOW,GREEN],
+                          [axs[0,1],axs[1,0],axs[1,1]]):
         voronoi_plot_2d(voronoi, ax=ax, show_vertices=False, line_colors='orange')
         Image.show(axis=ax,channels=[BLUE,channel])
         ax.set_title(IMAGE_LEVEL_LABELS[channel])
