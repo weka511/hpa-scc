@@ -86,8 +86,17 @@ class Image4(object):
     def show(self,
             channels = [BLUE],
             axis     = None,
-            origin   = 'lower'):
-        axis.imshow(self.get(channels),
+            origin   = 'lower',
+            actuals  = None):
+        if actuals==None:
+            axis.imshow(self.get(channels),
+                    extent = [0,self.nx-1,0,self.ny-1],
+                    origin = origin)
+        else:
+            Image = zeros((self.nx,self.ny,NRGB))
+            for a,b in zip(channels,actuals):
+                Image[:,:,b] = self.Image[:,:,a]
+            axis.imshow(Image,
                     extent = [0,self.nx-1,0,self.ny-1],
                     origin = origin)
         axis.set_xlim(0,self.nx-1)
@@ -371,8 +380,8 @@ def segment(image_id     = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
             delta        = 64,
             XKCD         = [],
             N            = 100):
-    fig                = figure(figsize=(20,20))
-    axs                = fig.subplots(nrows = 2, ncols = 3)
+    fig                = figure(figsize=(27,18))
+    axs                = fig.subplots(nrows = 2, ncols = 4)
     Image = Image4(image_id  = image_id,
                    path      = path,
                    image_set = image_set)
@@ -404,10 +413,16 @@ def segment(image_id     = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
     axs[0,1].set_title(f'{IMAGE_LEVEL_LABELS[BLUE]}: k={k}, iteration={seq}')
 
     for channel,ax in zip([RED,YELLOW,GREEN],
-                          [axs[0,2],axs[1,0],axs[1,1]]):
+                          [axs[0,2],axs[0,3],axs[1,0]]):
         voronoi_plot_2d(voronoi, ax=ax, show_vertices=False, line_colors='orange')
         Image.show(axis=ax,channels=[BLUE,channel])
-        ax.set_title(IMAGE_LEVEL_LABELS[channel])
+        ax.set_title(f'{IMAGE_LEVEL_LABELS[BLUE]}+{IMAGE_LEVEL_LABELS[channel]}')
+
+    for channel,ax in zip([RED,YELLOW,BLUE],
+                          [axs[1,1],axs[1,2],axs[1,3]]):
+        voronoi_plot_2d(voronoi, ax=ax, show_vertices=False, line_colors='orange')
+        Image.show(axis=ax,channels=[channel,GREEN],actuals=[BLUE,RED])
+        ax.set_title(f'{IMAGE_LEVEL_LABELS[channel]}+{IMAGE_LEVEL_LABELS[GREEN]}')
 
     fig.suptitle(f'{image_id}: {", ".join([Descriptions[label] for label in Training[image_id]])}')
     savefig(get_image_file_name(image_id,figs=figs),
