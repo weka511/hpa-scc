@@ -21,7 +21,7 @@
 from   argparse          import ArgumentParser
 from   csv               import writer
 from   random            import shuffle
-from   segment           import read_training_expectations,DESCRIPTIONS
+from   segment           import read_training_expectations,create_descriptions
 from   time              import time
 
 if __name__=='__main__':
@@ -45,7 +45,7 @@ if __name__=='__main__':
                         type    = int,
                         help    = 'Number of instances of each class to be processed by segment.py')
     args     = parser.parse_args()
-
+    descriptions = create_descriptions()
     with open(args.out,'w',newline='') as csvfile:
         singleton_writer = writer(csvfile)
         for image_id,label in sorted([(image_id,labels[0])
@@ -54,7 +54,7 @@ if __name__=='__main__':
             singleton_writer.writerow([label,image_id])
 
     if len(args.classes)>0:
-        classes = list(range(len(DESCRIPTIONS)+1)) if args.classes[0]=='all' else args.classes
+        classes = list(range(len(descriptions)+1)) if args.classes[0]=='all' else args.classes
         counts  = [0 for _ in classes]
         with open(args.selection,'w') as out:
             singletons   = {image_id:label[0] for image_id,label in read_training_expectations(path=args.path).items() if len(label)==1}
