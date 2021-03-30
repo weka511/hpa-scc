@@ -5,7 +5,7 @@
 
 |File|Description|
 |---------------------|-------------------------------------------------------------------------------------------------|
-|sensus.py|Compute statistics for number of images for combinations of classes|
+|census.py|Compute statistics for number of images for combinations of classes|
 |descriptions.csv|Text labels for classes|
 |dirichlet.py|Segment using dirichlet process means|
 |establish-N.R|R script used to establish value for maximum number of iterations|
