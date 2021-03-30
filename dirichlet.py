@@ -495,6 +495,10 @@ if __name__=='__main__':
                         default = 75, # Processed 1307 slides, and the most iteration I have observed was 57.
                         type    = int,
                         help    = 'Maximum number of iterations for DPmeans')
+    parser.add_argument('--singleton',
+                        default = False,
+                        action = 'store_true',
+                        help   = 'Process singletons only')
     args = parser.parse_args()
 
     with Timer(),Logger('dirichlet',dummy = not args.all and args.sample==None) as logger:
@@ -505,8 +509,9 @@ if __name__=='__main__':
                                 multiple = args.multiple or args.sample==None)
 
         if args.all:
-            for image_id in Training.keys():
+            for image_id,classes in Training.items():
                 if exists(get_image_file_name(image_id,figs=args.figs)): continue
+                if args.singleton and len(classes)>1: continue
                 fig = None
                 try:
                     fig,seq = segment(image_id     = image_id,
@@ -530,7 +535,8 @@ if __name__=='__main__':
                         close(fig)
         elif args.sample!=None:
             set_random_seed(args.seed,prefix=__file__)
-            for image_id in sample(list(Training.keys()),args.sample):
+            image_ids = [image_id for image_id,classes in Training.items() if len(classes)==1] if args.singleton else list(Training.keys())
+            for image_id in sample(image_ids,args.sample):
                 fig = None
                 try:
                     fig,seq = segment(image_id     = image_id,
