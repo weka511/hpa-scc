@@ -33,7 +33,7 @@ GREEN              = 1      # Channel number for Protein of interest
 BLUE               = 2      # Channel number for Nucelus
 YELLOW             = 3      # Channel number for Endoplasmic reticulum
 NCHANNELS          = 4      # Number of channels
-NRGB               = 3      # Number of actual channels for graphcs
+NRGB               = 3      # Number of actual channels for graphics
 
 COLOUR_NAMES     = [
     'red',
@@ -248,14 +248,17 @@ def create_xkcd_colours(file_name='rgb.txt'):
 
 # get_image_file_name
 
-def get_image_file_name(image_id, figs = '.'):
-    return join(figs,f'{image_id}_dirichlet.png')
+def get_image_file_name(image_id,
+                        figs   = '.',
+                        labels = [],
+                        sep    = '.'):
+    return join(figs,f'{sep.join([str(label) for label in labels])}{sep}{image_id}.png')
 
 # merge_greedy_centroids
 
 def merge_greedy_centroids(k,L,mu,delta=1):
     # binary_search
-    #
+
     # Find the nearest match to a specified value within a sorted list
     #
     # Parameters:
@@ -400,7 +403,7 @@ def segment(image_id     = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
     for l in range(len(L)):
         axs[0,0].scatter([x for x,_ in L[l]],[y for _,y in L[l]],c=f'xkcd:{XKCD[l]}',s=1)
     axs[0,0].scatter([x for x,_ in mu],[y for _,y in mu],marker='X',c=f'xkcd:{XKCD[k+1]}',s=10)
-    axs[0,0].set_title(f'{IMAGE_LEVEL_LABELS[BLUE]}: k={k}, iteration={seq}')
+    axs[0,0].set_title(f'Lambda={Lambda}, k={k}, iteration={seq}')
 
     k,mu,L             = remove_isolated_centroids(L,mu)
     k,mu,L             = merge_greedy_centroids(k,L,mu)
@@ -410,7 +413,7 @@ def segment(image_id     = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
     for l in range(len(L)):
         axs[0,1].scatter([x for x,_ in L[l]],[y for _,y in L[l]],c=f'xkcd:{XKCD[l]}',s=1)
     axs[0,1].scatter([x for x,_ in mu],[y for _,y in mu],marker='X',c=f'xkcd:{XKCD[k+1]}',s=10)
-    axs[0,1].set_title(f'{IMAGE_LEVEL_LABELS[BLUE]}: k={k}, iteration={seq}')
+    axs[0,1].set_title(f'{IMAGE_LEVEL_LABELS[BLUE]}: k={k}')
 
     for channel,ax in zip([RED,YELLOW,GREEN],
                           [axs[0,2],axs[0,3],axs[1,0]]):
@@ -425,7 +428,9 @@ def segment(image_id     = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
         ax.set_title(f'{IMAGE_LEVEL_LABELS[channel]}+{IMAGE_LEVEL_LABELS[GREEN]}')
 
     fig.suptitle(f'{image_id}: {", ".join([Descriptions[label] for label in Training[image_id]])}')
-    savefig(get_image_file_name(image_id,figs=figs),
+    savefig(get_image_file_name(image_id,
+                                figs  = figs,
+                                labels = Training[image_id]),
             dpi         = args.dpi,
             bbox_inches = 'tight')
     return fig,seq
@@ -477,7 +482,7 @@ if __name__=='__main__':
                         help    = 'Used to seed random number generator')
     parser.add_argument('--Lambda',
                         type    = float,
-                        default = 8000,
+                        default = 8000, # Tested with  0a7e47d2-bbb2-11e8-b2ba-ac1f6b6435d0. Cannot reduce much below 8000
                         help    = 'Penalty to discourage creating new clusters')
     parser.add_argument('--background',
                         type    = float,
@@ -523,7 +528,8 @@ if __name__=='__main__':
                                       background   = args.background,
                                       XKCD         = XKCD,
                                       N            = args.N,
-                                      delta        = args.delta)
+                                      delta        = args.delta,
+                                      Lambda       = args.Lambda)
                     print (f'Segmented {image_id},{seq}')
                     logger.log(f'{image_id},{seq}')
                 except KeyboardInterrupt:
@@ -548,7 +554,8 @@ if __name__=='__main__':
                                       background   = args.background,
                                       XKCD         = XKCD,
                                       N            = args.N,
-                                      delta        = args.delta)
+                                      delta        = args.delta,
+                                      Lambda       = args.Lambda)
                     print (f'Segmented {image_id},{seq}')
                     logger.log(f'{image_id},{seq}')
                 except KeyboardInterrupt:
@@ -568,7 +575,8 @@ if __name__=='__main__':
                            background   = args.background,
                            XKCD         = XKCD,
                            N            = args.N,
-                           delta        = args.delta)
+                           delta        = args.delta,
+                           Lambda       = args.Lambda)
             print (f'Segmented {args.image_id},{seq}')
             logger.log(f'{args.image_id},{seq}')
 
