@@ -15,37 +15,73 @@
 #
 #  To contact me, Simon Crase, email simon@greenweaves.nz
 #
-#  Compute statistics for number of images for combinations of classes
+#  Compute statistics for number of images for combinations of labels
 
-from   dirichlet         import read_training_expectations
-from   matplotlib.pyplot import show, figure
-from   utils             import Timer
+from csv               import reader
+from dirichlet         import read_training_expectations
+from matplotlib.pyplot import show, figure, savefig, tight_layout
+from re                import split
+from utils             import Timer
 
+# read_descriptions
+#
+# Create a lookup table for the interpretation of each label
+
+def read_descriptions(file_name='descriptions.csv'):
+    with open(file_name) as descriptions_file:
+        return {int(row[0]) : row[1] for row in  reader(descriptions_file)}
+
+# create_xkcd_colours
+#
+# Create list of XKCD colours
+def create_xkcd_colours(file_name='rgb.txt'):
+    with open(file_name) as colours:
+        for row in colours:
+            parts = split(r'\s+#',row)
+            if len(parts)>1:
+                yield parts[0]
 
 if __name__=='__main__':
     with Timer():
-        counts   = []
-        for item_id,classes in read_training_expectations().items():
-            class_key = '-'.join(str(c) for c in sorted(classes))
-            while len(counts)<len(classes)+1:
+        Descriptions = read_descriptions('descriptions.csv')
+        counts       = []
+        label_counts = [0]*len(Descriptions)
+        for item_id,labels in read_training_expectations().items():
+            for label in labels:
+                label_counts[label]+=1
+            label_key = '-'.join(str(c) for c in sorted(labels))
+            while len(counts)<len(labels)+1:
                 counts.append({})
-            if class_key in counts[len(classes)]:
-                counts[len(classes)][class_key] += 1
+            if label_key in counts[len(labels)]:
+                counts[len(labels)][label_key] += 1
             else:
-                counts[len(classes)][class_key] = 1
+                counts[len(labels)][label_key] = 1
 
-        fig = figure(figsize=(20,20))
-        axs = fig.subplots(ncols = 2)
-        axs[0].bar(range(len(counts)), [len(data) for data in counts])
+        XKCD = [colour for colour in create_xkcd_colours()][::-1]
+        fig  = figure(figsize=(21,14))
+        axs  = fig.subplots(ncols = 3)
+
+        axs[0].bar(range(len(counts)), [len(data) for data in counts],color='xkcd:teal')
         axs[0].set_title('Number of data combinations of each multiplicity')
-        axs[0].set_xlabel('Multiplicty')
-        axs[0].set_ylabel('Number')
+        axs[0].set_xlabel('Multiplicity')
+        axs[0].set_ylabel('Count')
 
         for i in range(len(counts)):
             if len(counts[i])>1:
-                axs[1].hist([count for _,count in counts[i].items()],label=f'{i}',alpha=0.5)
+                axs[1].hist([count for _,count in counts[i].items()],label=f'{i}',
+                            alpha = 0.5,
+                            color = XKCD[i-1])
 
-        axs[1].legend(title='Number of classes')
-        axs[1].set_title('Number of slides by combination of classes')
+        axs[1].legend(title='Number of labels')
+        axs[1].set_title('Number of cells by combination of labels')
+
+        x = list(range(len(label_counts)))
+        axs[2].bar(x,label_counts, color=[f'xkcd:{XKCD[i]}' for i in x])
+        axs[2].set_title('Number of examples for each label')
+        axs[2].set_xticks(x)
+        axs[2].set_xticklabels([Descriptions[i] for i in x],rotation=90)
+
+        tight_layout()
+        savefig('census.png')
 
     show()
