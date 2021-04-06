@@ -24,7 +24,6 @@ from numpy             import zeros, array
 from os                import environ
 from os.path           import join
 from random            import sample, seed
-from scipy.signal      import correlate2d,fftconvolve
 from sys               import exit
 
 RED                = 0      # Channel number for Microtubules
@@ -71,17 +70,11 @@ def visualize(image_id     = None,
               image_set    = 'train512x512',
               figs         = './figs',
               dpi          = 300,
-              correlate2d  = False,
-              bins         = None,
               Descriptions = {},
               Training     =  {}):
     fig          = figure(figsize=(20,20))
-    nrows        = 2
-    if correlate2d:
-        nrows += 1
-    if bins!=None:
-        nrows += 1
-    axs          = fig.subplots(nrows = nrows, ncols = NCHANNELS)
+
+    axs          = fig.subplots(nrows = 3, ncols = NCHANNELS)
     Greys        = []
 
     for seq,colour in enumerate([BLUE,RED,YELLOW,GREEN]):
@@ -91,16 +84,21 @@ def visualize(image_id     = None,
         nx,ny            = Greys[-1].shape
         Image            = zeros((nx,ny,NRGB))
 
+        flattened = [z for zs in Greys[-1] for z in zs if z>0]
         if colour==YELLOW:
-            Image[:,:,RED]    = Greys[-1][:,:]
-            Image[:,:,GREEN]  = Greys[-1][:,:]
+            Image[:,:,RED]    = Greys[-1][:,:]/max(flattened)
+            Image[:,:,GREEN]  = Greys[-1][:,:]/max(flattened)
         else:
-            Image[:,:,colour] = Greys[-1][:,:]
+            Image[:,:,colour] = Greys[-1][:,:]/max(flattened)
 
         axs[0,seq].imshow(Image)
         axs[0,seq].axes.xaxis.set_ticks([])
         axs[0,seq].axes.yaxis.set_ticks([])
         axs[0,seq].set_title(meanings[colour])
+
+        axs[2,seq].hist(flattened,
+                        color = f'xkcd:{colours[colour]}',
+                        bins  = 25)
 
     for seq,colour in enumerate([BLUE,RED,YELLOW]):
         nx,ny           = Greys[-1].shape
@@ -111,23 +109,9 @@ def visualize(image_id     = None,
         axs[1,seq].axes.xaxis.set_ticks([])
         axs[1,seq].axes.yaxis.set_ticks([])
         axs[1,seq].set_title(f'{meanings[GREEN]}+{meanings[colour]}')
-        next_row = 2
-        if correlate2d or bins!=None:
-            green_reversed = Greys[GREEN][::-1,::-1]
-            corr           = fftconvolve(Greys[seq], green_reversed)
-            if correlate2d:
-                corr_plot = axs[next_row,seq].imshow(corr)
-                axs[next_row,seq].axes.xaxis.set_ticks([])
-                axs[next_row,seq].axes.yaxis.set_ticks([])
-                fig.colorbar(corr_plot, ax=axs[next_row,seq])
-                axs[next_row,seq].grid(True)
-                next_row+=1
-            if bins!=None:
-                axs[next_row,seq].hist(corr.flatten(),bins='stone',color=colours[colour])
 
-    for i in range(nrows):
-        axs[i,NRGB].axes.xaxis.set_ticks([])
-        axs[i,NRGB].axes.yaxis.set_ticks([])
+    axs[1,NRGB].axes.xaxis.set_ticks([])
+    axs[1,NRGB].axes.yaxis.set_ticks([])
 
     fig.suptitle(f'{image_id}: {"+".join([Descriptions[label] for label in Training[image_id]])}')
     savefig(join(figs,image_id), dpi=dpi, bbox_inches='tight')
@@ -187,12 +171,7 @@ if __name__=='__main__':
                         default = 300,
                         type    = int,
                         help    = 'Resolution for saving images')
-    parser.add_argument('--correlate2d',
-                        default = False,
-                        action  = 'store_true',
-                        help    = 'Specify that we want correlation plotted')
-    parser.add_argument('--bins',
-                        help    = 'Plot histogram - specifes binning strategy')
+
 
     args         = parser.parse_args()
     seed(args.seed)
@@ -208,8 +187,6 @@ if __name__=='__main__':
                                 path         = args.path,
                                 image_set    = args.image_set,
                                 figs         = args.figs,
-                                correlate2d  = args.correlate2d,
-                                bins         = args.bins,
                                 Descriptions = Descriptions,
                                 Training     = Training)
                 if not args.show:
@@ -219,8 +196,6 @@ if __name__=='__main__':
                   path         = args.path,
                   image_set    = args.image_set,
                   figs         = args.figs,
-                  correlate2d  = args.correlate2d,
-                  bins         = args.bins,
                   Descriptions = Descriptions,
                   Training     = Training)
     elif args.sample != None:
@@ -229,8 +204,6 @@ if __name__=='__main__':
                             path         = args.path,
                             image_set    = args.image_set,
                             figs         = args.figs,
-                            correlate2d  = args.correlate2d,
-                            bins         = args.bins,
                             Descriptions = Descriptions,
                             Training     = Training)
             if not args.show:
