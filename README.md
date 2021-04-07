@@ -13,6 +13,7 @@
 |logs.py|Analyze log files from training/testing|
 |rgb.txt|List of xkcd colours|
 |segment.py|Segment images using HPA cellsegmentator|
+|select_images.py|Prepare worklist for pipeline|
 |slice.py|Slice and downsample dataset|
 |train2.py|Build and train neural network using sliced data|
 |utils.py|Utility classes: Timer and Log|
