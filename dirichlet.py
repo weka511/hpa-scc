@@ -16,8 +16,7 @@
 #  To contact me, Simon Crase, email simon@greenweaves.nz
 
 from argparse          import ArgumentParser
-#from csv               import reader
-from hpascc            import read_descriptions, read_training_expectations
+from hpascc            import read_descriptions, read_worklist, read_training_expectations
 from matplotlib.pyplot import hist, show, figure, savefig, close
 from matplotlib.image  import imread
 from numpy             import zeros, mean, std, argmin
@@ -490,6 +489,8 @@ if __name__=='__main__':
                         default = False,
                         action = 'store_true',
                         help   = 'Process singletons only')
+    parser.add_argument('--worklist',
+                        help   = 'List of IDs to be processed')
     args = parser.parse_args()
 
     with Timer(),Logger('dirichlet',dummy = not args.all and args.sample==None) as logger:
@@ -499,7 +500,31 @@ if __name__=='__main__':
                                 labels   = args.labels,
                                 multiple = args.multiple or args.sample==None)
 
-        if args.all:
+        if args.worklist != None:
+            for image_id in read_worklist(args.worklist):
+                fig = None
+                try:
+                    fig,seq = segment(image_id     = image_id,
+                                      path         = args.path,
+                                      image_set    = args.image_set,
+                                      figs         = args.figs,
+                                      Descriptions = Descriptions,
+                                      Training     = Training,
+                                      background   = args.background,
+                                      XKCD         = XKCD,
+                                      N            = args.N,
+                                      delta        = args.delta,
+                                      Lambda       = args.Lambda)
+                    print (f'Segmented {image_id},{seq}')
+                    logger.log(f'{image_id},{seq}')
+                except KeyboardInterrupt:
+                    exit(f'Interrupted while segmenting {image_id}')
+                except:
+                    print(f'Error segmenting {image_id} {exc_info()[0]}')
+                finally:
+                    if not args.show and fig!=None:
+                        close(fig)
+        elif args.all:
             for image_id,classes in Training.items():
                 if exists(get_image_file_name(image_id,figs=args.figs)): continue
                 if args.singleton and len(classes)>1: continue

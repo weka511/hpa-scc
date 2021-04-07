@@ -45,3 +45,16 @@ def read_training_expectations(path=join(environ['DATA'],'hpa-scc'),file_name='t
         rows = reader(train)
         next(rows)
         return {row[0] : list(set([int(label) for label in row[1].split('|')])) for row in rows}
+
+# read_worklist
+#
+# Read list of imagids that are to be processed
+#
+# Parameters:
+#     worklist_name  Base name of file containing imageids
+#     suffix         Extension
+
+def read_worklist(worklist_name,suffix='csv'):
+    with open(f'{worklist_name}.{suffix}') as worklist:
+        for row in reader(worklist):
+            yield row[0]
