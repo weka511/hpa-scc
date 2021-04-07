@@ -116,6 +116,11 @@ def set_random_seed(specified_seed=None,prefix='seed',suffix='txt'):
 # create_xkcd_colours
 #
 # Create list of XKCD colours
+#
+# Parameters:
+#     file_name Where XKCD colours live
+#     prefix    Use to prefix each colour with "xkcd:"
+
 def create_xkcd_colours(file_name='rgb.txt', prefix='xkcd:'):
     with open(file_name) as colours:
         for row in colours:
