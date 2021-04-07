@@ -17,10 +17,15 @@
 
 from argparse import ArgumentParser
 from csv      import reader
-from os                import environ
-from os.path           import join
+from os       import environ
+from os.path  import join
 
 # read_descriptions
+#
+# Read descriptions of each label
+#
+# Parameters:
+#     file_name  Location of file contai in descriptions
 
 def read_descriptions(file_name='descriptions.csv'):
     with open(file_name) as descriptions_file:
@@ -28,6 +33,12 @@ def read_descriptions(file_name='descriptions.csv'):
 
 
 # read_training_expectations
+#
+# Read list of training dataset image_ids and labels
+#
+# Parameters:
+#     path      LOcation of training dataset
+#     file_name Training dataset
 
 def read_training_expectations(path=join(environ['DATA'],'hpa-scc'),file_name='train.csv'):
     with open(join(path,file_name)) as train:

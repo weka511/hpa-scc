@@ -16,7 +16,8 @@
 #  To contact me, Simon Crase, email simon@greenweaves.nz
 
 from argparse          import ArgumentParser
-from csv               import reader
+#from csv               import reader
+from hpascc            import read_descriptions, read_training_expectations
 from matplotlib.pyplot import hist, show, figure, savefig, close
 from matplotlib.image  import imread
 from numpy             import zeros, mean, std, argmin
@@ -112,22 +113,7 @@ def restrict(Training,labels,multiple=False):
         return (len(set(image_labels)& set(labels))>0) and (multiple or len(image_labels)==1)
     return {image_id: image_labels for image_id,image_labels in Training.items() if should_include(image_labels)}
 
-# read_descriptions
-#
-# Create a lookup table for the interpretation of each label
 
-def read_descriptions(file_name='descriptions.csv'):
-    with open(file_name) as descriptions_file:
-        return {int(row[0]) : row[1] for row in  reader(descriptions_file)}
-
-
-# read_training_expectations
-
-def read_training_expectations(path=join(environ['DATA'],'hpa-scc'),file_name='train.csv'):
-    with open(join(path,file_name)) as train:
-        rows = reader(train)
-        next(rows)
-        return {row[0] : list(set([int(label) for label in row[1].split('|')])) for row in rows}
 
 # get_dist_sq
 #
