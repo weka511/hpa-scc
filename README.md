@@ -1,7 +1,7 @@
 # hpa-scc
 [Human Protein Atlas - Single Cell Classification](https://www.kaggle.com/c/hpa-single-cell-image-classification)
 
-## Python Scripts
+## Python Scripts--new architecture
 
 |File|Description|
 |---------------------|-------------------------------------------------------------------------------------------------|
@@ -11,13 +11,19 @@
 |establish-N.R|R script used to establish value for maximum number of iterations|
 |hpa-scc.wpr|Python project|
 |hpascc.py|Common code - e.g. read list of descriptions, image-ids|
-|logs.py|Analyze log files from training/testing|
 |rgb.txt|List of xkcd colours|
+|select_images.py|Prepare worklist for pipeline|
+|utils.py|Utility classes: Timer and Log|
+
+## Python Scripts--old architecture
+
+|File|Description|
+|---------------------|-------------------------------------------------------------------------------------------------|
+|logs.py|Analyze log files from training/testing|
 |segment.py|Segment images using HPA cellsegmentator|
 |select_images.py|Prepare worklist for pipeline|
 |slice.py|Slice and downsample dataset|
 |train2.py|Build and train neural network using sliced data|
-|utils.py|Utility classes: Timer and Log|
 |visualize.py|Visualize image files|
 |vizcnn.py|Visualize CNN filters|
 
