@@ -17,29 +17,10 @@
 #
 #  Compute statistics for number of images for combinations of labels
 
-from csv               import reader
-from dirichlet         import read_training_expectations
+from hpascc            import read_descriptions,read_training_expectations
 from matplotlib.pyplot import show, figure, savefig, tight_layout
-from re                import split
-from utils             import Timer
+from utils             import Timer,create_xkcd_colours
 
-# read_descriptions
-#
-# Create a lookup table for the interpretation of each label
-
-def read_descriptions(file_name='descriptions.csv'):
-    with open(file_name) as descriptions_file:
-        return {int(row[0]) : row[1] for row in  reader(descriptions_file)}
-
-# create_xkcd_colours
-#
-# Create list of XKCD colours
-def create_xkcd_colours(file_name='rgb.txt'):
-    with open(file_name) as colours:
-        for row in colours:
-            parts = split(r'\s+#',row)
-            if len(parts)>1:
-                yield parts[0]
 
 if __name__=='__main__':
     with Timer():
@@ -76,7 +57,7 @@ if __name__=='__main__':
         axs[1].set_title('Number of cells by combination of labels')
 
         x = list(range(len(label_counts)))
-        axs[2].bar(x,label_counts, color=[f'xkcd:{XKCD[i]}' for i in x])
+        axs[2].bar(x,label_counts, color=[XKCD[i] for i in x])
         axs[2].set_title('Number of examples for each label')
         axs[2].set_xticks(x)
         axs[2].set_xticklabels([Descriptions[i] for i in x],rotation=90)
