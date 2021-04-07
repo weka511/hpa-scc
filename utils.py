@@ -17,6 +17,7 @@
 from os      import walk
 from os.path import basename,exists, join, splitext
 from random  import randrange, seed
+from re      import split
 from sys     import maxsize
 from time    import time
 
@@ -111,6 +112,16 @@ def set_random_seed(specified_seed=None,prefix='seed',suffix='txt'):
         print (f'Reusing seed = {specified_seed}')
         seed(specified_seed)
         return specified_seed
+
+# create_xkcd_colours
+#
+# Create list of XKCD colours
+def create_xkcd_colours(file_name='rgb.txt', prefix='xkcd:'):
+    with open(file_name) as colours:
+        for row in colours:
+            parts = split(r'\s+#',row)
+            if len(parts)>1:
+                yield f'{prefix}{parts[0]}'
 
 if __name__=='__main__':
     with Timer('Test') as timer, Logger(prefix='utilstest') as log:
