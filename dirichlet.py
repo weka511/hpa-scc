@@ -26,7 +26,7 @@ from random            import sample
 from re                import split
 from scipy.spatial     import Voronoi, voronoi_plot_2d
 from sys               import float_info, exc_info, exit
-from utils             import Logger, set_random_seed, Timer
+from utils             import Logger, set_random_seed, Timer, create_xkcd_colours
 
 RED                = 0      # Channel number for Microtubules
 GREEN              = 1      # Channel number for Protein of interest
@@ -220,17 +220,6 @@ def remove_isolated_centroids(L,mu,cutoff = 20):
     L  = [cluster for cluster in L if len(cluster) > cutoff]
     return len(L),mu,L
 
-
-# create_xkcd_colours
-#
-# Create list of XKCD colours
-def create_xkcd_colours(file_name='rgb.txt'):
-    with open(file_name) as colours:
-        for row in colours:
-            parts = split(r'\s+#',row)
-            if len(parts)>1:
-                yield parts[0]
-
 # get_image_file_name
 
 def get_image_file_name(image_id,
@@ -369,7 +358,7 @@ def segment(image_id     = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
             XKCD         = [],
             N            = 100):
     fig                = figure(figsize=(27,18))
-    axs                = fig.subplots(nrows = 2, ncols = 4)
+    axs                = fig.subplots(nrows = 3, ncols = 3)
     Image = Image4(image_id  = image_id,
                    path      = path,
                    image_set = image_set)
@@ -386,28 +375,44 @@ def segment(image_id     = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
 
     Image.show(axis=axs[0,0])
     for l in range(len(L)):
-        axs[0,0].scatter([x for x,_ in L[l]],[y for _,y in L[l]],c=f'xkcd:{XKCD[l]}',s=1)
-    axs[0,0].scatter([x for x,_ in mu],[y for _,y in mu],marker='X',c=f'xkcd:{XKCD[k+1]}',s=10)
+        axs[0,0].scatter([x for x,_ in L[l]],[y for _,y in L[l]],c=XKCD[l],s=1)
+    axs[0,0].scatter([x for x,_ in mu],[y for _,y in mu],marker='X',c=XKCD[k+1],s=10)
     axs[0,0].set_title(f'Lambda={Lambda}, k={k}, iteration={seq}')
 
     k,mu,L             = remove_isolated_centroids(L,mu)
     k,mu,L             = merge_greedy_centroids(k,L,mu)
-    voronoi            = Voronoi(mu)
 
     Image.show(axis=axs[0,1])
     for l in range(len(L)):
-        axs[0,1].scatter([x for x,_ in L[l]],[y for _,y in L[l]],c=f'xkcd:{XKCD[l]}',s=1)
-    axs[0,1].scatter([x for x,_ in mu],[y for _,y in mu],marker='X',c=f'xkcd:{XKCD[k+1]}',s=10)
+        axs[0,1].scatter([x for x,_ in L[l]],[y for _,y in L[l]],c=XKCD[l],s=1)
+    axs[0,1].scatter([x for x,_ in mu],[y for _,y in mu],marker='X',c=XKCD[k+1],s=10)
     axs[0,1].set_title(f'{IMAGE_LEVEL_LABELS[BLUE]}: k={k}')
 
+    x0, x1 = axs[0,0].get_xlim()
+    y0, y1 = axs[0,0].get_ylim()
+    # When we generate the Voronoi diagram we need some dummy points to force colorization of all regions
+    # https://stackoverflow.com/questions/20515554/colorize-voronoi-diagram
+    dummy   = [(2*x1,2*y1),(-2*x1,2*y1),(2*x1,-2*y1),(-2*x1,-2*y1)]
+    voronoi = Voronoi(mu + dummy)
+    voronoi_plot_2d(voronoi,
+                    ax            = axs[0,2],
+                    show_vertices = False,
+                    line_colors   = XKCD[len(voronoi.regions)])
+
+    for i,region in enumerate(voronoi.regions):
+        polygon = [voronoi.vertices[j] for j in region]
+        axs[0,2].fill(*zip(*polygon), color = XKCD[i])
+
+    axs[0,2].set_xlim(x0, x1)
+    axs[0,2].set_ylim(y0, y1)
+
     for channel,ax in zip([RED,YELLOW,GREEN],
-                          [axs[0,2],axs[0,3],axs[1,0]]):
-        voronoi_plot_2d(voronoi, ax=ax, show_vertices=False, line_colors='orange')
+                          [axs[1,0],axs[1,1],axs[1,2]]):
         Image.show(axis=ax,channels=[BLUE,channel])
         ax.set_title(f'{IMAGE_LEVEL_LABELS[BLUE]}+{IMAGE_LEVEL_LABELS[channel]}')
 
     for channel,ax in zip([RED,YELLOW,BLUE],
-                          [axs[1,1],axs[1,2],axs[1,3]]):
+                          [axs[2,0],axs[2,1],axs[2,2]]):
         voronoi_plot_2d(voronoi, ax=ax, show_vertices=False, line_colors='orange')
         Image.show(axis=ax,channels=[channel,GREEN],actuals=[BLUE,RED])
         ax.set_title(f'{IMAGE_LEVEL_LABELS[channel]}+{IMAGE_LEVEL_LABELS[GREEN]}')
