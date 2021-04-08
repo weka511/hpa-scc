@@ -46,6 +46,7 @@
 |spike2.py|Estimate memory usage for down-sampled data, and loading and saving times|
 |spike3.py|Train network using data daved by spike2.py|
 |spike4.py|Understand how to make imshow and scatter consistent|
+|spike5.py|Figure out how to read segmentation masks|
 |train.py|Build and train neural network|
 |watershed.py|Naive Watershed segmentation|
 |download.py|Download training images from kaggle|

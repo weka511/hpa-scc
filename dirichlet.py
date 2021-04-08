@@ -432,9 +432,10 @@ def segment(image_id     = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
         ax.set_title(f'{IMAGE_LEVEL_LABELS[channel]}+{IMAGE_LEVEL_LABELS[GREEN]}')
 
     fig.suptitle(f'{image_id}: {", ".join([Descriptions[label] for label in Training[image_id]])}')
-    savefig(get_image_file_name(image_id,
-                                figs  = figs,
-                                labels = Training[image_id]),
+    savefig(get_image_file_name(
+                image_id,
+                figs   = figs,
+                labels = Training[image_id]),
             dpi         = args.dpi,
             bbox_inches = 'tight')
 
@@ -611,18 +612,18 @@ if __name__=='__main__':
                     if not args.show and fig!=None:
                         close(fig)
         else:
-            _,seq =segment(image_id     = args.image_id,
-                           path         = args.path,
-                           image_set    = args.image_set,
-                           figs         = args.figs,
-                           Descriptions = Descriptions,
-                           Training     = Training,
-                           background   = args.background,
-                           XKCD         = XKCD,
-                           N            = args.N,
-                           delta        = args.delta,
-                           Lambda       = args.Lambda,
-                          segments     = args.segments)
+            _,seq = segment(image_id     = args.image_id,
+                            path         = args.path,
+                            image_set    = args.image_set,
+                            figs         = args.figs,
+                            Descriptions = Descriptions,
+                            Training     = Training,
+                            background   = args.background,
+                            XKCD         = XKCD,
+                            N            = args.N,
+                            delta        = args.delta,
+                            Lambda       = args.Lambda,
+                            segments     = args.segments)
             print (f'Segmented {args.image_id},{seq}')
             logger.log(f'{args.image_id},{seq}')
 
