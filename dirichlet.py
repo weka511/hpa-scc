@@ -332,6 +332,19 @@ def merge_greedy_centroids(k,L,mu,delta=1):
                 mu1.append(mu[i])
         return len(L1),mu1,L1
 
+def save_masks(image_id,voronoi,colours=[],path='.',x0=0,x1=511,y0=0,y1=511):
+    fig                = figure(figsize=(10,10))
+    axs                = fig.subplots(nrows = 1, ncols = 1)
+    for i,region in enumerate(voronoi.regions):
+        polygon = [voronoi.vertices[j] for j in region]
+        axs.fill(*zip(*polygon), color = colours[i])
+
+    axs.set_xlim(x0, x1)
+    axs.set_ylim(y0, y1)
+    fig.savefig(join(path,f'{image_id}_mask.png'),
+                 bbox_inches=axs.get_window_extent().transformed(fig.dpi_scale_trans.inverted()))
+    close(fig)
+
 # segment
 #
 # Read slides and segment image: start with Dirichlet process means, then postprocess to remove phantom cells.
@@ -356,7 +369,8 @@ def segment(image_id     = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
             background   = 0,
             delta        = 64,
             XKCD         = [],
-            N            = 100):
+            N            = 100,
+            segments     = '.'):
     fig                = figure(figsize=(27,18))
     axs                = fig.subplots(nrows = 3, ncols = 3)
     Image = Image4(image_id  = image_id,
@@ -423,6 +437,15 @@ def segment(image_id     = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
                                 labels = Training[image_id]),
             dpi         = args.dpi,
             bbox_inches = 'tight')
+
+    save_masks(image_id, voronoi,
+               colours = XKCD,
+               path    = segments,
+               x0      = x0,
+               x1      = x1,
+               y0      = y0,
+               y1      = y1)
+
     return fig,seq
 
 
@@ -496,6 +519,9 @@ if __name__=='__main__':
                         help   = 'Process singletons only')
     parser.add_argument('--worklist',
                         help   = 'List of IDs to be processed')
+    parser.add_argument('--segments',
+                        default = './segments',
+                        help    = 'Identifies where to store cell masks')
     args = parser.parse_args()
 
     with Timer(),Logger('dirichlet',dummy = not args.all and args.sample==None) as logger:
@@ -519,7 +545,8 @@ if __name__=='__main__':
                                       XKCD         = XKCD,
                                       N            = args.N,
                                       delta        = args.delta,
-                                      Lambda       = args.Lambda)
+                                      Lambda       = args.Lambda,
+                                      segments     = args.segments)
                     print (f'Segmented {image_id},{seq}')
                     logger.log(f'{image_id},{seq}')
                 except KeyboardInterrupt:
@@ -545,7 +572,8 @@ if __name__=='__main__':
                                       XKCD         = XKCD,
                                       N            = args.N,
                                       delta        = args.delta,
-                                      Lambda       = args.Lambda)
+                                      Lambda       = args.Lambda,
+                                      segments     = args.segments)
                     print (f'Segmented {image_id},{seq}')
                     logger.log(f'{image_id},{seq}')
                 except KeyboardInterrupt:
@@ -571,7 +599,8 @@ if __name__=='__main__':
                                       XKCD         = XKCD,
                                       N            = args.N,
                                       delta        = args.delta,
-                                      Lambda       = args.Lambda)
+                                      Lambda       = args.Lambda,
+                                      segments     = args.segments)
                     print (f'Segmented {image_id},{seq}')
                     logger.log(f'{image_id},{seq}')
                 except KeyboardInterrupt:
@@ -592,7 +621,8 @@ if __name__=='__main__':
                            XKCD         = XKCD,
                            N            = args.N,
                            delta        = args.delta,
-                           Lambda       = args.Lambda)
+                           Lambda       = args.Lambda,
+                          segments     = args.segments)
             print (f'Segmented {args.image_id},{seq}')
             logger.log(f'{args.image_id},{seq}')
 
