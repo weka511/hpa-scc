@@ -17,6 +17,7 @@
 
 from argparse          import ArgumentParser
 from hpascc            import read_descriptions, read_worklist, read_training_expectations
+from matplotlib.patches import Rectangle
 from matplotlib.pyplot import hist, show, figure, savefig, close
 from matplotlib.image  import imread
 from numpy             import zeros, mean, std, argmin
@@ -115,6 +116,41 @@ class Image4(object):
         axis.set_xlim(0,self.nx-1)
         axis.set_ylim(0,self.ny-1)
 
+class Mask:
+    def __init__(self,Image,Centroids=[]):
+        self.nx    = Image.nx
+        self.ny    = Image.ny
+        self.Mask  = zeros((Image.ny,Image.ny))
+        for i in range(Image.nx):
+            for j in range(Image.ny):
+                self.Mask[i,j]    = None
+                max_distance = float_info.max
+                for k in range(len(Centroids)):
+                    i0,j0 = Centroids[k]
+                    distance = (i-i0)*(i-i0) + (j-j0)*(j-j0)
+                    if distance<max_distance:
+                        self.Mask[i,j]    = k
+                        max_distance = distance
+        self.Limits = [(self.nx,self.ny,-1,-1) for k in range(len(Centroids))] #[(xmin,ymin,xmax,ymax)]
+        for i in range(Image.nx):
+            for j in range(Image.ny):
+                k                   = int(self.Mask[i,j])
+                xmin,ymin,xmax,ymax = self.Limits[k]
+                changed = False
+                if i<xmin:
+                    xmin    = i
+                    changed = True
+                if j<ymin:
+                    ymin    = j
+                    changed = True
+                if xmax<i:
+                    xmax    = i
+                    changed = True
+                if ymax<j:
+                    ymax    = j
+                    changed = True
+                if changed:
+                    self.Limits[k] = (xmin,ymin,xmax,ymax)
 
 # restrict
 #
@@ -398,30 +434,26 @@ def segment(image_id     = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
 
     k,mu,L             = remove_isolated_centroids(L,mu)
     k,mu,L             = merge_greedy_centroids(k,L,mu)
-    with open(join(segments,f'{image_id}.csv'),'w') as centroids:
-        for x,y in mu:
-            centroids.write(f'{x},{y}\n')
+    mask = Mask(Image,mu)
+
     Image.show(axis=axs[0,1])
     for l in range(len(L)):
         axs[0,1].scatter([x for x,_ in L[l]],[y for _,y in L[l]],c=XKCD[l],s=1)
     axs[0,1].scatter([x for x,_ in mu],[y for _,y in mu],marker='X',c=XKCD[k+1],s=10)
     axs[0,1].set_title(f'{IMAGE_LEVEL_LABELS[BLUE]}: k={k}')
 
+    m=axs[0,2].imshow(mask.Mask.transpose())
+    fig.colorbar(m,ax=axs[0,2])
+    for i,(x0,y0,x1,y1) in enumerate(mask.Limits):
+        if True:
+            axs[0,2].add_patch( Rectangle((x0, y0), x1-x0, y1-y0,
+                                          linewidth = 1,
+                                          edgecolor = XKCD[i],
+                                          facecolor = 'none'))
+
+    voronoi = Voronoi(mu)
     x0, x1 = axs[0,0].get_xlim()
     y0, y1 = axs[0,0].get_ylim()
-    # When we generate the Voronoi diagram we need some dummy points to force colorization of all regions
-    # https://stackoverflow.com/questions/20515554/colorize-voronoi-diagram
-    dummy   = [(2*x1,2*y1),(-2*x1,2*y1),(2*x1,-2*y1),(-2*x1,-2*y1)]
-    voronoi = Voronoi(mu + dummy)
-    voronoi_plot_2d(voronoi,
-                    ax            = axs[0,2],
-                    show_vertices = False,
-                    line_colors   = XKCD[len(voronoi.regions)])
-
-    for i,region in enumerate(voronoi.regions):
-        polygon = [voronoi.vertices[j] for j in region]
-        axs[0,2].fill(*zip(*polygon), color = XKCD[i])
-
     axs[0,2].set_xlim(x0, x1)
     axs[0,2].set_ylim(y0, y1)
 
