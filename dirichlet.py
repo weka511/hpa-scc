@@ -15,40 +15,20 @@
 #
 #  To contact me, Simon Crase, email simon@greenweaves.nz
 
-from argparse          import ArgumentParser
-from hpascc            import read_descriptions, read_worklist, read_training_expectations
+from argparse           import ArgumentParser
+from hpascc             import *
 from matplotlib.patches import Rectangle
-from matplotlib.pyplot import hist, show, figure, savefig, close
-from matplotlib.image  import imread
-from numpy             import zeros, mean, std, argmin, save, load
-from os                import environ
-from os.path           import exists,join
-from random            import sample
-from re                import split
-from scipy.spatial     import Voronoi, voronoi_plot_2d
-from sys               import float_info, exc_info, exit
-from utils             import Logger, set_random_seed, Timer, create_xkcd_colours
+from matplotlib.pyplot  import hist, show, figure, savefig, close
+from matplotlib.image   import imread
+from numpy              import zeros, mean, std, argmin, save, load
+from os                 import environ
+from os.path            import exists,join
+from random             import sample
+from re                 import split
+from scipy.spatial      import Voronoi, voronoi_plot_2d
+from sys                import float_info, exc_info, exit
+from utils              import Logger, set_random_seed, Timer, create_xkcd_colours
 
-RED                = 0      # Channel number for Microtubules
-GREEN              = 1      # Channel number for Protein of interest
-BLUE               = 2      # Channel number for Nucelus
-YELLOW             = 3      # Channel number for Endoplasmic reticulum
-NCHANNELS          = 4      # Number of channels
-NRGB               = 3      # Number of actual channels for graphics
-
-COLOUR_NAMES     = [
-    'red',
-    'green',
-    'blue',
-    'yellow'
-]
-
-IMAGE_LEVEL_LABELS    = [
-    'Microtubules',
-    'Protein/antibody',
-    'Nuclei channels',
-    'Endoplasmic reticulum'
-]
 
 # Image4
 #

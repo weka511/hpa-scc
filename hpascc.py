@@ -20,6 +20,30 @@ from csv      import reader
 from os       import environ
 from os.path  import join
 
+
+RED                = 0      # Channel number for Microtubules
+GREEN              = 1      # Channel number for Protein of interest
+BLUE               = 2      # Channel number for Nucelus
+YELLOW             = 3      # Channel number for Endoplasmic reticulum
+NCHANNELS          = 4      # Number of channels
+NRGB               = 3      # Number of actual channels for graphics
+
+COLOUR_NAMES     = [
+    'red',
+    'green',
+    'blue',
+    'yellow'
+]
+
+IMAGE_LEVEL_LABELS    = [
+    'Microtubules',
+    'Protein/antibody',
+    'Nuclei channels',
+    'Endoplasmic reticulum'
+]
+
+
+
 # read_descriptions
 #
 # Read descriptions of each label

@@ -17,6 +17,7 @@
 
 from argparse          import ArgumentParser
 from csv               import reader
+from hpascc            import *
 from matplotlib.pyplot import figure, show, savefig, close
 from matplotlib.image  import imread
 from matplotlib        import cm
@@ -26,40 +27,9 @@ from os.path           import join
 from random            import sample, seed
 from sys               import exit
 
-RED                = 0      # Channel number for Microtubules
-GREEN              = 1      # Channel number for Protein of interest
-BLUE               = 2      # Channel number for Nucelus
-YELLOW             = 3      # Channel number for Endoplasmic reticulum
-NCHANNELS          = 4      # Number of channels
-NRGB               = 3      # Number of actual channels for graphcs
 
 
-colours     = ['red',
-               'green',
-               'blue',
-               'yellow'
-              ]
 
-meanings    = ['Microtubules',
-               'Protein/antibody',
-               'Nuclei channels',
-               'Endoplasmic reticulum'
-              ]
-
-# read_descriptions
-
-def read_descriptions(name):
-    with open(name) as descriptions_file:
-        return {int(row[0]) : row[1] for row in  reader(descriptions_file)}
-
-
-# read_training_expectations
-
-def read_training_expectations(path=join(environ['DATA'],'hpa-scc'),file_name='train.csv'):
-    with open(join(path,file_name)) as train:
-        rows = reader(train)
-        next(rows)
-        return {row[0] : list(set([int(label) for label in row[1].split('|')])) for row in rows}
 
 # visualize
 #
@@ -71,14 +41,14 @@ def visualize(image_id     = None,
               figs         = './figs',
               dpi          = 300,
               Descriptions = {},
-              Training     =  {}):
+              Training     = {}):
     fig          = figure(figsize=(20,20))
 
     axs          = fig.subplots(nrows = 3, ncols = NCHANNELS)
     Greys        = []
 
     for seq,colour in enumerate([BLUE,RED,YELLOW,GREEN]):
-        file_name        = f'{image_id}_{colours[colour]}.png'
+        file_name        = f'{image_id}_{COLOUR_NAMES[colour]}.png'
         path_name        = join(path,image_set,file_name)
         Greys.append(imread(path_name))
         nx,ny            = Greys[-1].shape
@@ -94,10 +64,10 @@ def visualize(image_id     = None,
         axs[0,seq].imshow(Image)
         axs[0,seq].axes.xaxis.set_ticks([])
         axs[0,seq].axes.yaxis.set_ticks([])
-        axs[0,seq].set_title(meanings[colour])
+        axs[0,seq].set_title(IMAGE_LEVEL_LABELS[colour])
 
         axs[2,seq].hist(flattened,
-                        color = f'xkcd:{colours[colour]}',
+                        color = f'xkcd:{COLOUR_NAMES[colour]}',
                         bins  = 25)
 
     for seq,colour in enumerate([BLUE,RED,YELLOW]):
@@ -108,7 +78,7 @@ def visualize(image_id     = None,
         axs[1,seq].imshow(Image)
         axs[1,seq].axes.xaxis.set_ticks([])
         axs[1,seq].axes.yaxis.set_ticks([])
-        axs[1,seq].set_title(f'{meanings[GREEN]}+{meanings[colour]}')
+        axs[1,seq].set_title(f'{IMAGE_LEVEL_LABELS[GREEN]}+{IMAGE_LEVEL_LABELS[colour]}')
 
     axs[1,NRGB].axes.xaxis.set_ticks([])
     axs[1,NRGB].axes.yaxis.set_ticks([])
