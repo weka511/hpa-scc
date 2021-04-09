@@ -20,38 +20,48 @@ from dirichlet import Image4
 import math
 import matplotlib.pyplot as plt
 import numpy as np
+from   os.path import join
 import sys
 from utils import Timer
 
-image_id = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0'
-Centroids = []
-with open (f'segments/{image_id}.csv') as file:
-    for row in csv.reader(file):
-        Centroids.append(tuple([float(s) for s in row]))
 
-Image = Image4(image_id=image_id)
-Segments = np.zeros((Image.ny,Image.ny))
+def get_centroids(image_id,path='./segments'):
+     with open (join(path,f'{image_id}.csv')) as file:
+          return [tuple([float(s) for s in row]) for row in csv.reader(file)]
+
+def create_mask(Image,Centroids=[]):
+     Mask  = np.zeros((Image.ny,Image.ny))
+     for i in range(Image.nx):
+          for j in range(Image.ny):
+               Mask[i,j]    = None
+               max_distance = sys.float_info.max
+               for k in range(len(Centroids)):
+                    i0,j0 = Centroids[k]
+                    distance = (i-i0)*(i-i0) + (j-j0)*(j-j0)
+                    if distance<max_distance:
+                         Mask[i,j]    = k
+                         max_distance = distance
+     return Mask
+
+image_id  = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0'
+
+
 with Timer():
-    for i in range(Image.nx):
-        for j in range(Image.ny):
-            Segments[i,j]    = None
-            best = sys.float_info.max
-            for k in range(len(Centroids)):
-                i0,j0 = Centroids[k]
-                distance = (i-i0)*(i-i0) + (j-j0)*(j-j0)
-                if distance<best:
-                    Segments[i,j] = k
-                    best          = distance
+     Centroids = get_centroids(image_id)
+     Image     = Image4(image_id=image_id)
+     Mask  = create_mask(Image, Centroids=Centroids)
+     nrows     = math.isqrt(len(Centroids))
+     ncols     = nrows
+     while nrows*ncols<len(Centroids):
+          ncols+= 1
 
-nrows = math.isqrt(len(Centroids))
-ncols = nrows
-while nrows*ncols<len(Centroids):
-    ncols+= 1
+     fig                = plt.figure(figsize=(27,18))
+     axs                = fig.subplots(nrows = nrows, ncols = ncols)
+     for i in range(nrows):
+          for j in range(ncols):
+               k = 3*i+j
+               axs[i][j].imshow(Image.get_segment(Mask     = Mask,
+                                                  selector = k,
+                                                  channels = [0,1,2,3]))
 
-fig                = plt.figure(figsize=(27,18))
-axs                = fig.subplots(nrows = nrows, ncols = ncols)
-for i in range(nrows):
-    for j in range(ncols):
-        k = 3*i+j
-        axs[i][j].imshow(Image.get_segment(Segments=Segments,selector=k,channels=[0,1,2,3]))
 plt.show()

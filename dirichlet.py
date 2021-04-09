@@ -81,11 +81,11 @@ class Image4(object):
                 Image[:,:,channel] =  self.Image [:,:,channel]
         return Image
 
-    def get_segment(self,channels=[BLUE],Segments=[],selector=None):
+    def get_segment(self,channels=[BLUE],Mask=[],selector=None):
         Image = zeros((self.nx,self.ny,NRGB))
         for i in range(self.nx):
             for j in range(self.ny):
-                if Segments[i,j]==selector:
+                if Mask[i,j]==selector:
                     for channel in channels:
                         if channel==YELLOW:
                             Image[i,j,RED]    =  self.Image [i,j,channel]
