@@ -81,6 +81,19 @@ class Image4(object):
                 Image[:,:,channel] =  self.Image [:,:,channel]
         return Image
 
+    def get_segment(self,channels=[BLUE],Segments=[],selector=None):
+        Image = zeros((self.nx,self.ny,NRGB))
+        for i in range(self.nx):
+            for j in range(self.ny):
+                if Segments[i,j]==selector:
+                    for channel in channels:
+                        if channel==YELLOW:
+                            Image[i,j,RED]    =  self.Image [i,j,channel]
+                            Image[i,j,GREEN]  =  self.Image [i,j,channel]
+                        else:
+                            Image[i,j,channel] =  self.Image [i,j,channel]
+        return Image
+
     # Display selected channels
 
     def show(self,
@@ -332,18 +345,8 @@ def merge_greedy_centroids(k,L,mu,delta=1):
                 mu1.append(mu[i])
         return len(L1),mu1,L1
 
-def save_masks(image_id,voronoi,colours=[],path='.',x0=0,x1=511,y0=0,y1=511):
-    fig                = figure(figsize=(10,10))
-    axs                = fig.subplots(nrows = 1, ncols = 1)
-    for i,region in enumerate(voronoi.regions):
-        polygon = [voronoi.vertices[j] for j in region]
-        axs.fill(*zip(*polygon), color = colours[i])
 
-    axs.set_xlim(x0, x1)
-    axs.set_ylim(y0, y1)
-    fig.savefig(join(path,f'{image_id}_mask.png'),
-                 bbox_inches=axs.get_window_extent().transformed(fig.dpi_scale_trans.inverted()))
-    close(fig)
+
 
 # segment
 #
@@ -395,7 +398,9 @@ def segment(image_id     = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
 
     k,mu,L             = remove_isolated_centroids(L,mu)
     k,mu,L             = merge_greedy_centroids(k,L,mu)
-
+    with open(join(segments,f'{image_id}.csv'),'w') as centroids:
+        for x,y in mu:
+            centroids.write(f'{x},{y}\n')
     Image.show(axis=axs[0,1])
     for l in range(len(L)):
         axs[0,1].scatter([x for x,_ in L[l]],[y for _,y in L[l]],c=XKCD[l],s=1)
@@ -438,14 +443,6 @@ def segment(image_id     = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
                 labels = Training[image_id]),
             dpi         = args.dpi,
             bbox_inches = 'tight')
-
-    save_masks(image_id, voronoi,
-               colours = XKCD,
-               path    = segments,
-               x0      = x0,
-               x1      = x1,
-               y0      = y0,
-               y1      = y1)
 
     return fig,seq
 
