@@ -82,7 +82,10 @@ class Image4(object):
                 Image[:,:,channel] =  self.Image [:,:,channel]
         return Image
 
-    def get_segment(self,channels=[BLUE],Mask=[],selector=None):
+    def get_segment(self,
+                    channels = [BLUE],
+                    Mask     = [],
+                    selector = None):
         Image = zeros((self.nx,self.ny,NRGB))
         for i in range(self.nx):
             for j in range(self.ny):
@@ -118,13 +121,14 @@ class Image4(object):
 
 class Mask:
     @classmethod
-    def load(cls,file_name):
-        mask      = Mask()
-        mask.Mask = load(file_name)
-        self.nx,self.ny = mask.Mask.size
+    def Load(cls,file_name):
+        mask            = Mask()
+        mask.Mask       = load(file_name)
+        mask.nx,mask.ny = mask.Mask.shape
         return mask
 
     def __init__(self,Image=None,Centroids=[]):
+        if Image is None: return
         self.nx    = Image.nx
         self.ny    = Image.ny
         if len(Centroids)==0:
@@ -140,6 +144,9 @@ class Mask:
                     if distance<max_distance:
                         self.Mask[i,j]    = k
                         max_distance = distance
+
+    def __getitem__(self,idx):
+        return self.Mask[idx]
 
     def get_limits(self):
         Limits = [] #[(xmin,ymin,xmax,ymax)]
