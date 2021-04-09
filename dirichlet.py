@@ -20,7 +20,7 @@ from hpascc            import read_descriptions, read_worklist, read_training_ex
 from matplotlib.patches import Rectangle
 from matplotlib.pyplot import hist, show, figure, savefig, close
 from matplotlib.image  import imread
-from numpy             import zeros, mean, std, argmin
+from numpy             import zeros, mean, std, argmin, save, load
 from os                import environ
 from os.path           import exists,join
 from random            import sample
@@ -117,25 +117,38 @@ class Image4(object):
         axis.set_ylim(0,self.ny-1)
 
 class Mask:
-    def __init__(self,Image,Centroids=[]):
+    @classmethod
+    def load(cls,file_name):
+        mask      = Mask()
+        mask.Mask = load(file_name)
+        self.nx,self.ny = mask.Mask.size
+        return mask
+
+    def __init__(self,Image=None,Centroids=[]):
         self.nx    = Image.nx
         self.ny    = Image.ny
+        if len(Centroids)==0:
+            return
         self.Mask  = zeros((Image.ny,Image.ny))
         for i in range(Image.nx):
             for j in range(Image.ny):
                 self.Mask[i,j]    = None
                 max_distance = float_info.max
-                for k in range(len(Centroids)):
-                    i0,j0 = Centroids[k]
+                for k in range(1,1+len(Centroids)):
+                    i0,j0 = Centroids[k-1]
                     distance = (i-i0)*(i-i0) + (j-j0)*(j-j0)
                     if distance<max_distance:
                         self.Mask[i,j]    = k
                         max_distance = distance
-        self.Limits = [(self.nx,self.ny,-1,-1) for k in range(len(Centroids))] #[(xmin,ymin,xmax,ymax)]
-        for i in range(Image.nx):
-            for j in range(Image.ny):
-                k                   = int(self.Mask[i,j])
-                xmin,ymin,xmax,ymax = self.Limits[k]
+
+    def get_limits(self):
+        Limits = [] #[(xmin,ymin,xmax,ymax)]
+        for i in range(self.nx):
+            for j in range(self.ny):
+                k = int(self.Mask[i,j])
+                while k>len(Limits):
+                    Limits.append((self.nx,self.ny,-1,-1))
+                xmin,ymin,xmax,ymax = Limits[k-1]
                 changed = False
                 if i<xmin:
                     xmin    = i
@@ -150,7 +163,13 @@ class Mask:
                     ymax    = j
                     changed = True
                 if changed:
-                    self.Limits[k] = (xmin,ymin,xmax,ymax)
+                    Limits[k-1] = (xmin,ymin,xmax,ymax)
+        return Limits
+
+    def save(self,file_name):
+        save(file_name,self.Mask)
+
+
 
 # restrict
 #
@@ -432,24 +451,23 @@ def segment(image_id     = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
     axs[0,0].scatter([x for x,_ in mu],[y for _,y in mu],marker='X',c=XKCD[k+1],s=10)
     axs[0,0].set_title(f'Lambda={Lambda}, k={k}, iteration={seq}')
 
-    k,mu,L             = remove_isolated_centroids(L,mu)
-    k,mu,L             = merge_greedy_centroids(k,L,mu)
-    mask = Mask(Image,mu)
-
+    k,mu,L = remove_isolated_centroids(L,mu)
+    k,mu,L = merge_greedy_centroids(k,L,mu)
+    mask   = Mask(Image,mu)
+    mask.save(join(segments,f'{image_id}.npy'))
     Image.show(axis=axs[0,1])
     for l in range(len(L)):
         axs[0,1].scatter([x for x,_ in L[l]],[y for _,y in L[l]],c=XKCD[l],s=1)
     axs[0,1].scatter([x for x,_ in mu],[y for _,y in mu],marker='X',c=XKCD[k+1],s=10)
     axs[0,1].set_title(f'{IMAGE_LEVEL_LABELS[BLUE]}: k={k}')
 
-    m=axs[0,2].imshow(mask.Mask.transpose())
-    fig.colorbar(m,ax=axs[0,2])
-    for i,(x0,y0,x1,y1) in enumerate(mask.Limits):
-        if True:
-            axs[0,2].add_patch( Rectangle((x0, y0), x1-x0, y1-y0,
-                                          linewidth = 1,
-                                          edgecolor = XKCD[i],
-                                          facecolor = 'none'))
+    mask_image = axs[0,2].imshow(mask.Mask.transpose())
+    fig.colorbar(mask_image,ax=axs[0,2])
+    for i,(x0,y0,x1,y1) in enumerate(mask.get_limits()):
+        axs[0,2].add_patch(Rectangle((x0, y0), x1-x0, y1-y0,
+                                     linewidth = 1,
+                                     edgecolor = XKCD[i],
+                                     facecolor = 'none'))
 
     voronoi = Voronoi(mu)
     x0, x1 = axs[0,0].get_xlim()
