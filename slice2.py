@@ -30,14 +30,6 @@ from utils            import Timer
 
 
 
-# create_data
-#
-# Read training data: optionally filter out some records
-#
-# Parameters:
-#     Training         Training expectations
-#     multiplets       Allow data that belongs to multiple classes
-#     negative         Allow data that belongs to multiple classes or to no class at all
 
 def create_data(Training,multiplets,negative):
     if negative:
@@ -101,10 +93,40 @@ def save_images(output,Images,Targets):
     print (f'Saving {output} {Images.shape}')
     savez(output,Images=Images,Targets=Targets)
 
-def read_worklist(worklist_base,ext='csv'):
-    with open (f'{worklist_base}.{ext}') as worklist:
-        for row in worklist:
-            yield row.strip()
+def create_image_target(Data,
+                        N            = 1,
+                        mx           = 512,
+                        my           = 512,
+                        path         = join(environ['DATA'],'hpa-scc'),
+                        image_set    = 'train512x512',
+                        segments     = './segments',
+                        Expectations = {}):
+    print (f'Creating data: N={N}')
+    Images  = zeros((N,NCHANNELS,mx,my), dtype=int8)
+    Targets = []
+    index   = 0
+    for image_id in Batch:
+        Image  = Image4(path = path,
+                 image_set   = image_set,
+                 image_id    = image_id)
+        mask   = Mask.Load(join(args.segments,
+                                f'{image_id}.npy'))
+        Limits = mask.get_limits()
+
+        Greys = [imread(join(path, image_set, f'{image_id}_{COLOUR_NAMES[colour]}.png')) for colour in [BLUE,RED,YELLOW,GREEN]]
+        MaxIntensities = [amax(image) for image in Greys]
+
+        for k in range(len(Limits)):
+            i0,j0,i1,j1 = Limits[k]
+            for i in range(i0,i1):
+                for j in range(j0,j1):
+                    if mask[i,j]==k+1:
+                        for column in range(len(Greys)):
+                            Images[index,column,i-i0,j-j0] = Greys[column][i,j]/MaxIntensities[column]
+            print (image_id,k,index)
+            Targets.append(Expectations[image_id])
+            index += 1
+    return Images,Targets
 
 if __name__=='__main__':
 
@@ -112,6 +134,9 @@ if __name__=='__main__':
     parser.add_argument('--worklist',
                         default = 'worklist',
                         help    = 'Name of file with list of images')
+    parser.add_argument('--segments',
+                        default = './segments',
+                        help    = 'Identifies where cell masks have been stored')
     parser.add_argument('--output',     default = 'train',                               help = 'Base name for output datasets')
     parser.add_argument('--path',       default = join(environ['DATA'],'hpa-scc'),       help = 'Path where raw data is located')
     parser.add_argument('--image_set',  default = 'train512x512',                        help = 'Location of images')
@@ -124,38 +149,37 @@ if __name__=='__main__':
     # parser.add_argument('--multiplets', default = False,          action = 'store_true', help = 'Include slides with multiple classes')
     # parser.add_argument('--negative',   default = False,          action = 'store_true', help = 'Include slides with no classes assigned')
     args         = parser.parse_args()
-    Descriptions = read_descriptions('descriptions.csv')
-    for image_id in read_worklist(args.worklist):
-        print (image_id)
+    with Timer():
+        Descriptions   = read_descriptions('descriptions.csv')
+        Expectations   = read_training_expectations(path=args.path)
 
-    Data         = create_data(read_training_expectations(path=args.path),
-                               args.multiplets,
-                               args.negative)
-    M            = ceil(len(Data)/args.N)
-    print (f'Splitting {len(Data)} records into {M} files of up to {args.N} slides each, {args.pixels} x {args.pixels} pixels')
-    seed(args.seed)
-    shuffle(Data)
-    N_validation = int(args.split*len(Data))
-    with Timer(f'{args.validation}.npz'):
-        Images, Targets = create_image_target(Data,
-                                              N         = N_validation,
-                                              mx        = args.pixels,
-                                              my        = args.pixels,
-                                              path      = args.path,
-                                              image_set = args.image_set)
-        save_images(f'{args.validation}.npz',Images,Targets)
+        Batch          = []
+        total_segments = 0
+        m              = 0
 
-    start = N_validation
+        for image_id in read_worklist(args.worklist):
 
-    for m in range(M):
-        with Timer(f'{args.output}{m+1}.npz'):
-            N_train = min(len(Data)-start,args.N)
-            Images, Targets = create_image_target(Data,
-                                                  N         = N_train,
-                                                  mx        = args.pixels,
-                                                  my        = args.pixels,
-                                                  start     = start,
-                                                  path      = args.path,
-                                                  image_set = args.image_set)
+            mask   = Mask.Load(join(args.segments,f'{image_id}.npy'))
+            Limits = mask.get_limits()
+            print (image_id,len(Limits))
+            if total_segments+len(Limits)>args.N:
+                Images,Targets = create_image_target(Batch,
+                                                     N            = total_segments,
+                                                     segments     = args.segments,
+                                                     path         = args.path,
+                                                     image_set    = args.image_set,
+                                                     Expectations = Expectations)
+                save_images(f'{args.output}{m+1}.npz',Images,Targets)
+                m+=1
+                Batch.clear()
+                total_segments = 0
+            total_segments += len(Limits)
+            Batch.append(image_id)
+        if len(Batch)>0:
+            Images,Targets= create_image_target(Batch,
+                                                N            = total_segments,
+                                                segments     = args.segments,
+                                                path         = args.path,
+                                                image_set    = args.image_set,
+                                                Expectations = Expectations)
             save_images(f'{args.output}{m+1}.npz',Images,Targets)
-            start += N_train
