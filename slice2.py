@@ -17,27 +17,18 @@
 #
 #  Slice and downsample dataset
 
-from argparse         import ArgumentParser
-from dirichlet        import Image4, Mask
-from hpascc           import *
-from math             import ceil
-from matplotlib.image import imread
-from numpy            import zeros, int8, amax, load, savez
-from os               import environ
-from os.path          import join
-from random           import seed, shuffle
-from utils            import Timer
+from argparse          import ArgumentParser
+from dirichlet         import Image4, Mask
+from hpascc            import *
+from math              import ceil
+from matplotlib.image  import imread
+from matplotlib.pyplot import figure, close, savefig, show
+from numpy             import zeros, int8, amax, load, savez
+from os                import environ
+from os.path           import join
+from random            import seed, shuffle
+from utils             import Timer
 
-
-
-
-def create_data(Training,multiplets,negative):
-    if negative:
-        return [(image_id, classes) for image_id,classes in Training.items()]
-    elif multiplets:
-        return [(image_id, classes) for image_id,classes in Training.items() if len(classes)>0]
-    else:
-        return [(image_id, classes) for image_id,classes in Training.items() if len(classes)==1]
 
 # create_image_target
 #
@@ -66,6 +57,8 @@ def create_image_target(Data,
         if k%args.frequency==0:
             print (f'{k} of {N} -> {k+start}')
         image_id,classes = Data[k+start]
+        fig = figure()
+        axs = fig.subolots(2,2)
         for column,colour in enumerate([BLUE,RED,YELLOW,GREEN]):
             file_name        = f'{image_id}_{COLOUR_NAMES[colour]}.png'
             path_name        = join(args.path,args.image_set,file_name)
@@ -77,6 +70,9 @@ def create_image_target(Data,
                 for j in range(my):
                     if grey_scale_image[2*i,2*j]>0:
                         Images[k,colour,i,j] = int8(128*grey_scale_image[2*i,2*j]/max_intensity)
+            axs[column//2][column%2].imshow(Images[k,colour,:,:])
+        savefig(fr'\temp\{image_id}-{k}.png')
+        close(fig)
         Targets.append(classes)
     return Images, Targets
 
@@ -100,30 +96,39 @@ def create_image_target(Data,
                         path         = join(environ['DATA'],'hpa-scc'),
                         image_set    = 'train512x512',
                         segments     = './segments',
-                        Expectations = {}):
+                        Expectations = {},
+                        Widths       = [],
+                        Heights      = []):
     print (f'Creating data: N={N}')
-    Images  = zeros((N,NCHANNELS,mx,my), dtype=int8)
+    Images  = zeros((N,NCHANNELS,mx,my), dtype=float)
     Targets = []
     index   = 0
+
     for image_id in Batch:
-        Image  = Image4(path = path,
-                 image_set   = image_set,
-                 image_id    = image_id)
-        mask   = Mask.Load(join(args.segments,
-                                f'{image_id}.npy'))
-        Limits = mask.get_limits()
-
-        Greys = [imread(join(path, image_set, f'{image_id}_{COLOUR_NAMES[colour]}.png')) for colour in [BLUE,RED,YELLOW,GREEN]]
+        mask           = Mask.Load(join(args.segments, f'{image_id}.npy'))
+        Limits         = mask.get_limits()
+        Greys          = [imread(join(path, image_set, f'{image_id}_{COLOUR_NAMES[colour]}.png')) for colour in [BLUE,RED,YELLOW,GREEN]]
         MaxIntensities = [amax(image) for image in Greys]
-
         for k in range(len(Limits)):
+
             i0,j0,i1,j1 = Limits[k]
+            Widths.append(i1-i0)
+            Heights.append(j1-j0)
             for i in range(i0,i1):
                 for j in range(j0,j1):
                     if mask[i,j]==k+1:
                         for column in range(len(Greys)):
                             Images[index,column,i-i0,j-j0] = Greys[column][i,j]/MaxIntensities[column]
             print (image_id,k,index)
+            fig            = figure()
+            axs            = fig.subplots(2,2)
+            for column in range(len(Greys)):
+                axs[column//2,column%2].imshow(Images[index,column,:,:],
+                                               cmap = 'gray',
+                                               vmin = 0,
+                                               vmax = 1.0)
+            savefig(fr'\temp\{image_id}-{k}.png')
+            close(fig)
             Targets.append(Expectations[image_id])
             index += 1
     return Images,Targets
@@ -137,17 +142,23 @@ if __name__=='__main__':
     parser.add_argument('--segments',
                         default = './segments',
                         help    = 'Identifies where cell masks have been stored')
-    parser.add_argument('--output',     default = 'train',                               help = 'Base name for output datasets')
-    parser.add_argument('--path',       default = join(environ['DATA'],'hpa-scc'),       help = 'Path where raw data is located')
-    parser.add_argument('--image_set',  default = 'train512x512',                        help = 'Location of images')
-    parser.add_argument('--N',          default = 4096,           type = int,            help = 'Number of images in each output dataset')
-    # parser.add_argument('--pixels',     default = 256,            type = int,            help = 'Number of pixels after downsampling')
-    # parser.add_argument('--seed',                                 type = int,            help = 'Seed for random number generator')
-    # parser.add_argument('--frequency',  default = 32,             type = int,            help = 'Frequency for progress reports')
-    # parser.add_argument('--split',      default = 0.05,           type = float,          help = 'Proportion of data for validation')
-    # parser.add_argument('--validation', default = 'validation',                          help = 'Validation dataset')
-    # parser.add_argument('--multiplets', default = False,          action = 'store_true', help = 'Include slides with multiple classes')
-    # parser.add_argument('--negative',   default = False,          action = 'store_true', help = 'Include slides with no classes assigned')
+    parser.add_argument('--train',
+                        default = 'train',
+                        help    = 'Base name for output datasets')
+    parser.add_argument('--output',
+                        default = './data',
+                        help    = 'Identifies where output datasets will be stored')
+    parser.add_argument('--path',
+                        default = join(environ['DATA'],'hpa-scc'),
+                        help    = 'Path where raw data is located')
+    parser.add_argument('--image_set',
+                        default = 'train512x512',
+                        help    = 'Location of images')
+    parser.add_argument('--N',
+                        default = 4096,
+                        type    = int,
+                        help    = 'Number of images in each output dataset')
+
     args         = parser.parse_args()
     with Timer():
         Descriptions   = read_descriptions('descriptions.csv')
@@ -156,7 +167,8 @@ if __name__=='__main__':
         Batch          = []
         total_segments = 0
         m              = 0
-
+        Widths  = []
+        Heights = []
         for image_id in read_worklist(args.worklist):
 
             mask   = Mask.Load(join(args.segments,f'{image_id}.npy'))
@@ -168,8 +180,10 @@ if __name__=='__main__':
                                                      segments     = args.segments,
                                                      path         = args.path,
                                                      image_set    = args.image_set,
-                                                     Expectations = Expectations)
-                save_images(f'{args.output}{m+1}.npz',Images,Targets)
+                                                     Expectations = Expectations,
+                                                     Widths       = Widths,
+                                                     Heights      = Heights)
+                save_images(join(args.output,f'{args.train}{m+1}.npz'),Images,Targets)
                 m+=1
                 Batch.clear()
                 total_segments = 0
@@ -181,5 +195,15 @@ if __name__=='__main__':
                                                 segments     = args.segments,
                                                 path         = args.path,
                                                 image_set    = args.image_set,
-                                                Expectations = Expectations)
-            save_images(f'{args.output}{m+1}.npz',Images,Targets)
+                                                Expectations = Expectations,
+                                                Widths       = Widths,
+                                                Heights      = Heights)
+            save_images(join(args.output,f'{args.train}{m+1}.npz'),Images,Targets)
+
+    fig = figure(figsize=(10,20))
+    axs = fig.subplots(1,2)
+    axs[0].hist(Widths)
+    axs[0].set_title('Widths')
+    axs[1].hist(Heights)
+    axs[1].set_title('Heights')
+    show()
