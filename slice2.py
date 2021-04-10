@@ -22,7 +22,7 @@ from dirichlet         import Image4, Mask
 from hpascc            import *
 from math              import ceil
 from matplotlib.image  import imread
-from matplotlib.pyplot import figure, close, savefig, show
+from matplotlib.pyplot import figure, close, savefig, show, hist, legend
 from numpy             import zeros, int8, amax, load, savez
 from os                import environ
 from os.path           import join
@@ -98,7 +98,8 @@ def create_image_target(Data,
                         segments     = './segments',
                         Expectations = {},
                         Widths       = [],
-                        Heights      = []):
+                        Heights      = [],
+                        test         = False):
     print (f'Creating data: N={N}')
     Images  = zeros((N,NCHANNELS,mx,my), dtype=float)
     Targets = []
@@ -120,15 +121,16 @@ def create_image_target(Data,
                         for column in range(len(Greys)):
                             Images[index,column,i-i0,j-j0] = Greys[column][i,j]/MaxIntensities[column]
             print (image_id,k,index)
-            fig            = figure()
-            axs            = fig.subplots(2,2)
-            for column in range(len(Greys)):
-                axs[column//2,column%2].imshow(Images[index,column,:,:],
-                                               cmap = 'gray',
-                                               vmin = 0,
-                                               vmax = 1.0)
-            savefig(fr'\temp\{image_id}-{k}.png')
-            close(fig)
+            if test:
+                fig            = figure()
+                axs            = fig.subplots(2,2)
+                for column in range(len(Greys)):
+                    axs[column//2,column%2].imshow(Images[index,column,:,:],
+                                                   cmap = 'gray',
+                                                   vmin = 0,
+                                                   vmax = 1.0)
+                savefig(fr'\temp\{image_id}-{k}.png')
+                close(fig)
             Targets.append(Expectations[image_id])
             index += 1
     return Images,Targets
@@ -158,7 +160,10 @@ if __name__=='__main__':
                         default = 4096,
                         type    = int,
                         help    = 'Number of images in each output dataset')
-
+    parser.add_argument('--test',
+                        default  = False,
+                        action   = 'store_true',
+                        help     = 'Store plots for verification')
     args         = parser.parse_args()
     with Timer():
         Descriptions   = read_descriptions('descriptions.csv')
@@ -182,7 +187,8 @@ if __name__=='__main__':
                                                      image_set    = args.image_set,
                                                      Expectations = Expectations,
                                                      Widths       = Widths,
-                                                     Heights      = Heights)
+                                                     Heights      = Heights,
+                                                     test         = args.test)
                 save_images(join(args.output,f'{args.train}{m+1}.npz'),Images,Targets)
                 m+=1
                 Batch.clear()
@@ -197,13 +203,15 @@ if __name__=='__main__':
                                                 image_set    = args.image_set,
                                                 Expectations = Expectations,
                                                 Widths       = Widths,
-                                                Heights      = Heights)
+                                                Heights      = Heights,
+                                                test         = args.test)
             save_images(join(args.output,f'{args.train}{m+1}.npz'),Images,Targets)
 
-    fig = figure(figsize=(10,20))
-    axs = fig.subplots(1,2)
-    axs[0].hist(Widths)
-    axs[0].set_title('Widths')
-    axs[1].hist(Heights)
-    axs[1].set_title('Heights')
+    figure(figsize=(10,20))
+    hist([Widths, Heights],
+         bins  = 25,
+         label = ['Widths', 'Heights'],
+         color = ['red','blue'])
+    legend(loc='upper right')
+    savefig('WidthsHeights.png')
     show()
