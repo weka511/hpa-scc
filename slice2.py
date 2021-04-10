@@ -15,14 +15,14 @@
 #
 #  To contact me, Simon Crase, email simon@greenweaves.nz
 #
-#  Slice and downsample dataset
+#  Slice and segment dataset
 
 from argparse          import ArgumentParser
 from dirichlet         import Image4, Mask
 from hpascc            import *
 from math              import ceil
 from matplotlib.image  import imread
-from matplotlib.pyplot import figure, close, savefig, show, hist, legend
+from matplotlib.pyplot import figure, close, savefig, show
 from numpy             import zeros, int8, amax, load, savez
 from os                import environ
 from os.path           import join
@@ -89,6 +89,47 @@ def save_images(output,Images,Targets):
     print (f'Saving {output} {Images.shape}')
     savez(output,Images=Images,Targets=Targets)
 
+class Stats:
+    def __init__(self,report_threshold,suspects):
+        self.Widths           = []
+        self.Heights          = []
+        self.Counts           = []
+        self.report_threshold = report_threshold
+        self.suspects         = suspects
+        self.plotfile_name    = 'WidthsHeights.png'
+
+    def __enter__(self):
+        self.suspects_file = open(self.suspects,'w')
+        return self
+
+    def record_count(self,image_id,count):
+        self.Counts.append(count)
+        if count<self.report_threshold:
+            self.suspects_file.write(f'{image_id},{count}\n')
+
+    def record_rectangle(self,width,height):
+        self.Widths.append(width)
+        self.Heights.append(height)
+
+    def plot(self):
+        fig = figure(figsize=(10,20))
+        axs = fig.subplots(nrows=1, ncols=2)
+        axs[0].hist([self.Widths, self.Heights],
+                    bins  = 25,
+                    label = ['Widths', 'Heights'],
+                    color = ['red','blue'])
+        axs[0].legend(loc='upper right')
+        axs[1].hist([self.Counts],
+                    bins  = 25,
+                    label = ['Counts'],
+                    color = ['green'])
+        axs[1].legend(loc='upper right')
+        savefig(self.plotfile_name)
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.suspects_file.close()
+
+
 def create_image_target(Data,
                         N            = 1,
                         mx           = 512,
@@ -97,9 +138,8 @@ def create_image_target(Data,
                         image_set    = 'train512x512',
                         segments     = './segments',
                         Expectations = {},
-                        Widths       = [],
-                        Heights      = [],
-                        test         = False):
+                        test         = False,
+                        stats        = None):
     print (f'Creating data: N={N}')
     Images  = zeros((N,NCHANNELS,mx,my), dtype=float)
     Targets = []
@@ -110,11 +150,13 @@ def create_image_target(Data,
         Limits         = mask.get_limits()
         Greys          = [imread(join(path, image_set, f'{image_id}_{COLOUR_NAMES[colour]}.png')) for colour in [BLUE,RED,YELLOW,GREEN]]
         MaxIntensities = [amax(image) for image in Greys]
+        stats.record_count(image_id,len(Limits))
+
         for k in range(len(Limits)):
 
             i0,j0,i1,j1 = Limits[k]
-            Widths.append(i1-i0)
-            Heights.append(j1-j0)
+            stats.record_rectangle(i1-i0,j1-j0)
+
             for i in range(i0,i1):
                 for j in range(j0,j1):
                     if mask[i,j]==k+1:
@@ -164,16 +206,22 @@ if __name__=='__main__':
                         default  = False,
                         action   = 'store_true',
                         help     = 'Store plots for verification')
+    parser.add_argument('--report_threshold',
+                        default = 7,
+                        type    = int,
+                        help    = 'Report images with fewer segments that this value')
+    parser.add_argument('--show',
+                        default = False,
+                        action  = 'store_true',
+                        help    = 'Display images')
     args         = parser.parse_args()
-    with Timer():
+    with Timer(), Stats(args.report_threshold,'suspects.csv') as stats:
         Descriptions   = read_descriptions('descriptions.csv')
         Expectations   = read_training_expectations(path=args.path)
 
         Batch          = []
         total_segments = 0
-        m              = 0
-        Widths  = []
-        Heights = []
+        file_sequence  = 0
         for image_id in read_worklist(args.worklist):
 
             mask   = Mask.Load(join(args.segments,f'{image_id}.npy'))
@@ -186,11 +234,10 @@ if __name__=='__main__':
                                                      path         = args.path,
                                                      image_set    = args.image_set,
                                                      Expectations = Expectations,
-                                                     Widths       = Widths,
-                                                     Heights      = Heights,
-                                                     test         = args.test)
-                save_images(join(args.output,f'{args.train}{m+1}.npz'),Images,Targets)
-                m+=1
+                                                     test         = args.test,
+                                                     stats        = stats)
+                file_sequence += 1
+                save_images(join(args.output,f'{args.train}{file_sequence}.npz'),Images,Targets)
                 Batch.clear()
                 total_segments = 0
             total_segments += len(Limits)
@@ -202,16 +249,12 @@ if __name__=='__main__':
                                                 path         = args.path,
                                                 image_set    = args.image_set,
                                                 Expectations = Expectations,
-                                                Widths       = Widths,
-                                                Heights      = Heights,
-                                                test         = args.test)
-            save_images(join(args.output,f'{args.train}{m+1}.npz'),Images,Targets)
+                                                test         = args.test,
+                                                stats        = stats)
+            file_sequence += 1
+            save_images(join(args.output,f'{args.train}{file_sequence}.npz'),Images,Targets)
 
-    figure(figsize=(10,20))
-    hist([Widths, Heights],
-         bins  = 25,
-         label = ['Widths', 'Heights'],
-         color = ['red','blue'])
-    legend(loc='upper right')
-    savefig('WidthsHeights.png')
-    show()
+        stats.plot()
+
+    if args.show:
+        show()
