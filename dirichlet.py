@@ -553,6 +553,7 @@ if __name__=='__main__':
                         action = 'store_true',
                         help   = 'Process singletons only')
     parser.add_argument('--worklist',
+                        default = 'worklist',
                         help   = 'List of IDs to be processed')
     parser.add_argument('--segments',
                         default = './segments',
