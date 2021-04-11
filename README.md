@@ -49,6 +49,7 @@
 |spike5.py|Figure out how to read segmentation masks|
 |spike6.py|Figure out how to extract segmented images|
 |spike7.py|Figure out how to extract segmented images using saved Mask|
+|spike8.py|Resampling|
 |train.py|Build and train neural network|
 |watershed.py|Naive Watershed segmentation|
 |download.py|Download training images from kaggle|
