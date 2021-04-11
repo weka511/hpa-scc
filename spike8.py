@@ -17,7 +17,6 @@
 #
 #  Figure out how to extract segmented images using saved Mask
 
-from   dirichlet import Image4,Mask
 import math
 import matplotlib.pyplot as plt
 from   matplotlib.image  import imread
@@ -53,15 +52,51 @@ def z_rotmat(theta):
                      [sin_t, cos_t, 0],
                      [0, 0, 1]])
 
-with Timer():
-     Greys       = imread(path_name)
-     M           = z_rotmat(np.pi/8)
-     translation = [0,0,0]
-     K           = affine_transform(Greys, M, translation, order=1,output_shape=(256,256))
-     print (K.shape)
+with Timer(): # https://bic-berkeley.github.io/psych-214-fall-2016/resampling_with_ndimage.html
      fig   = plt.figure(figsize=(27,18))
-     axs   = fig.subplots(nrows = 2, ncols = 2)
+     axs   = fig.subplots(nrows = 2, ncols = 4)
+     I           = np.array([[1, 0, 0],
+                     [0, 1, 0],
+                     [0, 0, 1]])
+     Greys       = imread(path_name)
+     Greys[0:10,0:10] = np.amax(Greys)                 # Add marker for origin
+     Greys[0:10,-10:-1] = 0.5*np.amax(Greys)           # Add marker for y axis
+     axs[0][0].imshow(Greys.transpose())
+     axs[0][0].set_title('Original')
 
-     axs[0][0].imshow(Greys)
-     axs[0][1].imshow(K)
+     translation1 = [0,0]
+     K1           = affine_transform(Greys, I, offset=translation1, order=1,output_shape=(256,256))
+     axs[0][1].imshow(K1.transpose())
+     axs[0][1].set_title('Down sampled')
+
+     translation2 = [300,500]
+     K2           = affine_transform(Greys, I, offset=translation2, order=1,output_shape=(256,256))
+     axs[0][2].imshow(K2.transpose())
+     axs[0][2].set_title('Down sampled & shifted')
+
+     # M           = z_rotmat(np.pi/8)
+     # translation = [0,0,0]
+     # K           = affine_transform(Greys, M, translation, order=1,output_shape=(256,256))
+     # print (K.shape)
+
+     G3 = Greys[270:315,225:350]
+     axs[0][3].imshow(G3.transpose())
+     axs[0][3].set_title('Segment')
+
+     K3  = affine_transform(G3, I, offset=[0,0,0], order=1,output_shape=(128,128),cval=np.amax(Greys))
+     axs[1][0].imshow(K3.transpose())
+     axs[1][0].set_title('Segmented and resampled')
+
+     M4           = z_rotmat(np.pi/8)
+     K4  = affine_transform(G3, M4, offset=[0,0,0], order=1,output_shape=(128,128),cval=np.amax(Greys))
+     axs[1][1].imshow(K4.transpose())
+     axs[1][1].set_title('Rotated about origin')
+     c_in   = 0.5*np.array(G3.shape)
+     c_out  = np.array(G3.shape)
+     transform=np.array([[np.cos(np.pi/8),-np.sin(np.pi/8)],[np.sin(np.pi/8),np.cos(np.pi/8)]]).dot(np.diag(([1,1])))
+     offset = c_in-c_out.dot(transform)
+     K5  = affine_transform(G3, transform, offset=offset, order=1,output_shape=(128,128),cval=np.amax(Greys))
+     axs[1][2].imshow(K5.transpose())
+     axs[1][2].set_title('Segmented and resampled')
+
 plt.show()
