@@ -148,8 +148,9 @@ def create_image_target(Data,
     for image_id in Batch:
         mask           = Mask.Load(join(args.segments, f'{image_id}.npy'))
         Limits         = mask.get_limits()
-        Greys          = [imread(join(path, image_set, f'{image_id}_{COLOUR_NAMES[colour]}.png')) for colour in [BLUE,RED,YELLOW,GREEN]]
-        MaxIntensities = [amax(image) for image in Greys]
+        GreysRaw       = [imread(join(path, image_set, f'{image_id}_{COLOUR_NAMES[colour]}.png')) for colour in [BLUE,RED,YELLOW,GREEN]]
+        Greys          = [Image/amax(Image) for Image in GreysRaw]
+
         stats.record_count(image_id,len(Limits))
 
         for k in range(len(Limits)):
@@ -161,7 +162,7 @@ def create_image_target(Data,
                 for j in range(j0,j1):
                     if mask[i,j]==k+1:
                         for column in range(len(Greys)):
-                            Images[index,column,i-i0,j-j0] = Greys[column][i,j]/MaxIntensities[column]
+                            Images[index,column,i-i0,j-j0] = Greys[column][i,j]
             print (image_id,k,index)
             if test:
                 fig            = figure()
