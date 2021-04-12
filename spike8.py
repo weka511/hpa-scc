@@ -16,6 +16,8 @@
 #  To contact me, Simon Crase, email simon@greenweaves.nz
 #
 #  Figure out how to extract segmented images using saved Mask
+#
+# See https://stackoverflow.com/questions/20161175/how-can-i-use-scipy-ndimage-interpolation-affine-transform-to-rotate-an-image-ab
 
 import math
 import matplotlib.pyplot as plt
@@ -49,53 +51,30 @@ def get_centroid(G):
 
 with Timer(): # https://bic-berkeley.github.io/psych-214-fall-2016/resampling_with_ndimage.html
      fig               = plt.figure(figsize=(27,18))
-     axs               = fig.subplots(nrows = 2, ncols = 4)
-     I                 = np.array([[1, 0, 0],
-                                   [0, 1, 0],
-                                   [0, 0, 1]])
+     axs               = fig.subplots(nrows = 2, ncols = 5)
+
      Greys              = imread(path_name)
      Greys[0:10,0:10]   = np.amax(Greys)                 # Add marker for origin
      Greys[0:10,-10:-1] = 0.5*np.amax(Greys)           # Add marker for y axis
      axs[0][0].imshow(Greys.transpose())
      axs[0][0].set_title('Original')
 
-     translation1 = [0,0]
-     K1           = affine_transform(Greys, I, offset=translation1, order=1,output_shape=(256,256))
-     axs[0][1].imshow(K1.transpose())
-     axs[0][1].set_title('Down sampled')
-
-     translation2 = [300,500]
-     K2           = affine_transform(Greys, I, offset=translation2, order=1,output_shape=(256,256))
-     axs[0][2].imshow(K2.transpose())
-     axs[0][2].set_title('Down sampled & shifted')
-
      G3 = Greys[270:312,240:340]
      x0,y0 = get_centroid(G3)
 
-     axs[0][3].imshow(G3.transpose())
-     axs[0][3].plot(x0,y0,'or')
-     axs[0][3].set_title('Segment')
+     axs[0][1].imshow(G3.transpose())
+     axs[0][1].plot(x0,y0,'or')
+     axs[0][1].set_title('Segment')
 
-     K3  = affine_transform(G3, I, offset=[0,0,0], order=1,output_shape=(128,128))
-     x0,y0 = get_centroid(K3)
-     axs[1][0].imshow(K3.transpose())
-     axs[1][0].plot(x0,y0,'or')
-     axs[1][0].set_title('Segmented and resampled')
-
-     M4           = rotate(np.pi/8)
-     K4  = affine_transform(G3, M4, offset=[0,0], order=1,output_shape=(128,128),cval=np.amax(Greys))
-     axs[1][1].imshow(K4.transpose())
-     axs[1][1].set_title('Rotated about origin')
-
-
-     c_in      = 0.5*np.array(G3.shape) # np.array([x0,y0]) #
-     c_out     = np.array((64,64))#np.array(G3.shape)
-     transform = rotate(np.pi/8)
-     offset    = c_in-c_out.dot(transform)
-     K5        = affine_transform(G3, transform.T, offset=offset, order=1,output_shape=(128,128),cval=np.amax(Greys))
-     axs[1][2].imshow(K5.transpose())
-     x1,y1 = c_out.dot(transform)
-     axs[1][2].plot(x1,y1,'or')
-     axs[1][2].set_title('rotated and offset')
-
+     mult = 1
+     for row in range(2):
+          for col in range(0 if row>0 else 2,5):
+               c_in      = 0.5*np.array(G3.shape)
+               c_out     = np.array((64,64))
+               transform = rotate(mult*np.pi/8)
+               offset    = c_in-c_out.dot(transform)
+               K5        = affine_transform(G3, transform.T, offset=offset, order=1,output_shape=(128,128),cval=np.amax(Greys))
+               axs[row][col].imshow(K5.transpose())
+               axs[row][col].set_title('rotated and offset')
+               mult += 1
 plt.show()
