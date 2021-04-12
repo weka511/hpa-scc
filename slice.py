@@ -155,19 +155,21 @@ def create_image_target(Data,
         stats.record_count(image_id,len(Limits))
 
         for k in range(len(Limits)):
-
             i0,j0,i1,j1 = Limits[k]
             stats.record_rectangle(i1-i0,j1-j0)
             for transform in Transformations:
                 for column in range(len(Greys)):
-                    Cropped   = Greys[column][i0:i1,j0:j1]
-                    c_in      = 0.5*array(Cropped.shape)
-                    c_out     = array((mx/2,mx/2))
+                    Cropped                  = Greys[column][i0:i1,j0:j1]
+                    c_in                     = 0.5*array(Cropped.shape)
+                    c_out                    = array((mx/2,mx/2))
+                    offset                   = c_in - c_out.dot(transform)
+                    Images[index,column,:,:] = affine_transform(Cropped, transform.T,
+                                                                offset       = offset,
+                                                                order        = 1,
+                                                                output_shape = (mx,my),
+                                                                cval         = 0)
 
-                    offset    = c_in-c_out.dot(transform)
-                    Images[index,column,:,:] = affine_transform(Cropped, transform.T, offset=offset, order=1,output_shape=(mx,my),cval=0)
-
-                print (image_id,k,index)
+                print (f'{image_id}, {k}, {index}')
                 Targets.append(Expectations[image_id])
                 index += 1
         return Images,Targets

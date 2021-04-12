@@ -13,7 +13,7 @@
 |hpascc.py|Common code - e.g. read list of descriptions, image-ids|
 |rgb.txt|List of xkcd colours|
 |select_images.py|Prepare worklist for pipeline|
-|slice2.py|Slice and downsample dataset|
+|slice.py|Slice and downsample dataset|
 |utils.py|Utility classes: Timer and Log|
 
 
