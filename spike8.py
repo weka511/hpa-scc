@@ -29,37 +29,32 @@ from   utils import Timer
 image_id  = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0'
 path_name = join (r'D:\data\hpa-scc\train512x512',f'{image_id}_blue.png')
 
-def x_rotmat(theta):
+
+def rotate(theta):
      cos_t = np.cos(theta)
      sin_t = np.sin(theta)
-     return np.array([[1, 0, 0],
-                     [0, cos_t, -sin_t],
-                     [0, sin_t, cos_t]])
-
-
-def y_rotmat(theta):
-     cos_t = np.cos(theta)
-     sin_t = np.sin(theta)
-     return np.array([[cos_t, 0, sin_t],
-                     [0, 1, 0],
-                     [-sin_t, 0, cos_t]])
-
-
-def z_rotmat(theta):
-     cos_t = np.cos(theta)
-     sin_t = np.sin(theta)
-     return np.array([[cos_t, -sin_t, 0],
-                     [sin_t, cos_t, 0],
-                     [0, 0, 1]])
+     return np.array([[cos_t, -sin_t],
+                      [sin_t, cos_t]])
+def get_centroid(G):
+     x = 0
+     y = 0
+     total = 0
+     m,n = G.shape
+     for i in range(m):
+          for j in range(n):
+               x += G[i,j]*i
+               y += G[i,j]*j
+               total += G[i,j]
+     return (x/total,y/ total)
 
 with Timer(): # https://bic-berkeley.github.io/psych-214-fall-2016/resampling_with_ndimage.html
-     fig   = plt.figure(figsize=(27,18))
-     axs   = fig.subplots(nrows = 2, ncols = 4)
-     I           = np.array([[1, 0, 0],
-                     [0, 1, 0],
-                     [0, 0, 1]])
-     Greys       = imread(path_name)
-     Greys[0:10,0:10] = np.amax(Greys)                 # Add marker for origin
+     fig               = plt.figure(figsize=(27,18))
+     axs               = fig.subplots(nrows = 2, ncols = 4)
+     I                 = np.array([[1, 0, 0],
+                                   [0, 1, 0],
+                                   [0, 0, 1]])
+     Greys              = imread(path_name)
+     Greys[0:10,0:10]   = np.amax(Greys)                 # Add marker for origin
      Greys[0:10,-10:-1] = 0.5*np.amax(Greys)           # Add marker for y axis
      axs[0][0].imshow(Greys.transpose())
      axs[0][0].set_title('Original')
@@ -74,29 +69,33 @@ with Timer(): # https://bic-berkeley.github.io/psych-214-fall-2016/resampling_wi
      axs[0][2].imshow(K2.transpose())
      axs[0][2].set_title('Down sampled & shifted')
 
-     # M           = z_rotmat(np.pi/8)
-     # translation = [0,0,0]
-     # K           = affine_transform(Greys, M, translation, order=1,output_shape=(256,256))
-     # print (K.shape)
+     G3 = Greys[270:312,240:340]
+     x0,y0 = get_centroid(G3)
 
-     G3 = Greys[270:315,225:350]
      axs[0][3].imshow(G3.transpose())
+     axs[0][3].plot(x0,y0,'or')
      axs[0][3].set_title('Segment')
 
-     K3  = affine_transform(G3, I, offset=[0,0,0], order=1,output_shape=(128,128),cval=np.amax(Greys))
+     K3  = affine_transform(G3, I, offset=[0,0,0], order=1,output_shape=(128,128))
+     x0,y0 = get_centroid(K3)
      axs[1][0].imshow(K3.transpose())
+     axs[1][0].plot(x0,y0,'or')
      axs[1][0].set_title('Segmented and resampled')
 
-     M4           = z_rotmat(np.pi/8)
-     K4  = affine_transform(G3, M4, offset=[0,0,0], order=1,output_shape=(128,128),cval=np.amax(Greys))
+     M4           = rotate(np.pi/8)
+     K4  = affine_transform(G3, M4, offset=[0,0], order=1,output_shape=(128,128),cval=np.amax(Greys))
      axs[1][1].imshow(K4.transpose())
      axs[1][1].set_title('Rotated about origin')
-     c_in   = 0.5*np.array(G3.shape)
-     c_out  = np.array(G3.shape)
-     transform=np.array([[np.cos(np.pi/8),-np.sin(np.pi/8)],[np.sin(np.pi/8),np.cos(np.pi/8)]]).dot(np.diag(([1,1])))
-     offset = c_in-c_out.dot(transform)
-     K5  = affine_transform(G3, transform, offset=offset, order=1,output_shape=(128,128),cval=np.amax(Greys))
+
+
+     c_in      = 0.5*np.array(G3.shape) # np.array([x0,y0]) #
+     c_out     = np.array((64,64))#np.array(G3.shape)
+     transform = rotate(np.pi/8)
+     offset    = c_in-c_out.dot(transform)
+     K5        = affine_transform(G3, transform.T, offset=offset, order=1,output_shape=(128,128),cval=np.amax(Greys))
      axs[1][2].imshow(K5.transpose())
-     axs[1][2].set_title('Segmented and resampled')
+     x1,y1 = c_out.dot(transform)
+     axs[1][2].plot(x1,y1,'or')
+     axs[1][2].set_title('rotated and offset')
 
 plt.show()
