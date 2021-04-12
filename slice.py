@@ -159,11 +159,11 @@ def create_image_target(Data,
             stats.record_rectangle(i1-i0,j1-j0)
             for transform in Transformations:
                 for column in range(len(Greys)):
-                    Cropped                  = Greys[column][i0:i1,j0:j1]
-                    c_in                     = 0.5*array(Cropped.shape)
+                    Masked                   = mask.apply(k,Limits[k],Greys[column])
+                    c_in                     = 0.5*array(Masked.shape)
                     c_out                    = array((mx/2,mx/2))
                     offset                   = c_in - c_out.dot(transform)
-                    Images[index,column,:,:] = affine_transform(Cropped, transform.T,
+                    Images[index,column,:,:] = affine_transform(Masked, transform.T,
                                                                 offset       = offset,
                                                                 order        = 1,
                                                                 output_shape = (mx,my),

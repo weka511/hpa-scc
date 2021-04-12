@@ -153,6 +153,15 @@ class Mask:
                     Limits[k-1] = (xmin,ymin,xmax,ymax)
         return Limits
 
+    def apply(self,k,Limits,Greys):
+        i0,j0,i1,j1 = Limits
+        Masked      = zeros((i1-i0,j1-j0))
+        for i in range(i0,i1):
+            for j in range(j0,j1):
+                if self.Mask[i,j]==k+1:
+                    Masked[i-i0,j-j0] = Greys[i,j]
+        return Masked
+
     def save(self,file_name):
         save(file_name,self.Mask)
 
