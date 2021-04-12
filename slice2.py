@@ -23,10 +23,11 @@ from hpascc            import *
 from math              import ceil
 from matplotlib.image  import imread
 from matplotlib.pyplot import figure, close, savefig, show
-from numpy             import zeros, int8, amax, load, savez
+from numpy             import zeros, int8, amax, load, savez, cos, sin, array, pi
 from os                import environ
 from os.path           import join
 from random            import seed, shuffle
+from scipy.ndimage     import affine_transform
 from utils             import Timer
 
 
@@ -131,15 +132,15 @@ class Stats:
 
 
 def create_image_target(Data,
-                        N            = 1,
-                        mx           = 512,
-                        my           = 512,
-                        path         = join(environ['DATA'],'hpa-scc'),
-                        image_set    = 'train512x512',
-                        segments     = './segments',
-                        Expectations = {},
-                        test         = False,
-                        stats        = None):
+                        N               = 1,
+                        mx              = 512,
+                        my              = 512,
+                        path            = join(environ['DATA'],'hpa-scc'),
+                        image_set       = 'train512x512',
+                        segments        = './segments',
+                        Expectations    = {},
+                        stats           = None,
+                        Transformations = []):
     print (f'Creating data: N={N}')
     Images  = zeros((N,NCHANNELS,mx,my), dtype=float)
     Targets = []
@@ -157,26 +158,25 @@ def create_image_target(Data,
 
             i0,j0,i1,j1 = Limits[k]
             stats.record_rectangle(i1-i0,j1-j0)
-
-            for i in range(i0,i1):
-                for j in range(j0,j1):
-                    if mask[i,j]==k+1:
-                        for column in range(len(Greys)):
-                            Images[index,column,i-i0,j-j0] = Greys[column][i,j]
-            print (image_id,k,index)
-            if test:
-                fig            = figure()
-                axs            = fig.subplots(2,2)
+            for transform in Transformations:
                 for column in range(len(Greys)):
-                    axs[column//2,column%2].imshow(Images[index,column,:,:],
-                                                   cmap = 'gray',
-                                                   vmin = 0,
-                                                   vmax = 1.0)
-                savefig(fr'\temp\{image_id}-{k}.png')
-                close(fig)
-            Targets.append(Expectations[image_id])
-            index += 1
-    return Images,Targets
+                    Cropped   = Greys[column][i0:i1,j0:j1]
+                    c_in      = 0.5*array(Cropped.shape)
+                    c_out     = array((mx/2,mx/2))
+
+                    offset    = c_in-c_out.dot(transform)
+                    Images[index,column,:,:] = affine_transform(Cropped, transform.T, offset=offset, order=1,output_shape=(mx,my),cval=0)
+
+                print (image_id,k,index)
+                Targets.append(Expectations[image_id])
+                index += 1
+        return Images,Targets
+
+def rotate(theta):
+    cos_t = cos(theta)
+    sin_t = sin(theta)
+    return array([[cos_t, -sin_t],
+                  [sin_t, cos_t]])
 
 if __name__=='__main__':
 
@@ -200,13 +200,9 @@ if __name__=='__main__':
                         default = 'train512x512',
                         help    = 'Location of images')
     parser.add_argument('--N',
-                        default = 4096,
+                        default = 256,
                         type    = int,
                         help    = 'Number of images in each output dataset')
-    parser.add_argument('--test',
-                        default  = False,
-                        action   = 'store_true',
-                        help     = 'Store plots for verification')
     parser.add_argument('--report_threshold',
                         default = 7,
                         type    = int,
@@ -215,43 +211,56 @@ if __name__=='__main__':
                         default = False,
                         action  = 'store_true',
                         help    = 'Display images')
+    parser.add_argument('--M',
+                        default = 8,
+                        type    = int,
+                        help    = 'Number of transformed copies of each cell')
+    parser.add_argument('--pixels',
+                        default = 128,
+                        type    = int,
+                        help    = 'Number of pixels after downsampling')
     args         = parser.parse_args()
     with Timer(), Stats(args.report_threshold,'suspects.csv') as stats:
-        Descriptions   = read_descriptions('descriptions.csv')
-        Expectations   = read_training_expectations(path=args.path)
+        Descriptions    = read_descriptions('descriptions.csv')
+        Expectations    = read_training_expectations(path=args.path)
+        Transformations = [rotate(i * pi/args.M) for i in range(args.M) ]
+        Batch           = []
+        total_segments  = 0
+        file_sequence   = 0
 
-        Batch          = []
-        total_segments = 0
-        file_sequence  = 0
         for image_id in read_worklist(args.worklist):
 
             mask   = Mask.Load(join(args.segments,f'{image_id}.npy'))
             Limits = mask.get_limits()
             print (image_id,len(Limits))
-            if total_segments+len(Limits)>args.N:
+            if total_segments+len(Limits)*args.M > args.N:
                 Images,Targets = create_image_target(Batch,
-                                                     N            = total_segments,
-                                                     segments     = args.segments,
-                                                     path         = args.path,
-                                                     image_set    = args.image_set,
-                                                     Expectations = Expectations,
-                                                     test         = args.test,
-                                                     stats        = stats)
+                                                     N               = total_segments,
+                                                     segments        = args.segments,
+                                                     path            = args.path,
+                                                     image_set       = args.image_set,
+                                                     Expectations    = Expectations,
+                                                     stats           = stats,
+                                                     Transformations = Transformations,
+                                                     mx              = args.pixels,
+                                                     my              = args.pixels)
                 file_sequence += 1
                 save_images(join(args.output,f'{args.train}{file_sequence}.npz'),Images,Targets)
                 Batch.clear()
                 total_segments = 0
-            total_segments += len(Limits)
+            total_segments += len(Limits) * args.M
             Batch.append(image_id)
         if len(Batch)>0:
             Images,Targets= create_image_target(Batch,
-                                                N            = total_segments,
-                                                segments     = args.segments,
-                                                path         = args.path,
-                                                image_set    = args.image_set,
-                                                Expectations = Expectations,
-                                                test         = args.test,
-                                                stats        = stats)
+                                                N               = total_segments,
+                                                segments        = args.segments,
+                                                path            = args.path,
+                                                image_set       = args.image_set,
+                                                Expectations    = Expectations,
+                                                stats           = stats,
+                                                Transformations = Transformations,
+                                                mx              = args.pixels,
+                                                my              = args.pixels)
             file_sequence += 1
             save_images(join(args.output,f'{args.train}{file_sequence}.npz'),Images,Targets)
 
