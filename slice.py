@@ -59,7 +59,7 @@ def create_image_target(Data,
             print (f'{k} of {N} -> {k+start}')
         image_id,classes = Data[k+start]
         fig = figure()
-        axs = fig.subolots(2,2)
+        axs = fig.subplots(2,2)
         for column,colour in enumerate([BLUE,RED,YELLOW,GREEN]):
             file_name        = f'{image_id}_{COLOUR_NAMES[colour]}.png'
             path_name        = join(args.path,args.image_set,file_name)
