@@ -1,4 +1,4 @@
-# spike
+# spikes
 
 ## Spike solutions and obsolete code
 
