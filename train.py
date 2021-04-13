@@ -157,7 +157,7 @@ def train_epoch(epoch,
 
     if shuffle_data:
         shuffle(seqs)
-    for i in range(m):
+    for i in range(len(seqs)):
         print (f'Epoch {epoch}, file {base_name} {seqs[i]}')
         loader    = DataLoader(CellDataset(base_name = base_name,
                                            path      = path,
@@ -225,6 +225,12 @@ if __name__=='__main__':
                         default = 8,
                         type    = int,
                         help    = 'Batch size for training/validating')
+    parser.add_argument('--chks',
+                        default = 'chks',
+                        help    = 'Folder for checkpoint files')
+    parser.add_argument('--checkpoint',
+                        default = 'chk',
+                        help    = 'Base of name for checkpoint files')
     args          = parser.parse_args()
     if args.action == VISUALIZE_DATA:
         visualize(args.data,path=args.path)
