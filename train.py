@@ -26,7 +26,7 @@ from torch.nn            import Module, Conv3d, MaxPool3d, Linear, MSELoss, Drop
 from torch.nn.functional import relu, softmax
 from torch.optim         import SGD
 from torch.utils.data    import Dataset, DataLoader
-from utils               import Logger, Timer
+from utils               import Logger, Timer, set_random_seed
 
 # Allowable actions for program
 
@@ -179,6 +179,24 @@ def train_epoch(epoch,
                     losses.clear()
                     logger.log(f'{epoch}, {m},  {j}, {mean_loss}')
 
+# restart
+#
+# Restart from saved data
+
+def restart(restart,
+            chks      = 'chks',
+            model     = None,
+            criterion = None,
+            optimizer = None):
+    checkpoint_file_name = join(chks,restart)
+    print (f'Loading checkpoint: {checkpoint_file_name}')
+    checkpoint = reload(checkpoint_file_name)
+    print (f'Loaded checkpoint: {checkpoint_file_name}')
+    model.load_state_dict(checkpoint['model_state_dict'])
+    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+    epoch = checkpoint['epoch'] + 1
+    model.train()
+    return epoch
 
 if __name__=='__main__':
     parser = ArgumentParser('Train with HPA data')
@@ -231,7 +249,17 @@ if __name__=='__main__':
     parser.add_argument('--checkpoint',
                         default = 'chk',
                         help    = 'Base of name for checkpoint files')
-    args          = parser.parse_args()
+    parser.add_argument('--restart',
+                        default = None,
+                        help   = 'Restart from specified checkpoint')
+    parser.add_argument('--seed',
+                        default = 42,
+                        type    = int,
+                        help    = 'Used to seed random number generator')
+    args  = parser.parse_args()
+
+    set_random_seed(args.seed)
+
     if args.action == VISUALIZE_DATA:
         visualize(args.data,path=args.path)
     elif args.action == TRAIN:
@@ -244,7 +272,7 @@ if __name__=='__main__':
             optimizer     = SGD(model.parameters(),
                                 lr       = args.lr,
                                 momentum = args.momentum)
-            epoch0 = 1#restart(args,model,criterion,optimizer) if args.restart!=None else 1
+            epoch0 = restart(args.restart,chks=args.chka,model,criterion,optimizer) if args.restart!=None else 1
             for epoch in range(epoch0,epoch0+args.n):
                 train_epoch(epoch,
                             base_name  = args.data,
@@ -259,10 +287,9 @@ if __name__=='__main__':
                 save({
                         'epoch'                : epoch,
                         'model_state_dict'     : model.state_dict(),
-                        'optimizer_state_dict' : optimizer.state_dict()#,
-                        # 'loss'                 : loss
+                        'optimizer_state_dict' : optimizer.state_dict()
                     },
-                    f'{join(args.chks,args.checkpoint)}{epoch}.pth')
+                    join(args.chks, f'{args.checkpoint}{epoch}.pth')
     elif args.action == TEST:
         test(args.data,path=args.path)
     elif args.action == VALIDATE:
