@@ -77,6 +77,109 @@ def visualize(data,
         savefig(join(path,f'{data}{seq}-{i}'))
         close(fig)
 
+# Net
+#
+# Simple convolutional neural network
+
+class Net(Module):
+    def __init__(self):
+        super(Net, self).__init__()
+
+        self.conv1    = Conv3d(in_channels  = 4,
+                               out_channels = 6,
+                               kernel_size  = (1,5,5),
+                               stride       = 1,
+                               padding      = 1)
+        self.pool     = MaxPool3d(2)
+        self.conv2    = Conv3d(in_channels  = 6,
+                               out_channels = 16,
+                               kernel_size  = (1,5,5),
+                               stride       = 1,
+                               padding      = 1)
+        self.fc1      = Linear(in_features  = 8* 16* 1* 30* 30,
+                               out_features = 120)
+
+        self.fc2      = Linear(in_features  = 120,
+                               out_features = 84)
+
+        self.fc3      = Linear(in_features  = 84,
+                               out_features = 18)
+
+    def forward(self, x):
+        # print (x.shape)
+        x = self.pool(relu(self.conv1(x.float())))
+        # print (x.shape)
+        x = self.pool(relu(self.conv2(x)))
+        # print (x.shape)
+        x = x.view(-1, 8* 16* 1* 30* 30)
+        x = relu(self.fc1(x))
+        x = relu(self.fc2(x))
+        x = self.fc3(x)
+        return softmax(x,dim=1)
+
+
+def validate(data,path='./'):
+    print ('Not implemented')
+
+def test(data,path='./'):
+    print ('Not implemented')
+
+# log_non_default
+#
+# Log any non-default arguments
+
+def log_non_default(args):
+    for key,value in vars(args).items():
+        if key in ['action', 'prefix', 'suffix']: continue    #...except for these
+        if value != parser.get_default(key):
+            logger.log (f'{key}, {value}')
+
+# train_epoch
+#
+# Train for one epoch. Iterates through all slices of data
+
+def train_epoch(epoch,
+                base_name    = None,
+                path         = './',
+                model        = None,
+                criterion    = None,
+                optimizer    = None,
+                logger       = None,
+                K            = 1,
+                frequency    = 1,
+                shuffle_data = False,
+                batch_size   = 8):
+    m    = 1
+    seqs = []
+    while exists(file_name:=join(path,f'{base_name}{m}.npz')):
+        seqs.append(m)
+        m+= 1
+
+    if shuffle_data:
+        shuffle(seqs)
+    for i in range(m):
+        print (f'Epoch {epoch}, file {base_name} {seqs[i]}')
+        loader    = DataLoader(CellDataset(base_name = base_name,
+                                           path      = path,
+                                           seq       = seqs[i]),
+                               batch_size=batch_size)
+        losses    = []
+
+        for k in range(K):
+            for j, data in enumerate(loader, 0):
+                optimizer.zero_grad()
+                inputs, labels = data
+                outputs        = model(inputs)
+                loss           = criterion(outputs, labels)
+                losses.append(loss.item())
+                loss.backward()
+                optimizer.step()
+                if j%frequency==0:
+                    mean_loss = mean(losses)
+                    losses.clear()
+                    logger.log(f'{epoch}, {m},  {j}, {mean_loss}')
+
+
 if __name__=='__main__':
     parser = ArgumentParser('Train with HPA data')
     parser.add_argument('action',
@@ -86,9 +189,77 @@ if __name__=='__main__':
     parser.add_argument('--path',
                         default = 'data',
                         help    = 'Folder for data files')
-
+    parser.add_argument('--prefix',
+                        default = 'train',
+                        help    = 'Prefix for log file names')
+    parser.add_argument('--suffix',
+                        default = '.csv',
+                        help    = 'Suffix for log file names')
+    parser.add_argument('--logdir',
+                        default = './logs',
+                        help = 'directory for storing logfiles')
+    parser.add_argument('--restart',
+                        default = None,
+                        help   = 'Restart from specified checkpoint')
+    parser.add_argument('--n',
+                        default = 10,
+                        type    = int,
+                        help    = 'Number of epochs for training')
+    parser.add_argument('--momentum',
+                        default = 0.9,
+                        type    = float,
+                        help    = 'Momentum for optimization')
+    parser.add_argument('--lr',
+                        default = 0.01,
+                        type    = float,
+                        help    = 'Learning Rate for optimization')
+    parser.add_argument('--K',
+                        default = 1,
+                        type    = int,
+                        help    = 'Number of pasees through one dataset before loading next one')
+    parser.add_argument('--frequency',
+                        default = 10,
+                        type    = int,
+                        help    = 'Controls frequency with which data logged')
+    parser.add_argument('--batch',
+                        default = 8,
+                        type    = int,
+                        help    = 'Batch size for training/validating')
     args          = parser.parse_args()
     if args.action == VISUALIZE_DATA:
         visualize(args.data,path=args.path)
+    elif args.action == TRAIN:
+        with Timer('training network'), Logger(prefix = args.prefix,
+                                               suffix = args.suffix,
+                                               logdir = args.logdir) as logger:
+            log_non_default(args)
+            model         = Net()
+            criterion     = MSELoss()
+            optimizer     = SGD(model.parameters(),
+                                lr       = args.lr,
+                                momentum = args.momentum)
+            epoch0 = 1#restart(args,model,criterion,optimizer) if args.restart!=None else 1
+            for epoch in range(epoch0,epoch0+args.n):
+                train_epoch(epoch,
+                            base_name  = args.data,
+                            path       = args.path,
+                            model      = model,
+                            criterion  = criterion,
+                            optimizer  = optimizer,
+                            logger     = logger,
+                            K          = args.K,
+                            frequency  = args.frequency,
+                            batch_size = args.batch)
+                save({
+                        'epoch'                : epoch,
+                        'model_state_dict'     : model.state_dict(),
+                        'optimizer_state_dict' : optimizer.state_dict()#,
+                        # 'loss'                 : loss
+                    },
+                    f'{join(args.chks,args.checkpoint)}{epoch}.pth')
+    elif args.action == TEST:
+        test(args.data,path=args.path)
+    elif args.action == VALIDATE:
+        validate(args.data,path=args.path)
     else:
-        print (f'{args.action} not implemented')
+        print (f'{args.action} not recognized')
