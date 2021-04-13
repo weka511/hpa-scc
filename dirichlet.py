@@ -23,11 +23,10 @@ from matplotlib.image   import imread
 from numpy              import zeros, mean, std, argmin, save, load
 from os                 import environ
 from os.path            import exists,join
-from random             import sample
 from re                 import split
 from scipy.spatial      import Voronoi, voronoi_plot_2d
 from sys                import float_info, exc_info, exit
-from utils              import Logger, set_random_seed, Timer, create_xkcd_colours
+from utils              import Logger, Timer, create_xkcd_colours
 
 
 # Image4
@@ -99,6 +98,10 @@ class Image4(object):
         axis.set_xlim(0,self.nx-1)
         axis.set_ylim(0,self.ny-1)
 
+# Mask
+#
+# This class represents a segmentation mask
+
 class Mask:
     @classmethod
     def Load(cls,file_name):
@@ -128,6 +131,10 @@ class Mask:
     def __getitem__(self,idx):
         return self.Mask[idx]
 
+    # get_limits
+    #
+    # Find bounding boxes for all segments
+
     def get_limits(self):
         Limits = [] #[(xmin,ymin,xmax,ymax)]
         for i in range(self.nx):
@@ -153,14 +160,22 @@ class Mask:
                     Limits[k-1] = (xmin,ymin,xmax,ymax)
         return Limits
 
-    def apply(self,k,Limits,Greys):
+    #  apply
+    #
+    # Mask ouy all bit in image, except for selected segment
+
+    def apply(self,segment,Limits,Greys):
         i0,j0,i1,j1 = Limits
         Masked      = zeros((i1-i0,j1-j0))
         for i in range(i0,i1):
             for j in range(j0,j1):
-                if self.Mask[i,j]==k+1:
+                if self.Mask[i,j]==segment+1:
                     Masked[i-i0,j-j0] = Greys[i,j]
         return Masked
+
+    # save
+    #
+    # Save mask to specified file
 
     def save(self,file_name):
         save(file_name,self.Mask)
@@ -520,10 +535,6 @@ if __name__=='__main__':
                         default = 10,
                         type    = int,
                         help    = 'Discard clusters with fewer points')
-    parser.add_argument('--sample',
-                        default = None,
-                        type    = int,
-                        help    = 'Used to sample a specified number of images')
     parser.add_argument('--multiple',
                         default = False,
                         action  = 'store_true',
@@ -549,10 +560,6 @@ if __name__=='__main__':
                         type    = float,
                         default = 1,
                         help    = 'If no centroids have shifted by more than this limit, we deem iterations to have converged')
-    parser.add_argument('--all',
-                        default = False,
-                        action = 'store_true',
-                        help   = 'Used to process all unprocessed slides')
     parser.add_argument('--N',
                         default = 75, # Processed 1307 slides, and the most iteration I have observed was 57.
                         type    = int,
@@ -569,69 +576,15 @@ if __name__=='__main__':
                         help    = 'Identifies where to store cell masks')
     args = parser.parse_args()
 
-    with Timer(),Logger('dirichlet',dummy = not args.all and args.sample==None) as logger:
+    with Timer(),Logger('dirichlet') as logger:
         XKCD         = [colour for colour in create_xkcd_colours()][::-1]
         Descriptions = read_descriptions('descriptions.csv')
         Training     = restrict(read_training_expectations(path=args.path),
                                 labels   = args.labels,
-                                multiple = args.multiple or args.sample==None)
+                                multiple = args.multiple or args.image_id!=None)
 
         if args.worklist != None:
             for image_id in read_worklist(args.worklist):
-                fig = None
-                try:
-                    fig,seq = segment(image_id     = image_id,
-                                      path         = args.path,
-                                      image_set    = args.image_set,
-                                      figs         = args.figs,
-                                      Descriptions = Descriptions,
-                                      Training     = Training,
-                                      background   = args.background,
-                                      XKCD         = XKCD,
-                                      N            = args.N,
-                                      delta        = args.delta,
-                                      Lambda       = args.Lambda,
-                                      segments     = args.segments)
-                    print (f'Segmented {image_id},{seq}')
-                    logger.log(f'{image_id},{seq}')
-                except KeyboardInterrupt:
-                    exit(f'Interrupted while segmenting {image_id}')
-                except:
-                    print(f'Error segmenting {image_id} {exc_info()[0]}')
-                finally:
-                    if not args.show and fig!=None:
-                        close(fig)
-        elif args.all:
-            for image_id,classes in Training.items():
-                if exists(get_image_file_name(image_id,figs=args.figs)): continue
-                if args.singleton and len(classes)>1: continue
-                fig = None
-                try:
-                    fig,seq = segment(image_id     = image_id,
-                                      path         = args.path,
-                                      image_set    = args.image_set,
-                                      figs         = args.figs,
-                                      Descriptions = Descriptions,
-                                      Training     = Training,
-                                      background   = args.background,
-                                      XKCD         = XKCD,
-                                      N            = args.N,
-                                      delta        = args.delta,
-                                      Lambda       = args.Lambda,
-                                      segments     = args.segments)
-                    print (f'Segmented {image_id},{seq}')
-                    logger.log(f'{image_id},{seq}')
-                except KeyboardInterrupt:
-                    exit(f'Interrupted while segmenting {image_id}')
-                except:
-                    print(f'Error segmenting {image_id} {exc_info()[0]}')
-                finally:
-                    if not args.show and fig!=None:
-                        close(fig)
-        elif args.sample!=None:
-            set_random_seed(args.seed,prefix=__file__)
-            image_ids = [image_id for image_id,classes in Training.items() if len(classes)==1] if args.singleton else list(Training.keys())
-            for image_id in sample(image_ids,args.sample):
                 fig = None
                 try:
                     fig,seq = segment(image_id     = image_id,
