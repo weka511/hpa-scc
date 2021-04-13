@@ -249,9 +249,6 @@ if __name__=='__main__':
     parser.add_argument('--checkpoint',
                         default = 'chk',
                         help    = 'Base of name for checkpoint files')
-    parser.add_argument('--restart',
-                        default = None,
-                        help   = 'Restart from specified checkpoint')
     parser.add_argument('--seed',
                         default = 42,
                         type    = int,
@@ -272,7 +269,11 @@ if __name__=='__main__':
             optimizer     = SGD(model.parameters(),
                                 lr       = args.lr,
                                 momentum = args.momentum)
-            epoch0 = restart(args.restart,chks=args.chka,model,criterion,optimizer) if args.restart!=None else 1
+            epoch0 = restart(args.restart,
+                             chks      = args.chks,
+                             model     = model,
+                             criterion = criterion,
+                             optimizer = optimizer) if args.restart!=None else 1
             for epoch in range(epoch0,epoch0+args.n):
                 train_epoch(epoch,
                             base_name  = args.data,
@@ -289,7 +290,7 @@ if __name__=='__main__':
                         'model_state_dict'     : model.state_dict(),
                         'optimizer_state_dict' : optimizer.state_dict()
                     },
-                    join(args.chks, f'{args.checkpoint}{epoch}.pth')
+                    join(args.chks, f'{args.checkpoint}{epoch}.pth'))
     elif args.action == TEST:
         test(args.data,path=args.path)
     elif args.action == VALIDATE:
