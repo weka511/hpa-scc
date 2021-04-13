@@ -30,42 +30,45 @@ from random            import seed, shuffle
 from scipy.ndimage     import affine_transform
 from utils             import Timer
 
-
-# save_images
+# Stats
 #
-# Save image/target pair
-#
-# Parameters:
-#     output      Name of file where data is to be saved
-#     Images      Numpy array of images
-#     Targets     List of values that are expected
-
-def save_images(output,Images,Targets):
-    print (f'Saving {output} {Images.shape}')
-    savez(output,Images=Images[0:len(Targets),:,:,:],Targets=Targets)
+# A context manager for keeping track of widths and heights of segments, and
+# the number of segments in each image, in orders to assess the
+# quality of segmentation. Stats is a
 
 class Stats:
-    def __init__(self,report_threshold,suspects):
-        self.Widths           = []
-        self.Heights          = []
-        self.Counts           = []
-        self.report_threshold = report_threshold
-        self.suspects         = suspects
-        self.plotfile_name    = 'WidthsHeights.png'
+    def __init__(self,report_threshold,suspects_file_name):
+        self.Widths             = []
+        self.Heights            = []
+        self.Counts             = []
+        self.report_threshold   = report_threshold
+        self.suspects_file_name = suspects_file_name
+        self.plotfile_name      = 'WidthsHeights.png'
 
     def __enter__(self):
-        self.suspects_file = open(self.suspects,'w')
+        self.suspects_file = open(self.suspects_file_name,'w')
         return self
+
+    # record_count
+    #
+    # Record number of segments in image
+    # Record if there are too few segments--segmentation may have failed
 
     def record_count(self,image_id,count):
         self.Counts.append(count)
         if count<self.report_threshold:
             self.suspects_file.write(f'{image_id},{count}\n')
 
+    # record_rectangle
+    #
+    # Record width and height of bounding reatcbagle for segment
     def record_rectangle(self,width,height):
         self.Widths.append(width)
         self.Heights.append(height)
 
+    # plot
+    #
+    # Display histograms of stats
     def plot(self):
         fig = figure(figsize=(10,20))
         axs = fig.subplots(nrows=1, ncols=2)
@@ -84,6 +87,22 @@ class Stats:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.suspects_file.close()
 
+# save_images
+#
+# Save image/target pair
+#
+# Parameters:
+#     output      Name of file where data is to be saved
+#     Images      Numpy array of images
+#     Targets     List of values that are expected
+
+def save_images(output,Images,Targets):
+    print (f'Saving {output} {Images.shape}')
+    savez(output,Images=Images[0:len(Targets),:,:,:],Targets=Targets)
+
+# create_image_target
+#
+# Create one pair of image plus labels, which will be stored in a file
 
 def create_image_target(Data,
                         N               = 1,
@@ -128,6 +147,10 @@ def create_image_target(Data,
                 index += 1
 
         return Images,Targets
+
+# rotate
+#
+# Used to rotate an image
 
 def rotate(theta):
     cos_t = cos(theta)
