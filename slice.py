@@ -31,52 +31,6 @@ from scipy.ndimage     import affine_transform
 from utils             import Timer
 
 
-# create_image_target
-#
-# Create one downsampled image & target pair of specified resolution
-#
-# Parameters:
-#     Data      Training data
-#     N         Number of images in  output dataset
-#     mx        Number of pixels
-#     my        Number of pixels
-#     start     Identifies first record to be output
-#     path      Path where raw data is located
-#     imageset  Location of data relative to path
-
-def create_image_target(Data,
-                        N         = 1,
-                        mx        = 256,
-                        my        = 256,
-                        start     = 0,
-                        path      = join(environ['DATA'],'hpa-scc'),
-                        image_set = 'train512x512'):
-    print (f'Creating data: N={N}, start={start}')
-    Images  = zeros((N,4,mx,my), dtype=int8)
-    Targets = []
-    for k in range(N):
-        if k%args.frequency==0:
-            print (f'{k} of {N} -> {k+start}')
-        image_id,classes = Data[k+start]
-        fig = figure()
-        axs = fig.subplots(2,2)
-        for column,colour in enumerate([BLUE,RED,YELLOW,GREEN]):
-            file_name        = f'{image_id}_{COLOUR_NAMES[colour]}.png'
-            path_name        = join(args.path,args.image_set,file_name)
-            grey_scale_image = imread(path_name)
-            nx,ny            = grey_scale_image.shape
-            max_intensity    = amax(grey_scale_image)
-
-            for i in range(mx):
-                for j in range(my):
-                    if grey_scale_image[2*i,2*j]>0:
-                        Images[k,colour,i,j] = int8(128*grey_scale_image[2*i,2*j]/max_intensity)
-            axs[column//2][column%2].imshow(Images[k,colour,:,:])
-        savefig(fr'\temp\{image_id}-{k}.png')
-        close(fig)
-        Targets.append(classes)
-    return Images, Targets
-
 # save_images
 #
 # Save image/target pair
@@ -88,7 +42,7 @@ def create_image_target(Data,
 
 def save_images(output,Images,Targets):
     print (f'Saving {output} {Images.shape}')
-    savez(output,Images=Images,Targets=Targets)
+    savez(output,Images=Images[0:len(Targets),:,:,:],Targets=Targets)
 
 class Stats:
     def __init__(self,report_threshold,suspects):
@@ -172,6 +126,7 @@ def create_image_target(Data,
                 print (f'{image_id}, {k}, {index}')
                 Targets.append(Expectations[image_id])
                 index += 1
+
         return Images,Targets
 
 def rotate(theta):
