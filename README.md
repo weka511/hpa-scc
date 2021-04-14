@@ -11,6 +11,7 @@
 |establish-N.R|R script used to establish value for maximum number of iterations|
 |hpa-scc.wpr|Python project|
 |hpascc.py|Common code - e.g. read list of descriptions, image-ids|
+|logs.py|Analyze log files from training/testing|
 |rgb.txt|List of xkcd colours|
 |select_images.py|Prepare worklist for pipeline|
 |slice.py|Slice and downsample dataset|

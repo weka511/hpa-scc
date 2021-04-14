@@ -15,7 +15,7 @@
 #
 # Analyze log files from training/testing
 
-from argparse          import   ArgumentParser
+from argparse          import ArgumentParser
 from csv               import reader
 from matplotlib.pyplot import figure,plot,show,title,legend,ylabel,savefig,ylim,axvspan
 from os                import walk
