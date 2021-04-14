@@ -49,16 +49,19 @@ class Image4(object):
 
             self.Image[:,:,channel] = image_mono
 
-    # Get a regular 3 colour image from selected channels
-
+    # get
+    #
+    # Get a regular 3 colour image from selected channels,
+    # which includes merging YELLOW into RED and GREEN using weights from
+    # https://www.kaggle.com/c/hpa-single-cell-image-classification/discussion/214863
     def get(self,channels=[BLUE]):
         Image = zeros((self.nx,self.ny,NRGB))
         for channel in channels:
             if channel==YELLOW:
-                Image[:,:,RED]    =  self.Image [:,:,channel]
-                Image[:,:,GREEN]  =  self.Image [:,:,channel]
+                Image[:,:,RED]    +=  self.Image [:,:,channel]
+                Image[:,:,GREEN]  +=  0.5* self.Image [:,:,channel]
             else:
-                Image[:,:,channel] =  self.Image [:,:,channel]
+                Image[:,:,channel] +=  self.Image [:,:,channel]
         return Image
 
     def get_segment(self,
