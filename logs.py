@@ -18,6 +18,7 @@
 from argparse          import ArgumentParser
 from csv               import reader
 from matplotlib.pyplot import figure,plot,show,title,legend,ylabel,savefig,ylim,axvspan
+from numpy             import log10
 from os                import walk
 from os.path           import splitext, join
 from utils             import create_xkcd_colours
@@ -109,15 +110,25 @@ if __name__ == '__main__':
                         default = False,
                         action  = 'store_true',
                         help    = 'Show details, not just averages')
+    parser.add_argument('--logarithmic',
+                        default = False,
+                        action  = 'store_true',
+                        help    = 'Plot log of errors')
 
-    args     = parser.parse_args()
-    fig      = figure(figsize=(20,20))
-    colours  = create_xkcd_colours()
-    for k,logfile_name in enumerate(get_logfile_names(args.notall,args.logfiles,
-                                                      prefix = args.prefix,
-                                                      suffix = args.suffix,
-                                                      logdir = args.logdir)):
-        colour = next(colours)
+    args          = parser.parse_args()
+
+    def scale(values):
+        return log10(values) if args.logarithmic else values
+
+    fig           = figure(figsize=(20,20))
+    XKCD          = [colour for colour in create_xkcd_colours()][::-1]
+    logfile_names = get_logfile_names(args.notall,args.logfiles,
+                                      prefix = args.prefix,
+                                      suffix = args.suffix,
+                                      logdir = args.logdir)
+
+    for k,logfile_name in enumerate(logfile_names):
+        colour = XKCD[k]
         with open(logfile_name) as logfile:
             data      = reader(logfile)
             params    = create_parameters(data)
@@ -140,20 +151,20 @@ if __name__ == '__main__':
                 pass
             finally:
                 breaks.append(j)
-                set_background(breaks,epochs)
+                set_background(breaks,epochs,facecolor=XKCD[-1])
 
             if args.detail:
-                plot (losses[args.skip+args.average:],
+                plot (scale(losses[args.skip+args.average:]),
                       c     = colour,
                       label = display_parameters(params))
 
-            plot([sum([losses[i] for i in range(j,j+args.average)])/args.average for j in range(args.skip,len(losses)-args.average)],
+            plot(scale([sum([losses[i] for i in range(j,j+args.average)])/args.average for j in range(args.skip,len(losses)-args.average)]),
                  c         = colour,
                  linestyle = 'dashed',
                  label     = display_parameters(params) if not args.detail else f'{args.average}-point moving average')
 
-    ylabel('Training Error')
-
+    ylabel('Log Training Error' if args.logarithmic else 'Training Error')
+    title(f'Logs: {" ".join(logfile_names)}')
     legend()
     savefig (f'{args.savefile}.png' if len(splitext(args.savefile))==0 else args.savefile)
     show()
