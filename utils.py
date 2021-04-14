@@ -128,6 +128,16 @@ def create_xkcd_colours(file_name='rgb.txt', prefix='xkcd:'):
             if len(parts)>1:
                 yield f'{prefix}{parts[0]}'
 
+# non_default_arguments
+#
+# Generate command line arguments that are not set to defaulkt values
+
+def non_default_arguments(args,parser,ignored=['action', 'prefix', 'suffix']):
+    for key,value in vars(args).items():
+        if key in ignored: continue    #...except for these
+        if value != parser.get_default(key):
+            yield key,value
+
 if __name__=='__main__':
     with Timer('Test') as timer, Logger(prefix='utilstest') as log:
         set_random_seed(prefix=__file__)

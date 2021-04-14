@@ -21,7 +21,7 @@ from matplotlib.pyplot import figure,plot,show,title,legend,ylabel,savefig,ylim,
 from numpy             import log10
 from os                import walk
 from os.path           import splitext, join
-from utils             import create_xkcd_colours
+from utils             import create_xkcd_colours, non_default_arguments
 
 # is_logfile
 #
@@ -71,10 +71,20 @@ def create_parameters(data):
 
 # display_parameters
 #
-# Display paramters from logfile - used in legend
+# Display parameters from logfile - used in legend
 
 def display_parameters(params):
     return ', '.join([f'{key}={value}' for key,value in params])
+
+# expand
+#
+# Used when we display command line parameters in title
+
+def expand(key,value):
+    def expand_boolean():
+        return key if isinstance(value,bool) else f'{key}={value}'
+    return f'{key}={join(",".join(str(i) for i in value))}' if isinstance(value, list) else expand_boolean()
+
 
 if __name__ == '__main__':
     parser = ArgumentParser('Analyze log files from training/testing')
@@ -116,10 +126,7 @@ if __name__ == '__main__':
                         help    = 'Plot log of errors')
 
     args          = parser.parse_args()
-
-    def scale(values):
-        return log10(values) if args.logarithmic else values
-
+    scale         = lambda values: log10(values) if args.logarithmic else values
     fig           = figure(figsize=(20,20))
     XKCD          = [colour for colour in create_xkcd_colours()][::-1]
     logfile_names = get_logfile_names(args.notall,args.logfiles,
@@ -164,7 +171,7 @@ if __name__ == '__main__':
                  label     = display_parameters(params) if not args.detail else f'{args.average}-point moving average')
 
     ylabel('Log Training Error' if args.logarithmic else 'Training Error')
-    title(f'Logs: {" ".join(logfile_names)}')
+    title('; '.join(f'{expand(key,value)}' for key,value in non_default_arguments(args,parser,ignored=[])))
     legend()
     savefig (f'{args.savefile}.png' if len(splitext(args.savefile))==0 else args.savefile)
     show()
