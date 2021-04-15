@@ -26,7 +26,7 @@ from torch.nn            import Module, Conv3d, MaxPool3d, Linear, MSELoss, Drop
 from torch.nn.functional import relu, softmax
 from torch.optim         import SGD
 from torch.utils.data    import Dataset, DataLoader
-from utils               import Logger, Timer, set_random_seed
+from utils               import Logger, Timer, set_random_seed, non_default_arguments
 
 # Allowable actions for program
 
@@ -124,15 +124,6 @@ def validate(data,path='./'):
 def test(data,path='./'):
     print ('Not implemented')
 
-# log_non_default
-#
-# Log any non-default arguments
-
-def log_non_default(args):
-    for key,value in vars(args).items():
-        if key in ['action', 'prefix', 'suffix']: continue    #...except for these
-        if value != parser.get_default(key):
-            logger.log (f'{key}, {value}')
 
 # train_epoch
 #
@@ -263,7 +254,8 @@ if __name__=='__main__':
         with Timer('training network'), Logger(prefix = args.prefix,
                                                suffix = args.suffix,
                                                logdir = args.logdir) as logger:
-            log_non_default(args)
+            for key,value in non_default_arguments(args,parser,ignored=['action', 'prefix', 'suffix']):
+                logger.log (f'{key}, {value}')
             model         = Net()
             criterion     = MSELoss()
             optimizer     = SGD(model.parameters(),
