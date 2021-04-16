@@ -17,6 +17,7 @@
 
 from argparse           import ArgumentParser
 from hpascc             import *
+from matplotlib.colors  import ListedColormap
 from matplotlib.patches import Rectangle
 from matplotlib.pyplot  import hist, show, figure, savefig, close
 from matplotlib.image   import imread
@@ -459,6 +460,8 @@ def segment(image_id     = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
             print (f'Failed to converge in {N} steps')
             break
 
+    axs[0][0].set_ylabel(f'Segmentation',
+                         rotation='horizontal', labelpad=35)
     Image.show(axis=axs[0,0])
     for l in range(len(L)):
         axs[0,0].scatter([x for x,_ in L[l]],[y for _,y in L[l]],c=XKCD[l],s=1)
@@ -469,36 +472,50 @@ def segment(image_id     = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
     k,mu,L = merge_greedy_centroids(k,L,mu)
     mask   = Mask(Image,mu)
     mask.save(join(segments,f'{image_id}.npy'))
+
     Image.show(axis=axs[0,1])
     for l in range(len(L)):
         axs[0,1].scatter([x for x,_ in L[l]],[y for _,y in L[l]],c=XKCD[l],s=1)
     axs[0,1].scatter([x for x,_ in mu],[y for _,y in mu],marker='X',c=XKCD[k+1],s=10)
     axs[0,1].set_title(f'{IMAGE_LEVEL_LABELS[BLUE]}: k={k}')
 
-    mask_image = axs[0,2].imshow(mask.Mask.transpose())
+    # Show bounding boxes
+
+    Limits     = mask.get_limits()
+
+    cmap       = ListedColormap(XKCD[:len(Limits)])
+    mask_image = axs[0,2].imshow(mask.Mask.transpose(),
+                                 interpolation = 'nearest',
+                                 origin        = 'lower',
+                                 cmap          = cmap)
     fig.colorbar(mask_image,ax=axs[0,2])
-    for i,(x0,y0,x1,y1) in enumerate(mask.get_limits()):
+    for i,(x0,y0,x1,y1) in enumerate(Limits):
         axs[0,2].add_patch(Rectangle((x0, y0), x1-x0, y1-y0,
                                      linewidth = 1,
-                                     edgecolor = XKCD[i],
+                                     edgecolor = XKCD[len(Limits) + 1 +i],
                                      facecolor = 'none'))
-
-    voronoi = Voronoi(mu)
+    axs[0,2].set_title('Masks and Bounding boxes')
     x0, x1 = axs[0,0].get_xlim()
     y0, y1 = axs[0,0].get_ylim()
     axs[0,2].set_xlim(x0, x1)
     axs[0,2].set_ylim(y0, y1)
 
+    # Show distribution of each filter compared to Nuclei channels
+    axs[1][0].set_ylabel(f'{IMAGE_LEVEL_LABELS[BLUE]}+',rotation='horizontal', labelpad=40)
     for channel,ax in zip([RED,YELLOW,GREEN],
                           [axs[1,0],axs[1,1],axs[1,2]]):
         Image.show(axis=ax,channels=[BLUE,channel])
-        ax.set_title(f'{IMAGE_LEVEL_LABELS[BLUE]}+{IMAGE_LEVEL_LABELS[channel]}')
+        ax.set_title(f'{IMAGE_LEVEL_LABELS[channel]}', y = 0.95) # Tuned to minimize overwriting
 
+    # Show distribution of protein vs each other filter
+
+    voronoi = Voronoi(mu)
+    axs[2][0].set_ylabel(f'{IMAGE_LEVEL_LABELS[GREEN]}+',rotation='horizontal', labelpad=40)
     for channel,ax in zip([RED,YELLOW,BLUE],
                           [axs[2,0],axs[2,1],axs[2,2]]):
         voronoi_plot_2d(voronoi, ax=ax, show_vertices=False, line_colors='orange')
         Image.show(axis=ax,channels=[channel,GREEN],actuals=[BLUE,RED])
-        ax.set_title(f'{IMAGE_LEVEL_LABELS[channel]}+{IMAGE_LEVEL_LABELS[GREEN]}')
+        ax.set_title(f'{IMAGE_LEVEL_LABELS[channel]}', y = 0.95) # Tuned to minimize overwriting
 
     fig.suptitle(f'{image_id}: {", ".join([Descriptions[label] for label in Training[image_id]])}')
     savefig(get_image_file_name(
@@ -572,7 +589,7 @@ if __name__=='__main__':
                         action = 'store_true',
                         help   = 'Process singletons only')
     parser.add_argument('--worklist',
-                        default = 'worklist',
+                        default = None,
                         help   = 'List of IDs to be processed')
     parser.add_argument('--segments',
                         default = './segments',
