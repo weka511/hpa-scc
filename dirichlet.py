@@ -439,18 +439,20 @@ def merge_greedy_centroids(k,L,mu,delta=1):
 #     background   Threshold for blue pixels. We consider pixels only if they exceed this value.
 #     delta        Used to assess convergence. If no centroids have shifted by more than this limit, we have converged
 
-def segment(image_id     = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
-            path         = join(environ['DATA'],'hpa-scc'),
-            image_set    = 'train512x512',
-            figs         = '.',
-            Descriptions = [],
-            Training     = [],
-            Lambda       = 8000,
-            background   = 0,
-            delta        = 64,
-            XKCD         = [],
-            N            = 100,
-            segments     = '.'):
+def segment(image_id             = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
+            path                 = join(environ['DATA'],'hpa-scc'),
+            image_set            = 'train512x512',
+            figs                 = '.',
+            Descriptions         = [],
+            Training             = [],
+            Lambda               = 8000,
+            background           = 0,
+            delta                = 64,
+            XKCD                 = [],
+            N                    = 100,
+            segments             = '.',
+            min_size_for_cluster = 0,
+            merge_greedy         = False):
     fig                = figure(figsize=(27,18))
     axs                = fig.subplots(nrows = 3, ncols = 3)
     Image = Image4(image_id  = image_id,
@@ -475,8 +477,10 @@ def segment(image_id     = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
     axs[0,0].scatter([x for x,_ in mu],[y for _,y in mu],marker='X',c=XKCD[k+1],s=10)
     axs[0,0].set_title(f'Lambda={Lambda}, k={k}, iteration={seq}')
 
-    k,mu,L = remove_isolated_centroids(L,mu)
-    k,mu,L = merge_greedy_centroids(k,L,mu)
+    if min_size_for_cluster>0:
+        k,mu,L = remove_isolated_centroids(L,mu)
+    if merge_greedy:
+        k,mu,L = merge_greedy_centroids(k,L,mu)
     mask   = Mask(Image,mu)
     mask.save(join(segments,f'{image_id}.npy'))
 
@@ -602,6 +606,12 @@ if __name__=='__main__':
     parser.add_argument('--segments',
                         default = './segments',
                         help    = 'Identifies where to store cell masks')
+    parser.add_argument('--min_size_for_cluster',
+                        default = 5,
+                        type    = int)
+    parser.add_argument('--merge_greedy',
+                        default = False,
+                        action  = 'store_true')
     args = parser.parse_args()
 
     with Timer(),Logger('dirichlet') as logger:
@@ -615,18 +625,20 @@ if __name__=='__main__':
             for image_id in read_worklist(args.worklist):
                 fig = None
                 try:
-                    fig,seq = segment(image_id     = image_id,
-                                      path         = args.path,
-                                      image_set    = args.image_set,
-                                      figs         = args.figs,
-                                      Descriptions = Descriptions,
-                                      Training     = Training,
-                                      background   = args.background,
-                                      XKCD         = XKCD,
-                                      N            = args.N,
-                                      delta        = args.delta,
-                                      Lambda       = args.Lambda,
-                                      segments     = args.segments)
+                    fig,seq = segment(image_id             = image_id,
+                                      path                 = args.path,
+                                      image_set            = args.image_set,
+                                      figs                 = args.figs,
+                                      Descriptions         = Descriptions,
+                                      Training             = Training,
+                                      background           = args.background,
+                                      XKCD                 = XKCD,
+                                      N                    = args.N,
+                                      delta                = args.delta,
+                                      Lambda               = args.Lambda,
+                                      segments             = args.segments,
+                                      min_size_for_cluster = args.min_size_for_cluster,
+                                      merge_greedy         = args.merge_greedy)
                     print (f'Segmented {image_id},{seq}')
                     logger.log(f'{image_id},{seq}')
                 except KeyboardInterrupt:
