@@ -28,6 +28,8 @@ from re                 import split
 from scipy.spatial      import Voronoi, voronoi_plot_2d
 from sys                import float_info, exc_info, exit
 from utils              import Logger, Timer, create_xkcd_colours
+from warnings           import filterwarnings
+
 
 
 # Image4
@@ -206,6 +208,7 @@ def get_dist_sq(pt0,pt1):
     x1,y1 = pt1
     return (x1-x0)**2 + (y1-y0)**2
 
+
 # get_centroid
 #
 # Determine centroids of a list of points
@@ -229,7 +232,7 @@ def get_centroid(Points):
 #     delta        Used to assess convergence. If no centroids have shifted by more than this limit, we have converged
 
 def DPmeans(Image,
-            Lambda     = 8000,
+            Lambda     = 4000,
             background = 0,
             delta      = 64):
 
@@ -273,10 +276,14 @@ def DPmeans(Image,
                 if Zs[i] != c:
                     Zs[i] = c
 
-        L   =  [extract_one_cluster(c) for c in range(k)]
-        mu0 = mu[:]
-        mu  = [get_centroid(Xs) for Xs in L]
-        yield has_converged(mu,mu0),k,L,mu,Xs,Zs
+        L  =  [extract_one_cluster(c) for c in range(k)]
+
+        L1  = [c for c in L if len(c)>0]   # Eliminate empty clusters, e.g. 0a7e47d2-bbb2-11e8-b2ba-ac1f6b6435d0
+        k   = len(L1)
+
+        mu0 = mu[:]                        # Need copy to determine whether centroids have moved
+        mu  = [get_centroid(Xs) for Xs in L1]
+        yield has_converged(mu,mu0),k,L1,mu,Xs,Zs
 
 # generate_neighbours
 #
@@ -530,6 +537,7 @@ def segment(image_id     = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
 
 
 if __name__=='__main__':
+    filterwarnings('error', "Mean of empty slice.")
     parser = ArgumentParser('Cluster HPA data using Dirichlet Process Means')
     parser.add_argument('--path',
                         default = join(environ['DATA'],'hpa-scc'),
@@ -570,7 +578,7 @@ if __name__=='__main__':
                         help    = 'Used to seed random number generator')
     parser.add_argument('--Lambda',
                         type    = float,
-                        default = 8000, # Tested with  0a7e47d2-bbb2-11e8-b2ba-ac1f6b6435d0. Cannot reduce much below 8000
+                        default = 4000, # Tested with  0a7e47d2-bbb2-11e8-b2ba-ac1f6b6435d0
                         help    = 'Penalty to discourage creating new clusters')
     parser.add_argument('--background',
                         type    = float,
