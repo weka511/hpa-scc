@@ -95,24 +95,29 @@ class Image4(object):
     #      channels      Channels to be displayed
     #      axis          Identifies where plot is to be displayed
     #      actuals       Controls colours used for display, e.g. map nucleus to BLUE, some other channel to RED
+    #
+    #  Returns:
+    #      The image that was shown
 
     def show(self,
             channels = [BLUE],
             axis     = None,
             actuals  = None):
+        shown = None
         if actuals==None:
-            axis.imshow(self.get(channels),
-                    extent = [0,self.nx-1,0,self.ny-1],
-                    origin = 'lower')
+            shown = axis.imshow(self.get(channels),
+                                extent = [0,self.nx-1,0,self.ny-1],
+                                origin = 'lower')
         else:
             Image = zeros((self.nx,self.ny,NRGB))
             for a,b in zip(channels,actuals):
                 Image[:,:,b] = self.Image[:,:,a]
-            axis.imshow(Image,
-                    extent = [0,self.nx-1,0,self.ny-1],
-                    origin = 'lower')
+            shown = axis.imshow(Image,
+                                extent = [0,self.nx-1,0,self.ny-1],
+                                origin = 'lower')
         axis.set_xlim(0,self.nx-1)
         axis.set_ylim(0,self.ny-1)
+        return shown
 
 # Mask
 #
@@ -341,16 +346,21 @@ def DPmeans(Image,
 #     y         y coordinate of point
 #     delta     Used to generate neighbours from cartesian product delta x delta
 
-def generate_neighbours(x,y,delta=[-1,0,1]):
-    for dx in delta:
-        for dy in delta:
-            if dx==0 and dy==0: continue  # Don't visit the original point
-            yield x + dx, y + dy
+# def generate_neighbours(x,y,delta=[-1,0,1]):
+    # for dx in delta:
+        # for dy in delta:
+            # if dx==0 and dy==0: continue  # Don't visit the original point
+            # yield x + dx, y + dy
 
 
 # remove_isolated_centroids
 #
 # Remove centroids that have fewer than a specified number of points
+#
+# Parameters:
+#     L
+#     mu
+#     cutoff
 
 def remove_isolated_centroids(L,mu,cutoff = 20):
     mu = [m for m,cluster in zip(mu,L) if len(cluster) > cutoff]
@@ -374,10 +384,18 @@ def get_image_file_name(image_id,
     return join(figs,f'{sep.join([str(label) for label in labels])}{sep}{image_id}.png')
 
 # merge_greedy_centroids
+#
+# Used to merge centroids that appear to have divided on cluster between them
+#
+# Parameters:
+#     k
+#     L
+#     mu
+#     delta
 
 def merge_greedy_centroids(k,L,mu,delta=1):
     # binary_search
-
+    #
     # Find the nearest match to a specified value within a sorted list
     #
     # Parameters:
@@ -421,7 +439,7 @@ def merge_greedy_centroids(k,L,mu,delta=1):
     #
     # Create lists of elements to be merged or skipped
     # Each pair of elements (a,b) has the property a>b
-    # All data will go into clutser b, so a will need to
+    # All data will go into cluster b, so a will need to
     # be skipped
 
     def create_merges(merge_pairs):
@@ -441,7 +459,7 @@ def merge_greedy_centroids(k,L,mu,delta=1):
 
     # can_merge
     #
-    # Determines whether to cluster can be merged
+    # Determines whether two clusters can be merged
 
     def can_merge(i,j):
         mu_i  = mu[i]
@@ -524,12 +542,20 @@ def segment(image_id             = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
             print (f'Failed to converge in {N} steps')
             break
 
+    # Head up plot with image_id and labels
+
+    fig.suptitle(f'{image_id}: {", ".join([Descriptions[label] for label in Training[image_id]])}')
+
     axs[0][0].set_ylabel(f'Segmentation',
-                         rotation='horizontal', labelpad=35)
-    Image.show(axis=axs[0,0])
+                         rotation = 'horizontal',
+                         labelpad = 35)
+    raw_image = Image.show(axis=axs[0,0])
     for l in range(len(L)):
         axs[0,0].scatter([x for x,_ in L[l]],[y for _,y in L[l]],c=XKCD[l],s=1)
-    axs[0,0].scatter([x for x,_ in mu],[y for _,y in mu],marker='X',c=XKCD[k+1],s=10)
+    axs[0,0].scatter([x for x,_ in mu],[y for _,y in mu],
+                     marker = 'x',
+                     c      = XKCD[k+1],
+                     s      = 10)
     axs[0,0].set_title(f'Lambda={Lambda}, k={k}, iteration={seq}')
 
     if min_size_for_cluster>0:
@@ -542,7 +568,10 @@ def segment(image_id             = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
     Image.show(axis=axs[0,1])
     for l in range(len(L)):
         axs[0,1].scatter([x for x,_ in L[l]],[y for _,y in L[l]],c=XKCD[l],s=1)
-    axs[0,1].scatter([x for x,_ in mu],[y for _,y in mu],marker='X',c=XKCD[k+1],s=10)
+    axs[0,1].scatter([x for x,_ in mu],[y for _,y in mu],
+                     marker = 'x',
+                     c      = XKCD[k+1],
+                     s      = 10)
     axs[0,1].set_title(f'{IMAGE_LEVEL_LABELS[BLUE]}: k={k}')
 
     # Show bounding boxes
@@ -576,14 +605,22 @@ def segment(image_id             = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
     # Show distribution of protein vs each other filter
 
     voronoi = Voronoi(mu)
-    axs[2][0].set_ylabel(f'{IMAGE_LEVEL_LABELS[GREEN]}+',rotation='horizontal', labelpad=40)
+    axs[2][0].set_ylabel(f'{IMAGE_LEVEL_LABELS[GREEN]}+',
+                         rotation = 'horizontal',
+                         labelpad = 40)
     for channel,ax in zip([RED,YELLOW,BLUE],
                           [axs[2,0],axs[2,1],axs[2,2]]):
-        voronoi_plot_2d(voronoi, ax=ax, show_vertices=False, line_colors='orange')
-        Image.show(axis=ax,channels=[channel,GREEN],actuals=[BLUE,RED])
-        ax.set_title(f'{IMAGE_LEVEL_LABELS[channel]}', y = 0.95) # Tuned to minimize overwriting
+        voronoi_plot_2d(voronoi,
+                        ax            = ax,
+                        show_vertices = False,
+                        show_points   = False,
+                        line_colors   = 'orange')
+        Image.show(axis     = ax,
+                   channels = [channel,GREEN],
+                   actuals  = [BLUE,RED])
+        ax.set_title(f'{IMAGE_LEVEL_LABELS[channel]}', y = 0.95) # Tuned to minimize overwriting of text
 
-    fig.suptitle(f'{image_id}: {", ".join([Descriptions[label] for label in Training[image_id]])}')
+
     savefig(get_image_file_name(
                 image_id,
                 figs   = figs,
@@ -664,7 +701,7 @@ if __name__=='__main__':
     parser.add_argument('--min_size_for_cluster',
                         default = 5,
                         type    = int)
-    parser.add_argument('--merge_greedy',
+    parser.add_argument('--merge',
                         default = False,
                         action  = 'store_true')
     args = parser.parse_args()
@@ -673,7 +710,7 @@ if __name__=='__main__':
         XKCD         = [colour for colour in create_xkcd_colours()][::-1]
         Descriptions = read_descriptions('descriptions.csv')
         Training     = restrict(read_training_expectations(path=args.path),
-                                labels   = args.labels,
+                                Labels   = args.labels,
                                 multiple = args.multiple or args.image_id!=None)
 
         if args.worklist != None:
@@ -693,7 +730,7 @@ if __name__=='__main__':
                                       Lambda               = args.Lambda,
                                       segments             = args.segments,
                                       min_size_for_cluster = args.min_size_for_cluster,
-                                      merge_greedy         = args.merge_greedy)
+                                      merge_greedy         = args.merge)
                     print (f'Segmented {image_id},{seq}')
                     logger.log(f'{image_id},{seq}')
                 except KeyboardInterrupt:
@@ -704,18 +741,20 @@ if __name__=='__main__':
                     if not args.show and fig!=None:
                         close(fig)
         else:
-            _,seq = segment(image_id     = args.image_id,
-                            path         = args.path,
-                            image_set    = args.image_set,
-                            figs         = args.figs,
-                            Descriptions = Descriptions,
-                            Training     = Training,
-                            background   = args.background,
-                            XKCD         = XKCD,
-                            N            = args.N,
-                            delta        = args.delta,
-                            Lambda       = args.Lambda,
-                            segments     = args.segments)
+            _,seq = segment(image_id             = args.image_id,
+                            path                 = args.path,
+                            image_set            = args.image_set,
+                            figs                 = args.figs,
+                            Descriptions         = Descriptions,
+                            Training             = Training,
+                            background           = args.background,
+                            XKCD                 = XKCD,
+                            N                    = args.N,
+                            delta                = args.delta,
+                            Lambda               = args.Lambda,
+                            segments             = args.segments,
+                            min_size_for_cluster = args.min_size_for_cluster,
+                            merge_greedy         = args.merge)
             print (f'Segmented {args.image_id},{seq}')
             logger.log(f'{args.image_id},{seq}')
 
