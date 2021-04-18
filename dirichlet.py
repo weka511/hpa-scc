@@ -24,10 +24,11 @@ from matplotlib.image   import imread
 from numpy              import zeros, mean, std, argmin, save, load
 from os                 import environ
 from os.path            import exists,join
+from random             import shuffle
 from re                 import split
 from scipy.spatial      import Voronoi, voronoi_plot_2d
 from sys                import float_info, exc_info, exit
-from utils              import Logger, Timer, create_xkcd_colours
+from utils              import Logger, Timer, create_xkcd_colours, set_random_seed
 from warnings           import filterwarnings
 
 
@@ -282,15 +283,18 @@ def get_centroid(Points):
 #     Lambda       Penalty to discourage creating new clusters
 #     background   Threshold for blue pixels. We consider pixels only if they exceed this value.
 #     delta        Used to assess convergence. If no centroids have shifted by more than this limit, we have converged
+#     randomize    Randomize order of observations prior to clustering
 
 def DPmeans(Image,
             Lambda     = 4000,
             background = 0,
-            delta      = 64):
+            delta      = 64,
+            randomize  = False):
 
     # extract_one_cluster
     #
     # Extract observations that should be assigned to specified cluster index
+
     def extract_one_cluster(index):
         return [Xs[i] for i in range(n) if Zs[i]==index]
 
@@ -315,6 +319,8 @@ def DPmeans(Image,
     k     = 1                    # Initially all points are in just one cluster
     mu    = [get_centroid(Xs)]   # So there is only one centroid
     Zs    = [0] * n              # Hidden variables - initially all points are in just one cluster
+    if randomize:
+        shuffle(Xs)
 
     while True:
         for i in range(n):
@@ -336,21 +342,6 @@ def DPmeans(Image,
         mu0 = mu[:]                        # Need copy to determine whether centroids have moved
         mu  = [get_centroid(Xs) for Xs in L1]
         yield has_converged(mu,mu0),k,L1,mu,Xs,Zs
-
-# generate_neighbours
-#
-# Used to iterate through 8 neighbours of a point
-#
-# Parameters:
-#     x         x coordinate of point
-#     y         y coordinate of point
-#     delta     Used to generate neighbours from cartesian product delta x delta
-
-# def generate_neighbours(x,y,delta=[-1,0,1]):
-    # for dx in delta:
-        # for dy in delta:
-            # if dx==0 and dy==0: continue  # Don't visit the original point
-            # yield x + dx, y + dy
 
 
 # remove_isolated_centroids
@@ -511,6 +502,7 @@ def merge_greedy_centroids(k,L,mu,delta=1):
 #     Lambda       Penalty to discourage creating new clusters
 #     background   Threshold for blue pixels. We consider pixels only if they exceed this value.
 #     delta        Used to assess convergence. If no centroids have shifted by more than this limit, we have converged
+#     randomize    Randomize order of observations prior to clustering
 
 def segment(image_id             = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
             path                 = join(environ['DATA'],'hpa-scc'),
@@ -525,7 +517,8 @@ def segment(image_id             = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
             N                    = 100,
             segments             = '.',
             min_size_for_cluster = 0,
-            merge_greedy         = False):
+            merge_greedy         = False,
+            randomize            = False):
     fig                = figure(figsize=(27,18))
     axs                = fig.subplots(nrows = 3, ncols = 3)
     Image = Image4(image_id  = image_id,
@@ -535,7 +528,8 @@ def segment(image_id             = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
     for seq,(converged,k,L,mu,Xs,Zs) in enumerate(DPmeans(Image.get()[:,:,BLUE],
                                                           Lambda     = Lambda,
                                                           background = background,
-                                                          delta      = delta)):
+                                                          delta      = delta,
+                                                          randomize  = randomize)):
         if converged: break
 
         if seq>N:
@@ -700,11 +694,19 @@ if __name__=='__main__':
                         help    = 'Identifies where to store cell masks')
     parser.add_argument('--min_size_for_cluster',
                         default = 5,
-                        type    = int)
+                        type    = int,
+                        help    = 'Used to delete clusters that are too small')
     parser.add_argument('--merge',
                         default = False,
-                        action  = 'store_true')
+                        action  = 'store_true',
+                        help    = 'Merge clusters if they appear to have been split')
+    parser.add_argument('--randomize',
+                        default = False,
+                        action  = 'store_true',
+                        help    = 'Randomize observations prior to clustering')
     args = parser.parse_args()
+    if args.randomize:
+        set_random_seed(specified_seed=args.seed)
 
     with Timer(),Logger('dirichlet') as logger:
         XKCD         = [colour for colour in create_xkcd_colours()][::-1]
@@ -730,7 +732,8 @@ if __name__=='__main__':
                                       Lambda               = args.Lambda,
                                       segments             = args.segments,
                                       min_size_for_cluster = args.min_size_for_cluster,
-                                      merge_greedy         = args.merge)
+                                      merge_greedy         = args.merge,
+                                      randomize            = args.randomize)
                     print (f'Segmented {image_id},{seq}')
                     logger.log(f'{image_id},{seq}')
                 except KeyboardInterrupt:
@@ -754,7 +757,9 @@ if __name__=='__main__':
                             Lambda               = args.Lambda,
                             segments             = args.segments,
                             min_size_for_cluster = args.min_size_for_cluster,
-                            merge_greedy         = args.merge)
+                            merge_greedy         = args.merge,
+                            randomize            = args.randomize)
+
             print (f'Segmented {args.image_id},{seq}')
             logger.log(f'{args.image_id},{seq}')
 
