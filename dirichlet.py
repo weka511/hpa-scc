@@ -67,40 +67,50 @@ class Image4(object):
                 Image[:,:,channel] +=  self.Image [:,:,channel]
         return Image
 
+    # get_segment
+    #
+    # Factory method, currrent used only by spikes, to prepare data for display
+
     def get_segment(self,
                     channels = [BLUE],
                     Mask     = [],
                     selector = None):
-        Image = zeros((self.nx,self.ny,NRGB))
+        Product = zeros((self.nx,self.ny,NRGB))
         for i in range(self.nx):
             for j in range(self.ny):
                 if Mask[i,j]==selector:
                     for channel in channels:
                         if channel==YELLOW:
-                            Image[i,j,RED]    =  self.Image [i,j,channel]
-                            Image[i,j,GREEN]  =  self.Image [i,j,channel]
+                            Product[i,j,RED]     =  self.Image [i,j,channel]
+                            Product[i,j,GREEN]   =  self.Image [i,j,channel]
                         else:
-                            Image[i,j,channel] =  self.Image [i,j,channel]
-        return Image
+                            Product[i,j,channel] =  self.Image [i,j,channel]
+        return Product
 
-    # Display selected channels
+    # show
+    #
+    #  Display selected channels
+    #
+    #  Parameters:
+    #      channels      Channels to be displayed
+    #      axis          Identifies where plot is to be displayed
+    #      actuals       Controls colours used for display, e.g. map nucleus to BLUE, some other channel to RED
 
     def show(self,
             channels = [BLUE],
             axis     = None,
-            origin   = 'lower',
             actuals  = None):
         if actuals==None:
             axis.imshow(self.get(channels),
                     extent = [0,self.nx-1,0,self.ny-1],
-                    origin = origin)
+                    origin = 'lower')
         else:
             Image = zeros((self.nx,self.ny,NRGB))
             for a,b in zip(channels,actuals):
                 Image[:,:,b] = self.Image[:,:,a]
             axis.imshow(Image,
                     extent = [0,self.nx-1,0,self.ny-1],
-                    origin = origin)
+                    origin = 'lower')
         axis.set_xlim(0,self.nx-1)
         axis.set_ylim(0,self.ny-1)
 
@@ -109,15 +119,22 @@ class Image4(object):
 # This class represents a segmentation mask
 
 class Mask:
+    # Load
+    #
+    # A factory method for [re]creating a Mask that has been saved previously
+    #
+    # Parameters:
+    #     file_name    File where mask has been stored
+
     @classmethod
     def Load(cls,file_name):
-        mask            = Mask()
-        mask.Mask       = load(file_name)
-        mask.nx,mask.ny = mask.Mask.shape
-        return mask
+        Product            = Mask()
+        Product.Mask       = load(file_name)
+        Product.nx,Product.ny = Product.Mask.shape
+        return Product
 
     def __init__(self,Image=None,Centroids=[]):
-        if Image is None: return
+        if Image is None: return            # Used by Mask.Load() to create empty Mask
         self.nx    = Image.nx
         self.ny    = Image.ny
         if len(Centroids)==0:
@@ -139,45 +156,56 @@ class Mask:
 
     # get_limits
     #
-    # Find bounding boxes for all segments
+    # Factory method to find bounding boxes for all segments
+    #
+    # Returns:
+    #       List of limits for bounding boxes [(xmin0,ymin0,xmax0,ymax0),(xmin1,ymin1,xmax1,ymax1),...]
 
     def get_limits(self):
-        Limits = [] #[(xmin,ymin,xmax,ymax)]
+        Product = []
         for i in range(self.nx):
             for j in range(self.ny):
                 k = int(self.Mask[i,j])
-                while k>len(Limits):
-                    Limits.append((self.nx,self.ny,-1,-1))
-                xmin,ymin,xmax,ymax = Limits[k-1]
-                changed = False
-                if i<xmin:
+                while k>len(Product):
+                    Product.append((self.nx,self.ny,-1,-1))
+                xmin,ymin,xmax,ymax = Product[k-1]
+                changed             = False
+
+                # Establish whether (i,j) is outside current limits for box 'k'
+                if i < xmin:
                     xmin    = i
                     changed = True
-                if j<ymin:
+                if j < ymin:
                     ymin    = j
                     changed = True
-                if xmax<i:
+                if xmax < i:
                     xmax    = i
                     changed = True
-                if ymax<j:
+                if ymax < j:
                     ymax    = j
                     changed = True
+
                 if changed:
-                    Limits[k-1] = (xmin,ymin,xmax,ymax)
-        return Limits
+                    Product[k-1] = (xmin,ymin,xmax,ymax)
+        return Product
 
     #  apply
     #
-    # Mask ouy all bit in image, except for selected segment
+    # Mask out all bits in image, except for selected segment
+    #
+    # Parameters:
+    #     k         Number of segment, 1 based
+    #     Limits    Defines bounding box (limits search: saves time, but does not affect result).
+    #     Greys     Image to be masked - one colour only (greyscale)
 
-    def apply(self,segment,Limits,Greys):
+    def apply(self,k,Limits,Greys):
         i0,j0,i1,j1 = Limits
-        Masked      = zeros((i1-i0,j1-j0))
+        Product      = zeros((i1-i0,j1-j0))
         for i in range(i0,i1):
             for j in range(j0,j1):
-                if self.Mask[i,j]==segment+1:
-                    Masked[i-i0,j-j0] = Greys[i,j]
-        return Masked
+                if self.Mask[i,j] == k:
+                    Product[i-i0,j-j0] = Greys[i,j]
+        return Product
 
     # save
     #
@@ -186,15 +214,28 @@ class Mask:
     def save(self,file_name):
         save(file_name,self.Mask)
 
-
-
 # restrict
 #
 # Used to restrict training data to specified labels
+#
+# Parameters:
+#     Training   List of immage_ids for data
+#     Labels     We want to restrict to image_ids that match these labels
+#     multiple   Determines whether image_ids with multiple labels are to be in included (subject to at least one matching)
 
-def restrict(Training,labels,multiple=False):
+def restrict(Training,Labels,multiple=False):
+    # should_include
+    #
+    # Verify that image_label matches allowed list
+    #
+    # Parameters:
+    #     image_labels  List of labels for one image
+    #
+    # Returns: True iff 1. image_label is in our list Labels, AND
+    #                   2. EITHER image has only one label OR multiple labels are allwed
+
     def should_include(image_labels):
-        return (len(set(image_labels)& set(labels))>0) and (multiple or len(image_labels)==1)
+        return (len(set(image_labels)& set(Labels))>0) and (multiple or len(image_labels)==1)
     return {image_id: image_labels for image_id,image_labels in Training.items() if should_include(image_labels)}
 
 
@@ -202,7 +243,10 @@ def restrict(Training,labels,multiple=False):
 # get_dist_sq
 #
 # Compute squared Euclidean distance between two points
-
+#
+# Parameters:
+#     pt0
+#     pt1
 def get_dist_sq(pt0,pt1):
     x0,y0 = pt0
     x1,y1 = pt1
@@ -212,6 +256,9 @@ def get_dist_sq(pt0,pt1):
 # get_centroid
 #
 # Determine centroids of a list of points
+#
+# Parameters:
+#     Points
 
 def get_centroid(Points):
     return (mean([x for x,_ in Points]),
@@ -219,7 +266,7 @@ def get_centroid(Points):
 
 # DPmeans
 #
-# Find clusters using Dirichlet process means
+# A generator to find clusters using Dirichlet process means
 #
 # Revisiting k-means: New Algorithms via Bayesian Nonparametrics
 # Brian Kulis  and Michael I. Jordan
@@ -311,6 +358,14 @@ def remove_isolated_centroids(L,mu,cutoff = 20):
     return len(L),mu,L
 
 # get_image_file_name
+#
+# Construct actual file name for saving images
+#
+# Parameters:
+#     image_id   Identifies image
+#     figs       Path name for saved images
+#     labels     Prepend labels to image)id when we save
+#     sep        Separator character for multiple labals
 
 def get_image_file_name(image_id,
                         figs   = '.',
@@ -407,7 +462,7 @@ def merge_greedy_centroids(k,L,mu,delta=1):
     if len(merges)==0:
         return len(L),mu,L
     else:
-        L1 = []
+        L1  = []
         mu1 = []
         for i in range(len(L)):
             if i in skips: continue

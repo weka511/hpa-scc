@@ -132,7 +132,7 @@ def create_image_target(Data,
             stats.record_rectangle(i1-i0,j1-j0)
             for transform in Transformations:
                 for column in range(len(Greys)):
-                    Masked                   = mask.apply(k,Limits[k],Greys[column])
+                    Masked                   = mask.apply(k+1,Limits[k],Greys[column])
                     c_in                     = 0.5*array(Masked.shape)
                     c_out                    = array((mx/2,mx/2))
                     offset                   = c_in - c_out.dot(transform)
