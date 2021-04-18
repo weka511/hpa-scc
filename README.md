@@ -14,9 +14,7 @@
 |logs.py|Analyze log files from training/testing|
 |Notes.tex|Assorted notes|
 |rgb.txt|List of xkcd colours|
-|select_images.py|Prepare worklist for pipeline|
 |slice.py|Slice and downsample dataset|
 |train.py|Build and train neural network using sliced data|
 |utils.py|Utility classes: Timer and Log|
-
-
+|worklist.py|Prepare worklist for pipeline|
