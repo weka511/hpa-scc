@@ -18,7 +18,7 @@
 #  Slice and segment dataset
 
 from argparse          import ArgumentParser
-from dirichlet         import Image4, Mask
+from dirichlet         import Image4, SegmentationMask
 from hpascc            import *
 from math              import ceil
 from matplotlib.image  import imread
@@ -120,7 +120,7 @@ def create_image_target(Data,
     index   = 0
 
     for image_id in Batch:
-        mask           = Mask.Load(join(args.segments, f'{image_id}.npy'))
+        mask           = SegmentationMask.Load(join(args.segments, f'{image_id}.npy'))
         Limits         = mask.get_limits()
         GreysRaw       = [imread(join(path, image_set, f'{image_id}_{COLOUR_NAMES[colour]}.png')) for colour in [BLUE,RED,YELLOW,GREEN]]
         Greys          = [Image/amax(Image) for Image in GreysRaw]
@@ -210,7 +210,7 @@ if __name__=='__main__':
 
         for image_id in read_worklist(args.worklist):
 
-            mask   = Mask.Load(join(args.segments,f'{image_id}.npy'))
+            mask   = SegmentationMask.Load(join(args.segments,f'{image_id}.npy'))
             Limits = mask.get_limits()
             print (image_id,len(Limits))
             if total_segments+len(Limits)*args.M > args.N:

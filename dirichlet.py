@@ -58,6 +58,7 @@ class Image4(object):
     # Get a regular 3 colour image from selected channels,
     # which includes merging YELLOW into RED and GREEN using weights from
     # https://www.kaggle.com/c/hpa-single-cell-image-classification/discussion/214863
+
     def get(self,channels=[BLUE]):
         Image = zeros((self.nx,self.ny,NRGB))
         for channel in channels:
@@ -97,34 +98,33 @@ class Image4(object):
     #      axis          Identifies where plot is to be displayed
     #      actuals       Controls colours used for display, e.g. map nucleus to BLUE, some other channel to RED
     #
-    #  Returns:
-    #      The image that was shown
 
     def show(self,
             channels = [BLUE],
             axis     = None,
             actuals  = None):
-        shown = None
+
         if actuals==None:
-            shown = axis.imshow(self.get(channels),
-                                extent = [0,self.nx-1,0,self.ny-1],
-                                origin = 'lower')
+            axis.imshow(self.get(channels),
+                        extent = [0,self.nx-1,0,self.ny-1],
+                        origin = 'lower')
         else:
             Image = zeros((self.nx,self.ny,NRGB))
             for a,b in zip(channels,actuals):
                 Image[:,:,b] = self.Image[:,:,a]
-            shown = axis.imshow(Image,
-                                extent = [0,self.nx-1,0,self.ny-1],
-                                origin = 'lower')
+            axis.imshow(Image,
+                        extent = [0,self.nx-1,0,self.ny-1],
+                        origin = 'lower')
         axis.set_xlim(0,self.nx-1)
         axis.set_ylim(0,self.ny-1)
-        return shown
 
-# Mask
+
+# SegmentationMask
 #
 # This class represents a segmentation mask
 
-class Mask:
+class SegmentationMask:
+
     # Load
     #
     # A factory method for [re]creating a Mask that has been saved previously
@@ -134,8 +134,8 @@ class Mask:
 
     @classmethod
     def Load(cls,file_name):
-        Product            = Mask()
-        Product.Mask       = load(file_name)
+        Product               = SegmentationMask()
+        Product.Mask          = load(file_name)
         Product.nx,Product.ny = Product.Mask.shape
         return Product
 
@@ -143,19 +143,29 @@ class Mask:
         if Image is None: return            # Used by Mask.Load() to create empty Mask
         self.nx    = Image.nx
         self.ny    = Image.ny
-        if len(Centroids)==0:
-            return
-        self.Mask  = zeros((Image.ny,Image.ny))
+        if len(Centroids)>0:
+            self.Mask  = self.create_bit_mask(Image,Centroids)
+
+    # create_bit_mask
+    #
+    # Create a mask that has the same size as image, and initialize each
+    # point with the index (1-based) of the nearest centroid
+
+    def create_bit_mask(self,Image,Centroids):
+        Product = zeros((Image.ny,Image.ny))
         for i in range(Image.nx):
             for j in range(Image.ny):
-                self.Mask[i,j]    = None
                 max_distance = float_info.max
                 for k in range(1,1+len(Centroids)):
-                    i0,j0 = Centroids[k-1]
-                    distance = (i-i0)*(i-i0) + (j-j0)*(j-j0)
+                    distance = get_dist_sq((i,j),Centroids[k-1])
                     if distance<max_distance:
-                        self.Mask[i,j]    = k
+                        Product[i,j] = k
                         max_distance = distance
+        return Product
+
+    # __getitem__
+    #
+    # Index segmentation mask by position within image
 
     def __getitem__(self,idx):
         return self.Mask[idx]
@@ -251,8 +261,9 @@ def restrict(Training,Labels,multiple=False):
 # Compute squared Euclidean distance between two points
 #
 # Parameters:
-#     pt0
-#     pt1
+#     pt0    One point
+#     pt1    T'other point
+
 def get_dist_sq(pt0,pt1):
     x0,y0 = pt0
     x1,y1 = pt1
@@ -556,7 +567,7 @@ def segment(image_id             = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
         k,mu,L = remove_isolated_centroids(L,mu)
     if merge_greedy:
         k,mu,L = merge_greedy_centroids(k,L,mu)
-    mask   = Mask(Image,mu)
+    mask   = SegmentationMask(Image,mu)
     mask.save(join(segments,f'{image_id}.npy'))
 
     Image.show(axis=axs[0,1])
