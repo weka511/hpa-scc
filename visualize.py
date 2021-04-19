@@ -27,10 +27,6 @@ from os.path           import join
 from random            import sample, seed
 from sys               import exit
 
-
-
-
-
 # visualize
 #
 # Display images for one slide.

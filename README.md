@@ -17,4 +17,5 @@
 |slice.py|Slice and downsample dataset|
 |train.py|Build and train neural network using sliced data|
 |utils.py|Utility classes: Timer and Log|
+|visualize.py|Visualize image files|
 |worklist.py|Prepare worklist for pipeline|
