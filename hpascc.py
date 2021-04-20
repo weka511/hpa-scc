@@ -15,7 +15,6 @@
 #
 #  To contact me, Simon Crase, email simon@greenweaves.nz
 
-from argparse import ArgumentParser
 from csv      import reader
 from os       import environ
 from os.path  import join
@@ -67,12 +66,12 @@ def read_descriptions(file_name='descriptions.csv'):
 def read_training_expectations(path=join(environ['DATA'],'hpa-scc'),file_name='train.csv'):
     with open(join(path,file_name)) as train:
         rows = reader(train)
-        next(rows)
+        next(rows)              # skip header row
         return {row[0] : list(set([int(label) for label in row[1].split('|')])) for row in rows}
 
 # read_worklist
 #
-# Read list of imagids that are to be processed
+# Generate list of image_ids that are to be processed
 #
 # Parameters:
 #     worklist_name  Base name of file containing imageids
