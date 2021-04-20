@@ -497,7 +497,20 @@ def merge_greedy_centroids(k,L,mu,delta=1):
                 mu1.append(mu[i])
         return len(L1),mu1,L1
 
-
+def show_clusters_and_centroids(Image,
+                                L       = [],
+                                mu      = [],
+                                axis    = None,
+                                colours = [],
+                                title   = ''):
+    Image.show(axis=axis)
+    for l in range(len(L)):
+        axis.scatter([x for x,_ in L[l]],[y for _,y in L[l]],c=colours[l],s=1)
+    axis.scatter([x for x,_ in mu],[y for _,y in mu],
+                     marker = 'x',
+                     c      = colours[len(L)+1],
+                     s      = 10)
+    axis.set_title(title)
 
 
 # segment
@@ -529,9 +542,9 @@ def segment(image_id             = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
             segments             = '.',
             min_size_for_cluster = 0,
             merge_greedy         = False,
-            randomize            = False):
-    fig                = figure(figsize=(27,18))
-    axs                = fig.subplots(nrows = 3, ncols = 3)
+            randomize            = False,
+            details              = False):
+
     Image = Image4(image_id  = image_id,
                    path      = path,
                    image_set = image_set)
@@ -547,37 +560,54 @@ def segment(image_id             = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
             print (f'Failed to converge in {N} steps')
             break
 
+
+    k1,mu1,L1 = remove_isolated_centroids(L,mu) if min_size_for_cluster>0 else (k,mu,L)
+    k2,mu2,L2 = merge_greedy_centroids(k1,L1,mu1) if merge_greedy else (k1,L1,mu1)
+    mask      = SegmentationMask(Image,mu)
+    mask.save(join(segments,f'{image_id}.npy'))
+
+    if details:
+        fig = figure(figsize=(27,18))
+        axs = fig.subplots(nrows = 1, ncols = 2)
+
+        show_clusters_and_centroids(Image,
+                                    L       = L,
+                                    mu      = mu,
+                                    axis    = axs[0],
+                                    colours = [colour for colour in create_xkcd_colours(filter = lambda R,G,B:R<192 and max(R,G,B)>32)][::-1],
+                                    title   = f'Lambda={Lambda}, k={k}, iteration={seq}')
+
+        Image.show(axis=axs[0],channels=[RED])
+
+        Image.show(axis=axs[1],channels=[BLUE,RED])
+
+        axs[1].scatter([x for x,_ in mu],[y for _,y in mu],
+                         marker = 'x',
+                         c      = XKCD[len(L)+1],
+                         s      = 10)
+
+    fig                = figure(figsize=(27,18))
+    axs                = fig.subplots(nrows = 3, ncols = 3)
     # Head up plot with image_id and labels
 
     fig.suptitle(f'{image_id}: {", ".join([Descriptions[label] for label in Training[image_id]])}')
-
     axs[0][0].set_ylabel(f'Segmentation',
                          rotation = 'horizontal',
                          labelpad = 35)
-    raw_image = Image.show(axis=axs[0,0])
-    for l in range(len(L)):
-        axs[0,0].scatter([x for x,_ in L[l]],[y for _,y in L[l]],c=XKCD[l],s=1)
-    axs[0,0].scatter([x for x,_ in mu],[y for _,y in mu],
-                     marker = 'x',
-                     c      = XKCD[k+1],
-                     s      = 10)
-    axs[0,0].set_title(f'Lambda={Lambda}, k={k}, iteration={seq}')
 
-    if min_size_for_cluster>0:
-        k,mu,L = remove_isolated_centroids(L,mu)
-    if merge_greedy:
-        k,mu,L = merge_greedy_centroids(k,L,mu)
-    mask   = SegmentationMask(Image,mu)
-    mask.save(join(segments,f'{image_id}.npy'))
+    show_clusters_and_centroids(Image,
+                                L       = L,
+                                mu      = mu,
+                                axis    = axs[0,0],
+                                colours = XKCD,
+                                title   = f'Lambda={Lambda}, k={k}, iteration={seq}')
 
-    Image.show(axis=axs[0,1])
-    for l in range(len(L)):
-        axs[0,1].scatter([x for x,_ in L[l]],[y for _,y in L[l]],c=XKCD[l],s=1)
-    axs[0,1].scatter([x for x,_ in mu],[y for _,y in mu],
-                     marker = 'x',
-                     c      = XKCD[k+1],
-                     s      = 10)
-    axs[0,1].set_title(f'{IMAGE_LEVEL_LABELS[BLUE]}: k={k}')
+    show_clusters_and_centroids(Image,
+                                L       = L2,
+                                mu      = mu2,
+                                axis    = axs[0,1],
+                                colours = XKCD,
+                                title   = f'{IMAGE_LEVEL_LABELS[BLUE]}: k={k}')
 
     # Show bounding boxes
 
@@ -715,6 +745,10 @@ if __name__=='__main__':
                         default = False,
                         action  = 'store_true',
                         help    = 'Randomize observations prior to clustering')
+    parser.add_argument('--detail',
+                        default = False,
+                        action  = 'store_true',
+                        help    = 'Show a second, more detailed, plot')
     args = parser.parse_args()
     if args.randomize:
         set_random_seed(specified_seed=args.seed)
@@ -744,7 +778,8 @@ if __name__=='__main__':
                                       segments             = args.segments,
                                       min_size_for_cluster = args.min_size_for_cluster,
                                       merge_greedy         = args.merge,
-                                      randomize            = args.randomize)
+                                      randomize            = args.randomize,
+                                      details              = args.detail)
                     print (f'Segmented {image_id},{seq}')
                     logger.log(f'{image_id},{seq}')
                 except KeyboardInterrupt:
@@ -769,7 +804,8 @@ if __name__=='__main__':
                             segments             = args.segments,
                             min_size_for_cluster = args.min_size_for_cluster,
                             merge_greedy         = args.merge,
-                            randomize            = args.randomize)
+                            randomize            = args.randomize,
+                            details              = args.detail)
 
             print (f'Segmented {args.image_id},{seq}')
             logger.log(f'{args.image_id},{seq}')

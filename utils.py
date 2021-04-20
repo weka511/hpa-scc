@@ -120,13 +120,22 @@ def set_random_seed(specified_seed=None,prefix='seed',suffix='txt'):
 # Parameters:
 #     file_name Where XKCD colours live
 #     prefix    Use to prefix each colour with "xkcd:"
+#     filter    Allows us to exclude some colours based on RGB values
 
-def create_xkcd_colours(file_name='rgb.txt', prefix='xkcd:'):
+def create_xkcd_colours(file_name = 'rgb.txt',
+                        prefix    = 'xkcd:',
+                        filter    = lambda R,G,B:True):
     with open(file_name) as colours:
         for row in colours:
-            parts = split(r'\s+#',row)
+            parts = split(r'\s+#',row.strip())
             if len(parts)>1:
-                yield f'{prefix}{parts[0]}'
+                rgb  = int(parts[1],16)
+                B    = rgb%256
+                rest = (rgb-B)//256
+                G    = rest%256
+                R    = (rest-G)//256
+                if filter(R,G,B):
+                    yield f'{prefix}{parts[0]}'
 
 # non_default_arguments
 #
