@@ -18,7 +18,7 @@
 #  Slice and segment dataset
 
 from argparse          import ArgumentParser
-from dirichlet         import Image4, SegmentationMask
+from dirichlet         import Image4, SegmentationMask, get_dist
 from hpascc            import *
 from math              import ceil
 from matplotlib.image  import imread
@@ -210,7 +210,7 @@ if __name__=='__main__':
 
         for image_id in read_worklist(args.worklist):
 
-            mask   = SegmentationMask.Load(join(args.segments,f'{image_id}.npy'))
+            mask   = SegmentationMask.Load(join(args.segments,f'{image_id}.npy'),dist=get_dist)
             Limits = mask.get_limits()
             print (image_id,len(Limits))
             if total_segments+len(Limits)*args.M > args.N:

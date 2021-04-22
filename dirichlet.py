@@ -17,6 +17,7 @@
 
 from argparse           import ArgumentParser
 from hpascc             import *
+from math               import sqrt
 from matplotlib.colors  import ListedColormap
 from matplotlib.patches import Rectangle
 from matplotlib.pyplot  import hist, show, figure, savefig, close
@@ -133,31 +134,31 @@ class SegmentationMask:
     #     file_name    File where mask has been stored
 
     @classmethod
-    def Load(cls,file_name):
-        Product               = SegmentationMask()
+    def Load(cls,file_name,dist=None):
+        Product               = SegmentationMask(dist=dist)
         Product.Mask          = load(file_name)
         Product.nx,Product.ny = Product.Mask.shape
         return Product
 
-    def __init__(self,Image=None,Centroids=[]):
-        if Image is None: return            # Used by Mask.Load() to create empty Mask
+    def __init__(self,Image=None,Centroids=[],dist=None):
+        if Image is None: return            # Used by Mask.Load(...) to create empty Mask
         self.nx    = Image.nx
         self.ny    = Image.ny
         if len(Centroids)>0:
-            self.Mask  = self.create_bit_mask(Image,Centroids)
+            self.Mask  = self.create_bit_mask(Image,Centroids,dist=dist)
 
     # create_bit_mask
     #
     # Create a mask that has the same size as image, and initialize each
     # point with the index (1-based) of the nearest centroid
 
-    def create_bit_mask(self,Image,Centroids):
+    def create_bit_mask(self,Image,Centroids,dist=None):
         Product = zeros((Image.ny,Image.ny))
         for i in range(Image.nx):
             for j in range(Image.ny):
                 max_distance = float_info.max
                 for k in range(1,1+len(Centroids)):
-                    distance = get_dist_sq((i,j),Centroids[k-1])
+                    distance = dist((i,j),Centroids[k-1])
                     if distance<max_distance:
                         Product[i,j] = k
                         max_distance = distance
@@ -256,18 +257,18 @@ def restrict(Training,Labels,multiple=False):
 
 
 
-# get_dist_sq
+# get_dist
 #
-# Compute squared Euclidean distance between two points
+# Compute  Euclidean distance between two points
 #
 # Parameters:
 #     pt0    One point
 #     pt1    T'other point
 
-def get_dist_sq(pt0,pt1):
+def get_dist(pt0,pt1):
     x0,y0 = pt0
     x1,y1 = pt1
-    return (x1-x0)**2 + (y1-y0)**2
+    return sqrt((x1-x0)**2 + (y1-y0)**2)
 
 
 # get_centroid
@@ -299,8 +300,10 @@ def get_centroid(Points):
 def DPmeans(Image,
             Lambda     = 4000,
             background = 0,
-            delta      = 64,
-            randomize  = False):
+            delta      = 8,
+            randomize  = False,
+            dist       = get_dist
+            ):
 
     # extract_one_cluster
     #
@@ -312,10 +315,10 @@ def DPmeans(Image,
     # has_converged
     #
     # Establish whether iterations have converged, i.e.: number of clusters hasn't changed since last iteration
-    # and the centroids haven't moved by a distance of mre than sqrt(delta)
+    # and the centroids haven't moved by a distance of more than delta
 
     def has_converged(mu,mu0):
-        return len(mu)==len(mu0) and all(get_dist_sq(p1,p2)<delta for p1,p2 in zip(sorted(mu),sorted(mu0)))
+        return len(mu)==len(mu0) and all(dist(p1,p2)<delta for p1,p2 in zip(sorted(mu),sorted(mu0)))
 
     # create_observations
     #
@@ -335,7 +338,7 @@ def DPmeans(Image,
 
     while True:
         for i in range(n):
-            D = [get_dist_sq(Xs[i],mu[c]) for c in range(k)]
+            D = [dist(Xs[i],mu[c]) for c in range(k)]
             c = argmin(D)
             if D[c] > Lambda:     # Create new cluster
                 Zs[i]     = k
@@ -395,7 +398,7 @@ def get_image_file_name(image_id,
 #     mu
 #     delta
 
-def merge_greedy_centroids(k,L,mu,delta=1):
+def merge_greedy_centroids(k,L,mu,delta=1,dist=get_dist):
     # binary_search
     #
     # Find the nearest match to a specified value within a sorted list
@@ -434,7 +437,7 @@ def merge_greedy_centroids(k,L,mu,delta=1):
         while i1<len(Xs) and Xs[i1]-pt[0]<delta:
             i1+=1
         for i in range(i0,i1):
-            if get_dist_sq(pt,L[i]) < delta**2: return True
+            if dist(pt,L[i]) < delta: return True
         return False
 
     # create_merges
@@ -466,7 +469,7 @@ def merge_greedy_centroids(k,L,mu,delta=1):
     def can_merge(i,j):
         mu_i  = mu[i]
         mu_j = mu[j]
-        while delta < get_dist_sq(mu_i,mu_j):
+        while delta < dist(mu_i,mu_j):
             mid = get_centroid([mu_i,mu_j])
             if found(mid,L[i]):
                 mu_i = mid
@@ -543,7 +546,8 @@ def segment(image_id             = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
             min_size_for_cluster = 0,
             merge_greedy         = False,
             randomize            = False,
-            details              = False):
+            details              = False,
+            dist                 = get_dist):
 
     Image = Image4(image_id  = image_id,
                    path      = path,
@@ -553,7 +557,8 @@ def segment(image_id             = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
                                                           Lambda     = Lambda,
                                                           background = background,
                                                           delta      = delta,
-                                                          randomize  = randomize)):
+                                                          randomize  = randomize,
+                                                          dist       = dist)):
         if converged: break
 
         if seq>N:
@@ -562,8 +567,8 @@ def segment(image_id             = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
 
 
     k1,mu1,L1 = remove_isolated_centroids(L,mu) if min_size_for_cluster>0 else (k,mu,L)
-    k2,mu2,L2 = merge_greedy_centroids(k1,L1,mu1) if merge_greedy else (k1,L1,mu1)
-    mask      = SegmentationMask(Image,mu)
+    k2,mu2,L2 = merge_greedy_centroids(k1,L1,mu1,dist=dist) if merge_greedy else (k1,L1,mu1)
+    mask      = SegmentationMask(Image,mu,dist=dist)
     mask.save(join(segments,f'{image_id}.npy'))
 
     if details:
@@ -639,17 +644,17 @@ def segment(image_id             = '5c27f04c-bb99-11e8-b2b9-ac1f6b6435d0',
 
     # Show distribution of protein vs each other filter
 
-    voronoi = Voronoi(mu)
+    # voronoi = Voronoi(mu)
     axs[2][0].set_ylabel(f'{IMAGE_LEVEL_LABELS[GREEN]}+',
                          rotation = 'horizontal',
                          labelpad = 40)
     for channel,ax in zip([RED,YELLOW,BLUE],
                           [axs[2,0],axs[2,1],axs[2,2]]):
-        voronoi_plot_2d(voronoi,
-                        ax            = ax,
-                        show_vertices = False,
-                        show_points   = False,
-                        line_colors   = 'orange')
+        # voronoi_plot_2d(voronoi,
+                        # ax            = ax,
+                        # show_vertices = False,
+                        # show_points   = False,
+                        # line_colors   = 'orange')
         Image.show(axis     = ax,
                    channels = [channel,GREEN],
                    actuals  = [BLUE,RED])
